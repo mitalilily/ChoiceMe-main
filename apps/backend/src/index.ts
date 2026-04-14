@@ -9,10 +9,10 @@ const env = process.env.NODE_ENV || 'development'
 console.log('node env', env)
 
 // Load correct .env file
-dotenv.config({ path: path.resolve(__dirname, `../.env.${env}`) })
+dotenv.config()
 
 // Render provides PORT as a string env var, so coerce it to a real TCP port number.
-const PORT = Number(process.env.PORT) || 5002
+const PORT = process.env.PORT || 5002
 
 // Test database connection before starting server
 async function startServer() {
