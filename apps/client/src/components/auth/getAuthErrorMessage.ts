@@ -37,6 +37,7 @@ export const getAuthErrorMessage = (err: unknown, fallback: string) => {
   const isNetwork = errObj.code === 'ERR_NETWORK' || !errObj.response
   if (!isNetwork) return message
 
-  const base = import.meta.env.VITE_API_URL || 'https://choicemee-backend.onrender.com/api'
+  const base =
+    import.meta.env.VITE_API_URL || 'https://choiceme-backend-production.up.railway.app/api'
   return `Cannot reach API (${base}). Start backend or set VITE_API_URL.`
 }

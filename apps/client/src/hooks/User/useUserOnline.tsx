@@ -1,6 +1,6 @@
 import { io, type Socket } from 'socket.io-client'
 
-const DEFAULT_SOCKET_URL = 'https://choicemee-backend.onrender.com'
+const DEFAULT_SOCKET_URL = 'https://choiceme-backend-production.up.railway.app'
 
 const getSocketUrl = () => {
   const rawSocketUrl = import.meta.env.VITE_APP_SOCKET_URL
@@ -10,10 +10,13 @@ const getSocketUrl = () => {
 
     const candidate = new URL(rawSocketUrl, window.location.origin)
     const currentHost = window.location.hostname
-    const isNetlifyPreview = currentHost.endsWith('netlify.app')
+    const isHostedFrontend =
+      currentHost.endsWith('netlify.app') ||
+      currentHost.endsWith('vercel.app') ||
+      currentHost.endsWith('up.railway.app')
     const pointsBackToFrontend = candidate.hostname === currentHost
 
-    if (isNetlifyPreview && pointsBackToFrontend) {
+    if (isHostedFrontend && pointsBackToFrontend) {
       return DEFAULT_SOCKET_URL
     }
 

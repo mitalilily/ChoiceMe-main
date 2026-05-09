@@ -3,7 +3,7 @@ import axios from 'axios'
 import { clearAuthTokens, getAuthTokens, setAuthTokens } from './tokenVault'
 
 const RAW_API_BASE_URL = import.meta.env.VITE_API_URL
-const DEFAULT_API_BASE_URL = 'https://choicemee-backend.onrender.com/api'
+const DEFAULT_API_BASE_URL = 'https://choiceme-backend-production.up.railway.app/api'
 
 const getApiBaseUrl = () => {
   const fallback = DEFAULT_API_BASE_URL.replace(/\/+$/, '')
@@ -15,7 +15,8 @@ const getApiBaseUrl = () => {
     const currentHost = window.location.hostname
     const isHostedFrontend =
       currentHost.endsWith('netlify.app') ||
-      currentHost.endsWith('vercel.app')
+      currentHost.endsWith('vercel.app') ||
+      currentHost.endsWith('up.railway.app')
     const isLocalhost =
       currentHost === 'localhost' ||
       currentHost === '127.0.0.1' ||

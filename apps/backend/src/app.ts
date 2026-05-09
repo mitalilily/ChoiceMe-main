@@ -92,10 +92,12 @@ const localOrigins = [
   'http://127.0.0.1:3001',
   'http://localhost:4173',
   'http://127.0.0.1:4173',
-  'https://admin.choicemee.com',
-  'https://app.choicemee.com',
-  'https://choicemee.com',
-  'https://www.choicemee.com',
+  'https://choiceme-admin-production.up.railway.app',
+  'https://choiceme-client-production.up.railway.app',
+  'https://admin.choiceme.com',
+  'https://app.choiceme.com',
+  'https://choiceme.com',
+  'https://www.choiceme.com',
 ]
 const configuredAllowedOrigins = `${process.env.CORS_ALLOWED_ORIGINS || ''},${process.env.CORS_ORIGINS || ''}`
   .split(',')
@@ -112,7 +114,7 @@ const isAllowedOrigin = (origin: string) => {
     return true
   }
 
-  return /^https:\/\/([a-z0-9-]+\.)*choicemee\.com$/.test(normalizedOrigin)
+  return /^https:\/\/([a-z0-9-]+\.)*choiceme\.com$/.test(normalizedOrigin)
 }
 
 app.use(
@@ -137,14 +139,14 @@ app.use(
 app.get('/', (_req, res) => {
   res.status(200).json({
     ok: true,
-    service: 'ChoiceMee Logistics backend',
+    service: 'ChoiceMe Logistics backend',
   })
 })
 
 app.get('/health', (_req, res) => {
   res.status(200).json({
     ok: true,
-    service: 'ChoiceMee Logistics backend',
+    service: 'ChoiceMe Logistics backend',
   })
 })
 

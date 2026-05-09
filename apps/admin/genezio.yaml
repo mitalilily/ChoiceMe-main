@@ -1,4 +1,4 @@
-name: choicemee-admin-dashboard
+name: choiceme-admin-dashboard
 region: us-east-1
 frontend:
   # Specifies the path of your code.

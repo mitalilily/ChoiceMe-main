@@ -1,6 +1,6 @@
-# ChoiceMee Main
+# ChoiceMe Main
 
-Monorepo for the ChoiceMee Logistics admin dashboard, client portal, and backend API.
+Monorepo for the ChoiceMe admin dashboard, client portal, and backend API.
 
 ## Repository Layout
 
@@ -18,6 +18,6 @@ Monorepo for the ChoiceMee Logistics admin dashboard, client portal, and backend
 
 - Netlify admin: root `apps/admin`, build `npm run build:netlify`, publish `build`, Node `20`, `NPM_FLAGS=--legacy-peer-deps`.
 - Netlify client: root `apps/client`, build `npm run build:netlify`, publish `dist`, Node `20`.
-- Render backend: root `apps/backend`, or deploy with the root `render.yaml`.
+- Railway backend: root `apps/backend`, build `npm install && npm run build`, start `npm start`.
 
 Keep production environment variables and secrets in the hosting providers. Do not commit `.env` files.

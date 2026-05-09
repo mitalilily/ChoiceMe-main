@@ -29,7 +29,10 @@ async function startServer() {
   server.timeout = 210000 // 3.5 minutes
 
   server.listen(PORT, '0.0.0.0', () => {
-    const url = env === 'production' ? `https://api.choicemee.com` : `http://localhost:${PORT}`
+    const url =
+      env === 'production'
+        ? process.env.API_URL || 'https://choiceme-backend-production.up.railway.app'
+        : `http://localhost:${PORT}`
     console.log(`🚀 Server running on port ${PORT} in ${env} mode at ${url}`)
   })
 }
