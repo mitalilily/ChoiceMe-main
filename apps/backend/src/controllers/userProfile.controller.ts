@@ -58,11 +58,15 @@ export const requestEmailVerificationOtp = async (
   const { updatedEmail } = req.body;
 
   try {
-    await requestProfileEmailVerificationOTP(userId, updatedEmail);
+    const result = await requestProfileEmailVerificationOTP(userId, updatedEmail);
     /* Service succeeded */
-    return res
-      .status(201)
-      .json({ message: "Verification e‑mail sent", email: updatedEmail });
+    return res.status(201).json({
+      message: result.delivered
+        ? "Verification email sent"
+        : "Verification email code generated",
+      email: result.email,
+      ...(result.otp ? { otp: result.otp } : {}),
+    });
   } catch (err) {
     if (err instanceof HttpError) {
       return res.status(err.statusCode).json({ message: err.message });
@@ -102,11 +106,15 @@ export const requestPhoneVerificationOtp = async (
   const { updatedPhone } = req.body;
 
   try {
-    await requestProfilePhoneVerificationOTP(userId, updatedPhone);
+    const result = await requestProfilePhoneVerificationOTP(userId, updatedPhone);
     /* Service succeeded */
-    return res
-      .status(201)
-      .json({ message: "Verification otp sent", phone: updatedPhone });
+    return res.status(201).json({
+      message: result.delivered
+        ? "Verification otp sent"
+        : "Verification otp generated",
+      phone: result.phone,
+      ...(result.otp ? { otp: result.otp } : {}),
+    });
   } catch (err) {
     if (err instanceof HttpError) {
       return res.status(err.statusCode).json({ message: err.message });

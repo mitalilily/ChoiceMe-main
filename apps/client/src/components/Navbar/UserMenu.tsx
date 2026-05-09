@@ -162,7 +162,7 @@ const UserMenu = () => {
           }}
         >
           <Typography sx={{ fontSize: '0.92rem', fontWeight: 900, color: TEXT }} noWrap>
-            {user?.companyInfo?.contactPerson || user?.name || 'ChoiceMee User'}
+            {user?.companyInfo?.contactPerson || user?.name || 'ChoiceMe User'}
           </Typography>
           <Typography sx={{ mt: 0.3, fontSize: '0.76rem', fontWeight: 600, color: TEXT_SECONDARY }} noWrap>
             {user?.companyInfo?.contactEmail || user?.email}

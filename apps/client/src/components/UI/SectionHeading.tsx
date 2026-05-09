@@ -48,7 +48,7 @@ const SectionHeading: React.FC<SectionHeadingProps> = ({
               letterSpacing: '0.16em',
             }}
           >
-            ChoiceMee workflow
+            ChoiceMe workflow
           </Typography>
           <Typography
             variant="h3"

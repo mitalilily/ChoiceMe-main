@@ -53,7 +53,7 @@ const CarrierLogos: React.FC = () => {
             fontSize: '0.95rem',
           }}
         >
-          Connected carriers and commerce brands moving inside one ChoiceMee shipping flow.
+          Connected carriers and commerce brands moving inside one ChoiceMe shipping flow.
         </Typography>
       </Stack>
 

@@ -26,7 +26,7 @@ function Profile() {
         backgroundProfile={bgProfile}
         avatarImage={avatar4}
         name={"Esthera Jackson"}
-        email={"ops@choicemee.com"}
+        email={"ops@choiceme.com"}
         tabs={[
           {
             name: "OVERVIEW",
@@ -55,7 +55,7 @@ function Profile() {
           }
           name={"Esthera Jackson"}
           mobile={"(44) 123 1234 123"}
-          email={"ops@choicemee.com"}
+          email={"ops@choiceme.com"}
           location={"United States"}
         />
         <Conversations title={"Conversations"} />

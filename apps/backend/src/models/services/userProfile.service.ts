@@ -3,7 +3,7 @@ import { generateOtp } from '../../controllers/authController'
 import { CompanyInfo, IUserProfileDB } from '../../types/profileBlocks.types'
 import { HttpError } from '../../utils/classes'
 import { OTP_EXPIRY } from '../../utils/constants'
-import { sendVerificationEmail } from '../../utils/emailSender'
+import { isEmailDeliveryConfigured, logAuthCode, sendVerificationEmail } from '../../utils/emailSender'
 import {
   buildPatch,
   compare,
@@ -228,7 +228,7 @@ export const updateUserProfileService = async (userId: string, data: Record<stri
 export const requestProfileEmailVerificationOTP = async (
   userId: string,
   updatedEmail?: string,
-): Promise<void> => {
+): Promise<{ delivered: boolean; email: string; otp?: string }> => {
   /* 1️⃣ Fetch profile */
   const [profile] = await db
     .select()
@@ -272,8 +272,14 @@ export const requestProfileEmailVerificationOTP = async (
     })
     .where(eq(users.id, userId))
 
-  /* 5️⃣ Send the code */
-  await sendVerificationEmail(target, otp)
+  /* 5️⃣ Send or expose the code */
+  if (isEmailDeliveryConfigured()) {
+    await sendVerificationEmail(target, otp)
+    return { delivered: true, email: target }
+  }
+
+  logAuthCode({ purpose: 'profile-email-verification', to: target, code: otp })
+  return { delivered: false, email: target, otp }
 }
 
 export const verifyProfileEmailOTP = async (
@@ -364,7 +370,7 @@ export const verifyProfilePhoneOTP = async (
 
   const companyInfoWithPhone = sql`jsonb_set(
   ${userProfiles.companyInfo},
-  '{contactPhone}',
+  '{contactNumber}',
   ${JSON.stringify(phone)}::jsonb,
   true
 )`
@@ -411,7 +417,7 @@ export const verifyProfilePhoneOTP = async (
 export const requestProfilePhoneVerificationOTP = async (
   userId: string,
   updatedPhone?: string,
-): Promise<void> => {
+): Promise<{ delivered: boolean; phone: string; otp?: string }> => {
   /* ───────────────── 1️⃣  Fetch current profile ───────────────── */
   const [profile] = await db
     .select()
@@ -468,9 +474,17 @@ export const requestProfilePhoneVerificationOTP = async (
 
   /* ───────────────── 6️⃣  Send OTP via email (instead of SMS) ────── */
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
-  if (user?.email) {
+  if (user?.email && isEmailDeliveryConfigured()) {
     await sendVerificationEmail(user.email, otp)
+    return { delivered: true, phone: parsed.national }
   }
+
+  logAuthCode({
+    purpose: 'profile-phone-verification',
+    to: user?.email || `${parsed.national}@console.local`,
+    code: otp,
+  })
+  return { delivered: false, phone: parsed.national, otp }
 }
 
 export async function changePassword(

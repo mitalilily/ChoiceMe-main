@@ -488,7 +488,7 @@ export const syncShopifyStatusForLocalOrder = async (order: any, tx: any = db) =
         if (trackingNumber) {
           fulfillmentPayload.fulfillment.tracking_info = {
             number: trackingNumber,
-            company: String(order?.courier_partner || 'ChoiceMee').slice(0, 255),
+            company: String(order?.courier_partner || 'ChoiceMe').slice(0, 255),
           }
         }
 

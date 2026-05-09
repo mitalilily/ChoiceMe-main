@@ -74,8 +74,8 @@ export default function UserOnboarding() {
           userData?.companyInfo?.contactPerson?.split(' ')?.slice(1).join(' ') ||
           prefill?.lastName ||
           '',
-        email: userData?.companyInfo?.contactEmail ?? '',
-        phone: userData?.companyInfo?.contactNumber ?? '',
+        email: userData?.companyInfo?.contactEmail || userData?.email || '',
+        phone: userData?.companyInfo?.contactNumber || (userData as any)?.phone || '',
         companyName: userData?.companyInfo?.businessName ?? '',
         pincode: userData?.companyInfo?.pincode ?? '',
         state: userData?.companyInfo?.state ?? '',
@@ -173,7 +173,7 @@ export default function UserOnboarding() {
           variant="h6"
           sx={{ fontWeight: 900, color: DE_BLUE, letterSpacing: -0.5, fontSize: '1.4rem' }}
         >
-          ChoiceMee Seller Panel
+          ChoiceMe Seller Panel
         </Typography>
         <SwitchAccountButton />
       </Stack>
@@ -308,7 +308,7 @@ export default function UserOnboarding() {
                 mb: 0.75,
               }}
             >
-              ChoiceMee onboarding
+              ChoiceMe onboarding
             </Typography>
             <Typography
               sx={{ fontSize: { xs: '1.35rem', md: '1.8rem' }, fontWeight: 900, color: DE_BLUE }}

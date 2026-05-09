@@ -110,7 +110,7 @@ const DEFAULT_LABEL_SETTINGS = {
     deadWeight: false,
     otherCharges: true,
   },
-  powered_by: 'ChoiceMee',
+  powered_by: 'ChoiceMe',
 }
 
 function mergeSettings(prefs: any) {
@@ -169,10 +169,10 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
   }
 
   const adminPrefs = await getAdminInvoicePreferences()
-  // Always show ChoiceMee platform logo (Powered by ...)
+  // Always show ChoiceMe platform logo (Powered by ...)
   let platformLogoBase64: string | null = null
   try {
-    const platformLogoKey = adminPrefs?.logoFile ?? 'choicemee-logistics-logo.png'
+    const platformLogoKey = adminPrefs?.logoFile ?? 'choiceme-logo.png'
     const logoUrl = await presignDownload(platformLogoKey)
     const finalUrl = Array.isArray(logoUrl) ? logoUrl[0] : logoUrl
     if (finalUrl) {

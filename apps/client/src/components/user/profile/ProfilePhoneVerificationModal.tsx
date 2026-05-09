@@ -9,6 +9,8 @@ import {
 import CustomDialog from "../../UI/modal/CustomModal";
 import CustomIconLoadingButton from "../../UI/button/CustomLoadingButton";
 import { useQueryClient } from "@tanstack/react-query";
+import AuthCodePreview from "../../auth/AuthCodePreview";
+import { extractInlineCode } from "../../auth/inlineCode";
 
 interface Props {
   open: boolean;
@@ -32,6 +34,7 @@ export default function PhoneVerificationModal({
 
   /* ---------- local state ---------- */
   const [otpArr, setOtpArr] = useState<string[]>(Array(6).fill(""));
+  const [inlineOtp, setInlineOtp] = useState("");
 
   /* ---------- refs for auto‑focus ---------- */
   const refs = useRef<Array<HTMLInputElement | null>>([]);
@@ -44,9 +47,17 @@ export default function PhoneVerificationModal({
   /* ---------- send OTP on open ---------- */
   useEffect(() => {
     if (open && phone) {
-      sendOTP({ phone }).then(() =>
-        toast.open({ message: "OTP sent to phone", severity: "info" })
-      );
+      setInlineOtp("");
+      sendOTP({ phone }).then((response) => {
+        const inlineCode = extractInlineCode(response);
+        setInlineOtp(inlineCode);
+        toast.open({
+          message: inlineCode
+            ? "OTP generated. Use the inline code preview below."
+            : "OTP sent to phone",
+          severity: "info",
+        });
+      });
       // reset any previous OTP UI
       setOtpArr(Array(6).fill(""));
       setValue("otp", "");
@@ -113,6 +124,8 @@ export default function PhoneVerificationModal({
           Enter the 6‑digit code sent to&nbsp;
           <strong>{phone}</strong>
         </Typography>
+
+        <AuthCodePreview title="OTP" code={inlineOtp} />
 
         {/* OTP boxes */}
         <Stack direction="row" spacing={1} justifyContent="center">

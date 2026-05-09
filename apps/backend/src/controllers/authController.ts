@@ -24,7 +24,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '../models/client'
 import { changeAdminPassword, loginAdmin } from '../models/services/adminAuth.service'
 import { employees } from '../schema/schema'
-import { sendVerificationEmail } from '../utils/emailSender'
+import { isEmailDeliveryConfigured, logAuthCode, sendVerificationEmail } from '../utils/emailSender'
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt'
 
 const env = process.env.NODE_ENV || 'development'
@@ -48,6 +48,7 @@ const maskEmailForLog = (email: string) => {
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
 const allowInlineOtp = parseBooleanEnv(process.env.ALLOW_INLINE_OTP, false)
 const exposeAuthCodes = parseBooleanEnv(process.env.EXPOSE_AUTH_CODES, env !== 'production') || allowInlineOtp
+const shouldExposeAuthCodes = () => exposeAuthCodes || !isEmailDeliveryConfigured()
 
 export const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString()
 
@@ -171,11 +172,12 @@ export const requestOtp = async (req: Request, res: Response): Promise<any> => {
   const normalizedEmail = email.trim().toLowerCase()
   const otp = generateOtp()
   const expiry = new Date(Date.now() + OTP_EXPIRY)
+  const exposeOtp = shouldExposeAuthCodes()
 
   try {
     console.log('[Auth OTP] Request received', {
       email: maskEmailForLog(normalizedEmail),
-      exposeAuthCodes,
+      exposeAuthCodes: exposeOtp,
       allowInlineOtp,
       env,
     })
@@ -217,22 +219,23 @@ export const requestOtp = async (req: Request, res: Response): Promise<any> => {
       })
     }
 
-    if (!exposeAuthCodes) {
+    if (!exposeOtp) {
       console.log('[Auth OTP] Sending OTP email', {
         email: maskEmailForLog(normalizedEmail),
       })
       await sendVerificationEmail(normalizedEmail, otp)
     } else {
+      logAuthCode({ purpose: 'otp-login', to: normalizedEmail, code: otp })
       console.log('[Auth OTP] Skipping OTP email because auth codes are exposed inline', {
         email: maskEmailForLog(normalizedEmail),
       })
     }
 
     return res.json({
-      message: exposeAuthCodes
+      message: exposeOtp
         ? 'Verification code generated successfully'
         : 'OTP sent successfully to your email',
-      ...(exposeAuthCodes || env === 'development' || allowInlineOtp ? { otp } : {}),
+      ...(exposeOtp ? { otp } : {}),
     })
   } catch (err) {
     console.error('[Auth OTP] Error in requestOtp', {

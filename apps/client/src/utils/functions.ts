@@ -34,8 +34,6 @@ export const validateOnboardingFields = (
   if (step === 1) {
     const {
       firstName,
-      state,
-      city,
       lastName,
       companyName,
       email,
@@ -66,10 +64,8 @@ export const validateOnboardingFields = (
     } else if (!/^\d{10}$/.test(phone.replace(/\D/g, ""))) {
       errors.basicInfo.phone = "Enter a valid 10-digit phone number";
     }
-    if (pincode && (!state || !city)) {
-      errors.basicInfo.pincode =
-        "Location not found. Maybe check your pincode?";
-    }
+    // Pincode lookup is helpful, but it should not block onboarding when
+    // the external postal API is slow or unavailable.
   }
 
   // Step 2: Business Legal

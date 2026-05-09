@@ -1,9 +1,9 @@
 {
-  "short_name": "ChoiceMee Admin",
-  "name": "ChoiceMee Logistics Admin",
+  "short_name": "ChoiceMe Admin",
+  "name": "ChoiceMe Logistics Admin",
   "icons": [
     {
-      "src": "brand/choicemee-logistics-logo.png",
+      "src": "brand/choiceme-logo.png",
       "sizes": "788x546",
       "type": "image/png"
     }

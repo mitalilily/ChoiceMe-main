@@ -11,7 +11,12 @@ import * as schema from '../../schema/schema'
 import { CompanyInfo } from '../../types/profileBlocks.types'
 import { IUser } from '../../types/users.types'
 import { OTP_EXPIRY } from '../../utils/constants'
-import { sendTempPasswordEmail, sendVerificationEmail } from '../../utils/emailSender'
+import {
+  isEmailDeliveryConfigured,
+  logAuthCode,
+  sendTempPasswordEmail,
+  sendVerificationEmail,
+} from '../../utils/emailSender'
 import { generate8DigitsVerificationToken } from '../../utils/functions'
 import { stores } from '../schema/stores'
 
@@ -34,6 +39,7 @@ const maskEmailForLog = (email: string) => {
   return `${visibleLocal}@${domain}`
 }
 const exposeAuthCodes = parseBooleanEnv(process.env.EXPOSE_AUTH_CODES, env !== 'production')
+const shouldExposeAuthCodes = () => exposeAuthCodes || !isEmailDeliveryConfigured()
 
 // Define User and NewUser types for convenience
 export type User = typeof users.$inferSelect
@@ -390,6 +396,7 @@ export const handleEmailVerificationRequest = async (
     const token = generate8DigitsVerificationToken()
     const expiresAt = new Date(Date.now() + OTP_EXPIRY)
     let shouldSendEmail = false
+    const exposeCode = shouldExposeAuthCodes()
 
     const user = await findUserByEmail(normalizedEmail, tx)
 
@@ -475,13 +482,14 @@ export const handleEmailVerificationRequest = async (
       await updateUserVerificationToken(normalizedEmail, token, expiresAt, tx)
       shouldSendEmail = true
 
-      if (shouldSendEmail && !exposeAuthCodes) {
+      if (shouldSendEmail && !exposeCode) {
         console.log('[Auth Email Verification] Sending verification email', {
           email: maskEmailForLog(normalizedEmail),
           existingUser: true,
         })
         await sendVerificationEmail(normalizedEmail, token)
       } else if (shouldSendEmail) {
+        logAuthCode({ purpose: 'password-login-verification', to: normalizedEmail, code: token })
         console.log('[Auth Email Verification] Skipping verification email because auth codes are exposed inline', {
           email: maskEmailForLog(normalizedEmail),
           existingUser: true,
@@ -491,10 +499,10 @@ export const handleEmailVerificationRequest = async (
       return {
         status: 200,
         data: {
-          message: exposeAuthCodes
+          message: exposeCode
             ? 'Verification code generated'
             : 'Verification email sent',
-          ...(exposeAuthCodes ? { verificationToken: token } : {}),
+          ...(exposeCode ? { verificationToken: token } : {}),
         },
       }
     }
@@ -530,13 +538,14 @@ export const handleEmailVerificationRequest = async (
 
     shouldSendEmail = true
 
-    if (shouldSendEmail && !exposeAuthCodes) {
+    if (shouldSendEmail && !exposeCode) {
       console.log('[Auth Email Verification] Sending verification email', {
         email: maskEmailForLog(normalizedEmail),
         existingUser: false,
       })
       await sendVerificationEmail(normalizedEmail, token)
     } else if (shouldSendEmail) {
+      logAuthCode({ purpose: 'signup-email-verification', to: normalizedEmail, code: token })
       console.log('[Auth Email Verification] Skipping verification email because auth codes are exposed inline', {
         email: maskEmailForLog(normalizedEmail),
         existingUser: false,
@@ -546,8 +555,8 @@ export const handleEmailVerificationRequest = async (
     return {
       status: 201,
       data: {
-        message: exposeAuthCodes ? 'Verification code generated' : 'Verification email sent',
-        ...(exposeAuthCodes ? { verificationToken: token } : {}),
+        message: exposeCode ? 'Verification code generated' : 'Verification email sent',
+        ...(exposeCode ? { verificationToken: token } : {}),
       },
     }
   })
@@ -620,7 +629,7 @@ export async function createUserWithWallet(data: Partial<IUser>, txn: any = db) 
       printer_type: 'thermal',
       char_limit: 25,
       max_items: 3,
-      powered_by: 'ChoiceMee',
+      powered_by: 'ChoiceMe',
       order_info: {
         orderId: true,
         invoiceNumber: true,

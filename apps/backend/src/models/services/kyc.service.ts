@@ -37,6 +37,8 @@ export const UpdateKYCDetails = async (userId: string, details: KycDetails): Pro
     throw new HttpError(400, `Missing required fields for ${structure}: ${missing.join(', ')}`)
   }
 
+  const hasRequiredDocumentFields = Object.values(requiredFieldsMap).some(Boolean)
+  const nextStatus = hasRequiredDocumentFields ? 'verification_in_progress' : 'verified'
   const now = new Date()
 
   await db.transaction(async (tx) => {
@@ -51,7 +53,7 @@ export const UpdateKYCDetails = async (userId: string, details: KycDetails): Pro
       structure,
       companyType,
       updatedAt: now,
-      status: 'verification_in_progress',
+      status: nextStatus,
     }
 
     const docFields: (keyof KycDetails)[] = [
@@ -123,7 +125,14 @@ export const UpdateKYCDetails = async (userId: string, details: KycDetails): Pro
       (k) => !['structure', 'companyType', 'updatedAt', 'status'].includes(k),
     )
 
-    if (existingKyc && changedKeys.length > 0) {
+    const shouldUpdateExisting =
+      existingKyc &&
+      (changedKeys.length > 0 ||
+        existingKyc.structure !== structure ||
+        existingKyc.companyType !== companyType ||
+        existingKyc.status !== nextStatus)
+
+    if (shouldUpdateExisting) {
       await tx.update(kyc).set(kycPayload).where(eq(kyc.userId, userId)).execute()
     } else if (!existingKyc) {
       await tx
@@ -141,7 +150,7 @@ export const UpdateKYCDetails = async (userId: string, details: KycDetails): Pro
       .update(userProfiles)
       .set({
         domesticKyc: {
-          status: 'verification_in_progress',
+          status: nextStatus,
           updatedAt: now,
         },
       })

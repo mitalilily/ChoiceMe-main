@@ -19,7 +19,7 @@ export default function Login() {
     <AuthShell
       eyebrow="Portal Login"
       title="Book, track, and manage every shipment in one place."
-      subtitle="Access the ChoiceMee courier portal to compare rates, follow deliveries, and keep your shipping operations moving without delays."
+      subtitle="Access the ChoiceMe courier portal to compare rates, follow deliveries, and keep your shipping operations moving without delays."
       helperTitle="Faster courier access"
       helperText="Sign in to reach your shipment dashboard, courier tools, and live tracking flow from a single screen."
       showChrome
@@ -66,7 +66,7 @@ export default function Login() {
         {mode === 'otp' ? <OtpLoginPanel /> : <CredentialAuthForm mode="login" />}
 
         <Typography sx={{ color: brand.inkSoft, textAlign: 'center', fontSize: '0.88rem' }}>
-          New to ChoiceMee?{' '}
+          New to ChoiceMe?{' '}
           <Box component={RouterLink} to="/signup" sx={{ color: brand.ink, fontWeight: 700 }}>
             Create an account
           </Box>

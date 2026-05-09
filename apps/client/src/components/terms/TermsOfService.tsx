@@ -14,18 +14,18 @@ const TermsOfService = () => {
           other information needed in order to complete the signup process.
         </li>
         <li>
-          You are responsible for keeping your password secure. ChoiceMee Logistics cannot and will not be
+          You are responsible for keeping your password secure. ChoiceMe Logistics cannot and will not be
           liable for any loss or damage from your failure to maintain the security of your account
           and password.
         </li>
         <li>
-          You may not use the ChoiceMee Logistics service for any illegal or unauthorized purpose nor may
+          You may not use the ChoiceMe Logistics service for any illegal or unauthorized purpose nor may
           you violate any laws in your jurisdiction (including copyright laws) as well as the laws
           of India.
         </li>
         <li>
           You are responsible for all activity and content (data, graphics, photos, links) uploaded
-          under your ChoiceMee Logistics account.
+          under your ChoiceMe Logistics account.
         </li>
         <li>You must not transmit any worms or viruses or any code of a destructive nature.</li>
         <li>
@@ -41,7 +41,7 @@ const TermsOfService = () => {
       <ul>
         <li>
           You must read, agree with, and accept all terms and conditions contained in this User
-          Agreement and the Privacy Policy before becoming a member of ChoiceMee Logistics.
+          Agreement and the Privacy Policy before becoming a member of ChoiceMe Logistics.
         </li>
         <li>
           We reserve the right to modify or terminate the Service for any reason, without notice at
@@ -53,11 +53,11 @@ const TermsOfService = () => {
           “as available” basis without any warranty or condition.
         </li>
         <li>
-          ChoiceMee Logistics does not warrant that the service will be uninterrupted, timely, secure, or
+          ChoiceMe Logistics does not warrant that the service will be uninterrupted, timely, secure, or
           error-free.
         </li>
         <li>
-          ChoiceMee Logistics does not warrant that the results obtained from the use of the service will
+          ChoiceMe Logistics does not warrant that the results obtained from the use of the service will
           be accurate or reliable.
         </li>
         <li>
@@ -69,7 +69,7 @@ const TermsOfService = () => {
           Terms of Service.
         </li>
         <li>
-          ChoiceMee Logistics shall not be liable for any direct, indirect, incidental, special, or
+          ChoiceMe Logistics shall not be liable for any direct, indirect, incidental, special, or
           consequential damages.
         </li>
         <li>
@@ -85,16 +85,16 @@ const TermsOfService = () => {
           We do not claim intellectual property rights over your material uploaded to the Service.
         </li>
         <li>
-          By uploading content, you agree to allow other users to view and ChoiceMee Logistics to store and
+          By uploading content, you agree to allow other users to view and ChoiceMe Logistics to store and
           review it.
         </li>
         <li>Failure to exercise any right does not constitute a waiver of that right.</li>
-        <li>The Terms of Service constitute the entire agreement between you and ChoiceMee Logistics.</li>
-        <li>You shall not purchase keywords or domains infringing on ChoiceMee Logistics trademarks.</li>
-        <li>ChoiceMee Logistics may refuse or remove any content at its discretion.</li>
+        <li>The Terms of Service constitute the entire agreement between you and ChoiceMe Logistics.</li>
+        <li>You shall not purchase keywords or domains infringing on ChoiceMe Logistics trademarks.</li>
+        <li>ChoiceMe Logistics may refuse or remove any content at its discretion.</li>
         <li>
           Questions about Terms of Service should be sent to{' '}
-          <Link href="mailto:ops@choicemee.com">ops@choicemee.com</Link>
+          <Link href="mailto:ops@choiceme.com">ops@choiceme.com</Link>
         </li>
       </ul>
 
@@ -112,7 +112,7 @@ const TermsOfService = () => {
           the online store.
         </li>
         <li>All fees are exclusive of applicable taxes, fees, or charges.</li>
-        <li>ChoiceMee Logistics does not provide refunds.</li>
+        <li>ChoiceMe Logistics does not provide refunds.</li>
       </ul>
 
       {/* Cancellation and Termination */}
@@ -134,9 +134,9 @@ const TermsOfService = () => {
       </Typography>
       <ul>
         <li>Prices may change with 14 days’ notice via posting on the site or announcement.</li>
-        <li>ChoiceMee Logistics reserves the right to modify or discontinue the Service at any time.</li>
+        <li>ChoiceMe Logistics reserves the right to modify or discontinue the Service at any time.</li>
         <li>
-          ChoiceMee Logistics shall not be liable for any modification, price change, suspension, or
+          ChoiceMe Logistics shall not be liable for any modification, price change, suspension, or
           discontinuance.
         </li>
       </ul>
@@ -151,7 +151,7 @@ const TermsOfService = () => {
           restricted items.
         </li>
         <li>
-          ChoiceMee Logistics does not permit hosting of the following:
+          ChoiceMe Logistics does not permit hosting of the following:
           <ul>
             <li>
               “Securities” including shares, bonds, debentures, or other financial instruments.

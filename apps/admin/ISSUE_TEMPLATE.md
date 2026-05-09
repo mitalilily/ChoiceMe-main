@@ -1,6 +1,6 @@
 ## Summary
 
-Describe the issue clearly and include the affected ChoiceMee Logistics area.
+Describe the issue clearly and include the affected ChoiceMe Logistics area.
 
 ## Steps To Reproduce
 

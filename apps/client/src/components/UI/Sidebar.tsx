@@ -444,7 +444,7 @@ export default function Sidebar({ role = 'customer', pinned, hovered, setHovered
                 Seller panel
               </Typography>
               <Typography sx={{ fontWeight: 800, fontSize: '0.96rem', lineHeight: 1.1 }}>
-                ChoiceMee workspace
+                ChoiceMe workspace
               </Typography>
             </Box>
           )}

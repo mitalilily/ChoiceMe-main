@@ -77,11 +77,11 @@ export function RollingVanScene({ compact = false }: { compact?: boolean }) {
       >
         <svg viewBox="0 0 360 210" width="100%" height={compact ? 152 : 174} role="img" aria-label="Animated delivery van">
           <defs>
-            <linearGradient id="choicemee-van-body" x1="0%" x2="100%" y1="0%" y2="100%">
+            <linearGradient id="choiceme-van-body" x1="0%" x2="100%" y1="0%" y2="100%">
               <stop offset="0%" stopColor="#4A3C34" />
               <stop offset="100%" stopColor="#171310" />
             </linearGradient>
-            <linearGradient id="choicemee-van-cargo" x1="0%" x2="100%" y1="0%" y2="100%">
+            <linearGradient id="choiceme-van-cargo" x1="0%" x2="100%" y1="0%" y2="100%">
               <stop offset="0%" stopColor="#EAA972" />
               <stop offset="100%" stopColor="#D97943" />
             </linearGradient>
@@ -104,11 +104,11 @@ export function RollingVanScene({ compact = false }: { compact?: boolean }) {
           >
             <path
               d="M88 122h122c7 0 13 6 13 13v17H64v-10c0-11 9-20 20-20h4z"
-              fill="url(#choicemee-van-cargo)"
+              fill="url(#choiceme-van-cargo)"
             />
             <path
               d="M217 110h44c13 0 21 7 28 20l18 22h17v-1c0-16-12-29-28-29h-6l-10-15c-5-7-13-11-21-11h-42z"
-              fill="url(#choicemee-van-body)"
+              fill="url(#choiceme-van-body)"
             />
             <rect x="116" y="128" width="84" height="16" rx="8" fill={alpha('#ffffff', 0.18)} />
             <path

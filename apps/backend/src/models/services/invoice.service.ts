@@ -225,10 +225,10 @@ export const generateInvoicePDF = async (invoice: InvoiceData): Promise<Buffer> 
 
   const adminPrefs = await getAdminInvoicePreferences()
 
-  // Platform (ChoiceMee) logo – try to load but don't fail if it doesn't work
+  // Platform (ChoiceMe) logo – try to load but don't fail if it doesn't work
   let platformLogoDataUrl: string | undefined
   try {
-    const logoKey = adminPrefs?.logoFile ?? 'choicemee-logistics-logo.png'
+    const logoKey = adminPrefs?.logoFile ?? 'choiceme-logo.png'
     const logoUrl = await presignDownload(logoKey)
     if (logoUrl && typeof logoUrl === 'string') {
       try {
@@ -892,7 +892,7 @@ export const generateInvoicePDF = async (invoice: InvoiceData): Promise<Buffer> 
   // Thermal Layout
   // -------------------
   const contentThermal: any[] = [
-    { text: invoice.companyName ?? 'ChoiceMee', alignment: 'center', bold: true },
+    { text: invoice.companyName ?? 'ChoiceMe', alignment: 'center', bold: true },
     { text: 'TAX INVOICE', alignment: 'center', bold: true, margin: [0, 2, 0, 2] },
     {
       text: 'ORIGINAL FOR RECIPIENT',
@@ -996,7 +996,7 @@ export const generateInvoicePDF = async (invoice: InvoiceData): Promise<Buffer> 
       ? { image: 'platformLogo', width: 40, alignment: 'center', margin: [0, 4, 0, 0] }
       : null,
     {
-      text: 'Powered by ChoiceMee',
+      text: 'Powered by ChoiceMe',
       alignment: 'center',
       italics: true,
       margin: [0, 4, 0, 0],

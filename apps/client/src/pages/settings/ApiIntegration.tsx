@@ -257,7 +257,7 @@ const ApiIntegration = () => {
   const handleDownloadDocumentation = () => {
     const link = document.createElement('a')
     link.href = '/API_DOCUMENTATION.pdf'
-    link.download = 'ChoiceMee-Logistics-API-Documentation-v1.pdf'
+    link.download = 'ChoiceMe-Logistics-API-Documentation-v1.pdf'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -269,7 +269,7 @@ const ApiIntegration = () => {
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <PageHeading
             title="API Integration"
-            subtitle="Manage API keys and webhook subscriptions inside the ChoiceMee developer workspace."
+            subtitle="Manage API keys and webhook subscriptions inside the ChoiceMe developer workspace."
             eyebrow="Developer"
           />
           <Button

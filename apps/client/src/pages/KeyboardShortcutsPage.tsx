@@ -90,7 +90,7 @@ export default function KeyboardShortcutsPage() {
       <PageHeading
         eyebrow="Workspace Tools"
         title="Keyboard Shortcuts"
-        subtitle="Speed up the ChoiceMee workspace with quick navigation and booking shortcuts."
+        subtitle="Speed up the ChoiceMe workspace with quick navigation and booking shortcuts."
       />
 
       <Grid container spacing={3} sx={{ mt: 1 }}>

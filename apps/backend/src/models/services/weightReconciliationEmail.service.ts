@@ -5,7 +5,7 @@ import path from 'path'
 const env = process.env.NODE_ENV || 'development'
 dotenv.config({ path: path.resolve(__dirname, `../../.env.${env}`) })
 
-const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@choicemee.com'
+const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@choiceme.com'
 const GOOGLE_SMTP_USER = process.env.GOOGLE_SMTP_USER || EMAIL_FROM
 const GOOGLE_SMTP_PASSWORD = process.env.GOOGLE_SMTP_PASSWORD!
 const SMTP_HOST = process.env.SMTP_HOST
@@ -40,7 +40,7 @@ async function sendEmail(to: string, subject: string, htmlContent: string) {
       })
 
   const mailOptions = {
-    from: `"ChoiceMee" <${EMAIL_FROM}>`,
+    from: `"ChoiceMe" <${EMAIL_FROM}>`,
     to,
     subject,
     html: htmlContent,
@@ -267,8 +267,8 @@ export async function sendWeightDiscrepancyEmail(data: WeightDiscrepancyNotifica
           </div>
           
           <div class="footer">
-            <p>This is an automated notification from ChoiceMee Weight Reconciliation System</p>
-            <p>© ${new Date().getFullYear()} ChoiceMee. All rights reserved.</p>
+            <p>This is an automated notification from ChoiceMe Weight Reconciliation System</p>
+            <p>© ${new Date().getFullYear()} ChoiceMe. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -414,11 +414,11 @@ export async function sendDailySummaryEmail(data: DailySummaryData) {
           </div>
           
           <div class="footer">
-            <p>This is an automated daily summary from ChoiceMee</p>
+            <p>This is an automated daily summary from ChoiceMe</p>
             <p>You can manage email preferences in your <a href="${
               process.env.FRONTEND_URL || 'http://localhost:5173'
             }/reconciliation/weight/settings">settings</a></p>
-            <p>© ${new Date().getFullYear()} ChoiceMee. All rights reserved.</p>
+            <p>© ${new Date().getFullYear()} ChoiceMe. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -501,7 +501,7 @@ export async function sendDisputeUpdateEmail(
           </div>
           
           <div class="footer">
-            <p>© ${new Date().getFullYear()} ChoiceMee. All rights reserved.</p>
+            <p>© ${new Date().getFullYear()} ChoiceMe. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -734,11 +734,11 @@ export async function sendWeeklyReportEmail(data: WeeklyReportData) {
           </div>
           
           <div class="footer">
-            <p>This is an automated weekly report from ChoiceMee</p>
+            <p>This is an automated weekly report from ChoiceMe</p>
             <p>You can manage email preferences in your <a href="${
               process.env.FRONTEND_URL || 'http://localhost:5173'
             }/reconciliation/weight/settings">settings</a></p>
-            <p>© ${new Date().getFullYear()} ChoiceMee. All rights reserved.</p>
+            <p>© ${new Date().getFullYear()} ChoiceMe. All rights reserved.</p>
           </div>
         </div>
       </body>

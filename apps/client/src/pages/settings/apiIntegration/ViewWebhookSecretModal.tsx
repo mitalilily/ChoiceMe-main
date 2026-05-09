@@ -28,12 +28,12 @@ export const ViewWebhookSecretModal = ({
 
   const handleDownloadCredentials = () => {
     const timestamp = new Date().toISOString()
-    const fileName = `choicemee-webhook-secret-${(webhook.name || 'webhook').replace(
+    const fileName = `choiceme-webhook-secret-${(webhook.name || 'webhook').replace(
       /\s/g,
       '-',
     )}-${timestamp.split('T')[0]}.txt`
     const fileContent = `
-ChoiceMee Logistics Webhook Secret
+ChoiceMe Logistics Webhook Secret
 Generated: ${timestamp}
 Webhook Name: ${webhook.name || 'Unnamed'}
 Webhook URL: ${webhook.url}

@@ -84,7 +84,7 @@ const testimonials = [
   {
     initials: 'AK',
     quote:
-      'ChoiceMee gave us a premium control-tower feel without operational complexity. Our shipping team now books faster and escalates less.',
+      'ChoiceMe gave us a premium control-tower feel without operational complexity. Our shipping team now books faster and escalates less.',
     name: 'Aaliya Khan',
     role: 'Head of Operations, NorthGrid Commerce',
   },
@@ -318,7 +318,7 @@ export default function LandingPage() {
               <Grid container spacing={{ xs: 2.2, md: 3 }} alignItems="center">
                 <Grid size={{ xs: 12, md: 4 }}>
                   <Typography sx={sectionIntro.eyebrowSx}>Brand integration</Typography>
-                  <Box component="img" src="/brand/choicemee-logistics-logo.png" alt={brandIdentity.name} sx={{ mt: 1.6, width: { xs: 180, md: 210 }, height: 'auto' }} />
+                  <Box component="img" src="/brand/choiceme-logo.png" alt={brandIdentity.name} sx={{ mt: 1.6, width: { xs: 180, md: 210 }, height: 'auto' }} />
                   <Typography sx={{ ...sectionIntro.copySx, mt: 1.8 }}>
                     {brandIdentity.tagline} Connected with leading courier brands in one trusted shipping workflow.
                   </Typography>
@@ -525,7 +525,7 @@ export default function LandingPage() {
 
           <Box component={motion.section} {...fadeUp}>
             <Typography sx={sectionIntro.eyebrowSx}>Testimonials</Typography>
-            <Typography sx={sectionIntro.titleSx}>What customers love about ChoiceMee Logistics</Typography>
+            <Typography sx={sectionIntro.titleSx}>What customers love about ChoiceMe Logistics</Typography>
             <Typography sx={sectionIntro.copySx}>
               Shipping teams, store owners, and logistics managers all choose us because we make their day-to-day operations clearer and faster.
             </Typography>

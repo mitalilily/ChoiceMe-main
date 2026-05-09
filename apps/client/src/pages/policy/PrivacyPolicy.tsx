@@ -53,7 +53,7 @@ const PrivacyPolicy = () => {
               <>
                 Your Privacy Rights: You may review, update, or correct your details, or withdraw
                 consent by contacting us at{' '}
-                <Link href="mailto:ops@choicemee.com">ops@choicemee.com</Link>.
+                <Link href="mailto:ops@choiceme.com">ops@choiceme.com</Link>.
               </>
             }
           />
@@ -73,10 +73,10 @@ const PrivacyPolicy = () => {
               <>
                 Grievance Officer: If you have queries or complaints, reach out to us at{' '}
                 <a
-                  href="mailto:ops@choicemee.com"
+                  href="mailto:ops@choiceme.com"
                   style={{ color: '#0052CC', textDecoration: 'none' }}
                 >
-                  ops@choicemee.com
+                  ops@choiceme.com
                 </a>
                 .
               </>

@@ -238,7 +238,7 @@ export const generateInvoiceForUser = async (
     .where(eq(userProfiles.userId, userId))
     .limit(1)
 
-  const issuerName = adminPrefs?.brandName || 'ChoiceMee'
+  const issuerName = adminPrefs?.brandName || 'ChoiceMe'
   const issuerAddress = adminPrefs?.sellerAddress || 'N/A'
   const issuerStateCode = adminPrefs?.stateCode || 'N/A'
   const issuerGST = adminPrefs?.gstNumber || 'N/A'
@@ -354,10 +354,10 @@ export const generateInvoiceForUser = async (
     }
   }
 
-  // Platform (ChoiceMee) logo for footer branding
+  // Platform (ChoiceMe) logo for footer branding
   let platformLogoDataUrl: string | undefined
   try {
-    const platformLogoKey = adminLogoFile || 'choicemee-logistics-logo.png'
+    const platformLogoKey = adminLogoFile || 'choiceme-logo.png'
     const logoUrl = await presignDownload(platformLogoKey)
     if (logoUrl && typeof logoUrl === 'string') {
       const resp = await axios.get(logoUrl, { responseType: 'arraybuffer' })
@@ -588,7 +588,7 @@ export const generateInvoiceForUser = async (
             : null,
 
           {
-            text: 'Powered by ChoiceMee',
+            text: 'Powered by ChoiceMe',
             alignment: 'center',
             italics: true,
             fontSize: fontSize - 1,
@@ -866,7 +866,7 @@ export const generateInvoiceForUser = async (
 
           // FOOTER
           {
-            text: 'Thank you for trusting and doing business with ChoiceMee.',
+            text: 'Thank you for trusting and doing business with ChoiceMe.',
             style: 'footer',
           },
           // Show admin signature only if includeSignature is true
@@ -894,7 +894,7 @@ export const generateInvoiceForUser = async (
               }
             : null,
           {
-            text: 'Powered by ChoiceMee',
+            text: 'Powered by ChoiceMe',
             alignment: 'center',
             italics: true,
             margin: [0, 6, 0, 0],

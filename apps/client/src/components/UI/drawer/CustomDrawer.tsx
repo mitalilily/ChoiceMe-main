@@ -95,7 +95,7 @@ const CustomDrawer: React.FC<GlassDrawerProps> = ({
                 mb: 0.5,
               }}
             >
-              ChoiceMee workspace
+              ChoiceMe workspace
             </Typography>
             <Typography variant="h6" fontWeight={800} color={theme.palette.text.primary}>
               {title}

@@ -26,7 +26,7 @@ export const ViewApiKeyModal = ({
   if (!apiKey) return null
 
   const handleDownloadCredentials = () => {
-    const content = `ChoiceMee Logistics API Credentials
+    const content = `ChoiceMe Logistics API Credentials
 Generated: ${new Date().toISOString()}
 Key Name: ${apiKey.key_name}
 
@@ -46,7 +46,7 @@ This file contains sensitive credentials. Store it securely and never commit it 
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `choicemee-api-credentials-${apiKey.key_name
+    link.download = `choiceme-api-credentials-${apiKey.key_name
       .replace(/\s+/g, '-')
       .toLowerCase()}-${new Date().toISOString().split('T')[0]}.txt`
     document.body.appendChild(link)

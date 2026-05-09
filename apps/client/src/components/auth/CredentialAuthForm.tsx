@@ -154,7 +154,7 @@ export default function CredentialAuthForm({ mode }: CredentialAuthFormProps) {
     mode === 'signup' ? 'Create your account with password access' : 'Sign in with email and password'
   const description =
     mode === 'signup'
-      ? 'Set up your ChoiceMee account and move into onboarding, courier setup, and shipment management.'
+      ? 'Set up your ChoiceMe account and move into onboarding, courier setup, and shipment management.'
       : 'Sign in with your email and password to access bookings, tracking, and courier operations.'
 
   return (

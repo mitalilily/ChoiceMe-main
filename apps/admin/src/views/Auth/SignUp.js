@@ -91,7 +91,7 @@ function SignUp() {
               </Text>
             </Heading>
             <Text color={textSecondary} fontSize="sm" maxW="360px" lineHeight="1.8">
-              Create a ChoiceMee Logistics workspace for teams that need cleaner shipment
+              Create a ChoiceMe Logistics workspace for teams that need cleaner shipment
               control, billing visibility, and faster daily operations.
             </Text>
           </VStack>
@@ -139,7 +139,7 @@ function SignUp() {
                   Create your admin workspace
                 </Heading>
                 <Text mt={2} color={textSecondary} fontSize="sm" lineHeight="1.8">
-                  Use this setup form to onboard your ChoiceMee operations team.
+                  Use this setup form to onboard your ChoiceMe operations team.
                 </Text>
               </Box>
 
@@ -162,7 +162,7 @@ function SignUp() {
                     Company
                   </FormLabel>
                   <Input
-                    placeholder="ChoiceMee operations"
+                    placeholder="ChoiceMe operations"
                     h="52px"
                     borderRadius="18px"
                     bg={inputBg}
@@ -217,7 +217,7 @@ function SignUp() {
                 _hover={{ boxShadow: '0 20px 36px rgba(255, 122, 21, 0.28)', transform: 'translateY(-1px)' }}
                 _active={{ transform: 'translateY(0)' }}
               >
-                Start with ChoiceMee
+                Start with ChoiceMe
               </Button>
 
               <Text color={textSecondary} fontWeight="medium" textAlign="center">

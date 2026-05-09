@@ -388,7 +388,7 @@ const ShopifyConnectionModal = ({
                       },
                     }))
                   }
-                  helperText="Automatically update order statuses in Shopify when they change in the ChoiceMee workspace."
+                  helperText="Automatically update order statuses in Shopify when they change in the ChoiceMe workspace."
                 />
 
                 {/* Auto cancel orders */}
@@ -404,7 +404,7 @@ const ShopifyConnectionModal = ({
                       },
                     }))
                   }
-                  helperText="Automatically cancel the order in Shopify when it's marked as cancelled in the ChoiceMee workspace."
+                  helperText="Automatically cancel the order in Shopify when it's marked as cancelled in the ChoiceMe workspace."
                 />
 
                 {/* Mark COD Orders Paid */}

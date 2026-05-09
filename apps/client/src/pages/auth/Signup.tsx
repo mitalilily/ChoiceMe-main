@@ -16,7 +16,7 @@ export default function Signup() {
     <AuthShell
       eyebrow="Create Account"
       title="Start shipping with a faster courier workspace."
-      subtitle="Create your ChoiceMee account to unlock courier booking, rate checks, shipment tracking, and a smoother delivery workflow."
+      subtitle="Create your ChoiceMe account to unlock courier booking, rate checks, shipment tracking, and a smoother delivery workflow."
       helperTitle="Start shipping sooner"
       helperText="Create your account once and move straight into onboarding, courier setup, and day-to-day shipment operations."
       showChrome

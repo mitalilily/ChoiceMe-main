@@ -183,7 +183,7 @@ export async function upsertShopifySettingsMetafield({
 
   try {
     const { data: existing } = await axios.get(
-      `${baseUrl}/metafields.json?namespace=ChoiceMee&key=settings`,
+      `${baseUrl}/metafields.json?namespace=ChoiceMe&key=settings`,
       { headers },
     )
 
@@ -206,7 +206,7 @@ export async function upsertShopifySettingsMetafield({
         `${baseUrl}/metafields.json`,
         {
           metafield: {
-            namespace: 'ChoiceMee',
+            namespace: 'ChoiceMe',
             key: 'settings',
             value: JSON.stringify(settings),
             type: 'json',

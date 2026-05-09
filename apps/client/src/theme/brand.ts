@@ -24,10 +24,10 @@ export const brandFonts = {
 }
 
 export const brandIdentity = {
-  name: 'ChoiceMee Logistics',
-  shortName: 'ChoiceMee',
+  name: 'ChoiceMe Logistics',
+  shortName: 'ChoiceMe',
   tagline: 'Your Trust, Our Commitment.',
-  supportEmail: 'ops@choicemee.com',
+  supportEmail: 'ops@choiceme.com',
   supportPhone: '9906690088',
   supportAddress: 'Baramulla, Jammu & Kashmir, 193123',
 }

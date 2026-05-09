@@ -470,7 +470,7 @@ function buildPickupFromWarehouse(
     city: warehouse.city,
     state: warehouse.state,
     pincode: warehouse.pincode,
-    name: warehouse.contactName || 'ChoiceMee',
+    name: warehouse.contactName || 'ChoiceMe',
     phone: warehouse.contactPhone || '',
     gst_number: previousPickup?.gst_number ?? warehouse.gstNumber ?? '',
     pickup_date: previousPickup?.pickup_date ?? fallbackDate,
@@ -2806,7 +2806,7 @@ export const createB2CShipmentService = async (
 
     params.company = {
       ...(params.company || {}),
-      name: resolvedCompanyName || 'ChoiceMee',
+      name: resolvedCompanyName || 'ChoiceMe',
       gst: resolvedCompanyGst || '',
     }
 

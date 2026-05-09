@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Box, Button, Grid, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Grid, Stack, Typography } from "@mui/material";
 import { useForm, Controller } from "react-hook-form";
 import type {
   BusinessStructure,
@@ -148,8 +148,13 @@ export default function AdditionalDetailsStep({
   return (
     <Box component="form" onSubmit={handleSubmit(onComplete)}>
       <Typography variant="h6" mb={2}>
-        Enter Additional KYC Details
+        Confirm KYC Details
       </Typography>
+      {requiredFields.length === 0 ? (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          No document upload is required right now. Submit to finish KYC instantly.
+        </Alert>
+      ) : null}
       <Grid container spacing={3}>
         {requiredFields.map((field) => (
           <Grid key={field} size={{ md: 6, xs: 12 }}>
@@ -335,8 +340,8 @@ export default function AdditionalDetailsStep({
 
       {/* Submit Button */}
       <Box mt={4} display="flex" justifyContent="flex-end">
-        <Button variant="contained" type="submit" disabled={!isValid}>
-          Submit KYC
+        <Button variant="contained" type="submit" disabled={requiredFields.length > 0 && !isValid}>
+          {requiredFields.length === 0 ? "Finish KYC" : "Submit KYC"}
         </Button>
       </Box>
     </Box>

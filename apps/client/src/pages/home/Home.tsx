@@ -157,7 +157,7 @@ export default function Home() {
                     mb: 1,
                   }}
                 >
-                  ChoiceMee shipping workspace
+                  ChoiceMe shipping workspace
                 </Typography>
                 <Typography
                   sx={{

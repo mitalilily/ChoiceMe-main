@@ -7,7 +7,7 @@
 
 set +e
 
-VPS_TARGET_PATH="/var/www/choicemee/admin-dashboard"
+VPS_TARGET_PATH="/var/www/choiceme/admin-dashboard"
 
 if [ -n "$1" ]; then
   VPS_CONNECTION="$1"

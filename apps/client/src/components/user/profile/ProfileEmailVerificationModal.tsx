@@ -8,7 +8,7 @@ import {
   Typography,
   TextField,
 } from "@mui/material";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { toast } from "../../UI/Toast";
@@ -17,6 +17,8 @@ import {
   useVerifyProfileEmailOtp,
 } from "../../../hooks/User/useVerifyProfileEmail";
 import { useQueryClient } from "@tanstack/react-query";
+import AuthCodePreview from "../../auth/AuthCodePreview";
+import { extractInlineCode } from "../../auth/inlineCode";
 
 interface Props {
   open: boolean;
@@ -30,6 +32,7 @@ export default function ProfileEmailVerificationModal({
   email,
 }: Props) {
   const queryClient = useQueryClient();
+  const [inlineOtp, setInlineOtp] = useState("");
   const {
     register,
     handleSubmit,
@@ -42,8 +45,16 @@ export default function ProfileEmailVerificationModal({
 
   useEffect(() => {
     if (open && email) {
-      sendOTP({ updatedEmail: email }).then(() => {
-        toast.open({ message: "OTP sent to email", severity: "info" });
+      setInlineOtp("");
+      sendOTP({ updatedEmail: email }).then((response) => {
+        const inlineCode = extractInlineCode(response);
+        setInlineOtp(inlineCode);
+        toast.open({
+          message: inlineCode
+            ? "OTP generated. Use the inline code preview below."
+            : "OTP sent to email",
+          severity: "info",
+        });
       });
     }
   }, [open, email, sendOTP]);
@@ -71,6 +82,7 @@ export default function ProfileEmailVerificationModal({
           <Typography variant="body2" color="text.secondary">
             Enter the OTP sent to <strong>{email}</strong>
           </Typography>
+          <AuthCodePreview title="OTP" code={inlineOtp} />
           <TextField
             label="OTP"
             fullWidth

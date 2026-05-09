@@ -12,7 +12,7 @@ const CancellationPolicy = () => {
             primary={
               <>
                 You may cancel your account at any time by emailing us at{' '}
-                <Link href="mailto:ops@choicemee.com">ops@choicemee.com</Link>.
+                <Link href="mailto:ops@choiceme.com">ops@choiceme.com</Link>.
               </>
             }
           />
@@ -27,11 +27,11 @@ const CancellationPolicy = () => {
         </ListItem>
 
         <ListItem sx={{ display: 'list-item' }}>
-          <ListItemText primary="ChoiceMee Logistics (ChoiceMee Logistics Pvt Ltd) reserves the right to modify, suspend, or terminate the Service for any reason, without prior notice at any time." />
+          <ListItemText primary="ChoiceMe Logistics (ChoiceMe Logistics Pvt Ltd) reserves the right to modify, suspend, or terminate the Service for any reason, without prior notice at any time." />
         </ListItem>
 
         <ListItem sx={{ display: 'list-item' }}>
-          <ListItemText primary="Fraud Prevention: Without limiting any other remedies, ChoiceMee Logistics may suspend or terminate your account if we suspect that you have engaged in fraudulent or unlawful activity in connection with the Platform." />
+          <ListItemText primary="Fraud Prevention: Without limiting any other remedies, ChoiceMe Logistics may suspend or terminate your account if we suspect that you have engaged in fraudulent or unlawful activity in connection with the Platform." />
         </ListItem>
 
         <ListItem sx={{ display: 'list-item' }}>

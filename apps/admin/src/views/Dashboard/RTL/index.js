@@ -68,7 +68,7 @@ export default function Dashboard() {
         gap='24px'>
         <BuiltByDevelopers
           title={"Ø¨Ù†Ø§Ù‡Ø§ Ø§Ù„Ù…Ø·ÙˆØ±ÙˆÙ†"}
-          name={"Ù„ÙˆØ­Ø© Ù…Ø¹Ù„ÙˆÙ…Ø§Øª ChoiceMee Logistics"}
+          name={"Ù„ÙˆØ­Ø© Ù…Ø¹Ù„ÙˆÙ…Ø§Øª ChoiceMe Logistics"}
           description={
             "Ù…Ù† Ø§Ù„Ø£Ù„ÙˆØ§Ù† ÙˆØ§Ù„Ø¨Ø·Ø§Ù‚Ø§Øª ÙˆØ§Ù„Ø·Ø¨Ø§Ø¹Ø© Ø¥Ù„Ù‰ Ø§Ù„Ø¹Ù†Ø§ØµØ± Ø§Ù„Ù…Ø¹Ù‚Ø¯Ø© ØŒ Ø³ØªØ¬Ø¯ Ø§Ù„ÙˆØ«Ø§Ø¦Ù‚ Ø§Ù„ÙƒØ§Ù…Ù„Ø©."
           }

@@ -1,19 +1,15 @@
 import { Box, Button, Container, Grid, Paper, Step, StepLabel, Stepper } from '@mui/material'
 import { useQueryClient } from '@tanstack/react-query'
-import axios from 'axios'
 import React, { useEffect, useRef, useState } from 'react'
 import { IoChevronBack, IoChevronForward } from 'react-icons/io5'
-import axiosInstance from '../../../../api/axiosInstance'
 import { useSubmitKyc } from '../../../../hooks/User/Kyc/UseKyc'
 import type { BusinessStructure, CompanyType } from '../../../../types/generic.types'
 import type { KycDetails } from '../../../../types/user.types'
-import { dataUrlToFile } from '../../../../utils/functions'
 import { toast } from '../../../UI/Toast'
 import AdditionalDetailsStep, { type AdditionalKYCForm } from './AdditionalInfoStep'
 import { BusinessStructureStep } from './BusinessStructureStep'
-import ImageCaptureStep from './ImageCaptureStep'
 
-const steps = ['Business Structure', 'Selfie', 'Additional Details']
+const steps = ['Business Structure', 'Confirm Details']
 
 const KYCVerificationStep: React.FC<{
   editing?: boolean
@@ -55,105 +51,53 @@ const KYCVerificationStep: React.FC<{
     setIsStepValid(true)
   }
 
-  const handleSelfieCapture = (img: string) => {
-    updateKycData({ selfieUrl: img })
-    setIsStepValid(true)
-  }
-
-  const handleAdditionalInfoChange = async (value: AdditionalKYCForm) => {
-    return new Promise<void>((resolve) => {
-      updateKycData(value)
-      setIsStepValid(true)
-      resolve()
-    })
-  }
-
   const handleFinalSubmit = async (data: AdditionalKYCForm) => {
-    await handleAdditionalInfoChange(data)
-    handleNext()
+    const nextData = { ...kycDataRef.current, ...data }
+    updateKycData(nextData)
+    await submitKyc(nextData)
   }
 
-  useEffect(() => {
-    if (kycData?.selfieUrl) setIsStepValid(true)
-  }, [kycData?.selfieUrl])
+  const validateBusinessStructureStep = () => {
+    const data = kycDataRef.current
+    if (!data.structure || (data.structure === 'company' && !data.companyType)) {
+      setIsStepValid(false)
+      toast.open({ message: 'Select a business structure to continue.', severity: 'warning' })
+      return false
+    }
+    return true
+  }
+
+  const submitKyc = async (data: Partial<KycDetails>) => {
+    if (!data.structure || (data.structure === 'company' && !data.companyType)) {
+      toast.open({ message: 'Select a business structure to continue.', severity: 'warning' })
+      return
+    }
+
+    try {
+      toast.open({ message: 'Submitting KYC details...', severity: 'info' })
+
+      const result = await mutateAsync({ details: data })
+
+      toast.open({
+        message: result?.message ?? 'KYC details submitted successfully!',
+        severity: 'success',
+      })
+
+      queryClient.invalidateQueries({ queryKey: ['userKyc'] })
+      queryClient.invalidateQueries({ queryKey: ['userProfile'] })
+
+      onComplete?.()
+    } catch (err: any) {
+      toast.open({
+        message: err?.response?.data?.message ?? err?.message ?? 'Failed to submit KYC details',
+        severity: 'error',
+      })
+      setIsStepValid(false)
+    }
+  }
 
   const handleNext = async () => {
-    const data = kycDataRef.current
-
-    if (
-      activeStep === 0 &&
-      (!data.structure || (data?.structure === 'company' && !data?.companyType))
-    ) {
-      return
-    }
-
-    if (activeStep === 1 && !data.selfieUrl) return
-
-    if (isStepValid && activeStep === 2) {
-      try {
-        toast.open({ message: 'Submitting KYC details...', severity: 'info' })
-
-        let selfieUrl = data?.selfieUrl ?? ''
-
-        if (selfieUrl.startsWith('data:image')) {
-          const file = dataUrlToFile(selfieUrl, 'selfie.jpg')
-
-          if (file.size / 1024 / 1024 > 5) {
-            throw new Error('Selfie exceeds 5MB limit')
-          }
-
-          const { data: presign } = await axiosInstance.post('/uploads/presign', {
-            contentType: file.type,
-            filename: file.name,
-            folder: 'kyc',
-          })
-
-          await axios.put(presign.uploadUrl, file, {
-            headers: { 'Content-Type': file.type },
-          })
-
-          selfieUrl = presign?.key
-        }
-
-        const result = await mutateAsync({
-          details: {
-            ...data,
-            selfieUrl,
-          },
-        })
-
-        toast.open({
-          message: result?.message ?? 'KYC details submitted successfully!',
-          severity: 'success',
-        })
-
-        // Refresh both the dedicated KYC query and the overall user profile
-        // so that status and details are up to date when the user revisits the KYC page.
-        queryClient.invalidateQueries({ queryKey: ['userKyc'] })
-        queryClient.invalidateQueries({ queryKey: ['userProfile'] })
-
-        if (onComplete) {
-          // After a successful submission (new or edit), let the parent decide what to show next.
-          onComplete()
-        } else {
-          setActiveStep((prev) => Math.min(prev + 1, steps.length - 1))
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        toast.open({
-          message: err?.response?.data?.message ?? err?.message ?? 'Failed to submit KYC details',
-          severity: 'error',
-        })
-
-        if (data.selfieUrl?.startsWith('data:image')) {
-          updateKycData({ selfieUrl: undefined })
-        }
-
-        setIsStepValid(false)
-      }
-
-      return
-    }
+    if (activeStep === 0 && !validateBusinessStructureStep()) return
 
     setActiveStep((prev) => Math.min(prev + 1, steps.length - 1))
   }
@@ -179,8 +123,6 @@ const KYCVerificationStep: React.FC<{
             onChange={handleBusinessStructureChange}
           />
         )
-      case 1:
-        return <ImageCaptureStep img={kycData?.selfieUrl ?? ''} onCapture={handleSelfieCapture} />
       default:
         return (
           <AdditionalDetailsStep
@@ -272,7 +214,7 @@ const KYCVerificationStep: React.FC<{
                       transition: 'all 0.3s ease',
                     }}
                   >
-                    {'Next'}
+                    Continue
                   </Button>
                 ) : null}
               </Box>

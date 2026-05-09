@@ -21,7 +21,7 @@ const MUTED = brand.inkSoft
 const DISPLAY_FONT = brandFonts.display
 
 const commandNotes = [
-  'Sign in with your registered email to access your ChoiceMee account.',
+  'Sign in with your registered email to access your ChoiceMe account.',
   'Use OTP login or email and password based on your account access.',
   'Access orders, billing, support, channels, and courier tools after sign in.',
 ]
@@ -97,7 +97,7 @@ export default function LoginForm() {
               />
 
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {['ChoiceMee platform', 'ChoiceMee brand colors', 'Secure login system'].map((chip) => (
+                {['ChoiceMe platform', 'ChoiceMe brand colors', 'Secure login system'].map((chip) => (
                   <Box
                     key={chip}
                     sx={{
@@ -139,7 +139,7 @@ export default function LoginForm() {
                 >
                   Sign in to your
                   <Box component="span" sx={{ color: CLAY, display: 'block' }}>
-                    ChoiceMee account.
+                    ChoiceMe account.
                   </Box>
                 </Typography>
                 <Typography
@@ -151,7 +151,7 @@ export default function LoginForm() {
                   }}
                 >
                   Access your account and continue with orders, billing, support,
-                  and shipping operations in ChoiceMee.
+                  and shipping operations in ChoiceMe.
                 </Typography>
               </Stack>
             </Stack>
@@ -263,7 +263,7 @@ export default function LoginForm() {
                     textTransform: 'uppercase',
                   }}
                 >
-                  ChoiceMee sign in
+                  ChoiceMe sign in
                 </Typography>
               </Stack>
 
@@ -288,7 +288,7 @@ export default function LoginForm() {
                     maxWidth: 470,
                   }}
                 >
-                  Sign in with OTP or password to access your ChoiceMee dashboard and account tools.
+                  Sign in with OTP or password to access your ChoiceMe dashboard and account tools.
                 </Typography>
               </Stack>
 
@@ -359,7 +359,7 @@ export default function LoginForm() {
               <Stack direction="row" spacing={0.8} alignItems="center" justifyContent="flex-start">
                 <TbTruckDelivery size={16} color={CLAY} />
                 <Typography sx={{ color: SKY, fontSize: '0.84rem', fontWeight: 700 }}>
-                  ChoiceMee account access
+                  ChoiceMe account access
                 </Typography>
               </Stack>
             </Stack>
