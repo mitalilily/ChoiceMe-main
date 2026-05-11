@@ -139,6 +139,12 @@ export const updateDelhiveryCredentials = async (payload) => {
   return data.data
 }
 
+export const updateDeliveryOneCredentials = async (payload) => {
+  const { data } = await api.put('/admin/couriers/credentials/delivery-one', payload)
+  if (!data?.success) throw new Error('Failed to update Delivery One credentials')
+  return data.data
+}
+
 export const updateEkartCredentials = async (payload) => {
   const { data } = await api.put('/admin/couriers/credentials/ekart', payload)
   if (!data?.success) throw new Error('Failed to update Ekart credentials')

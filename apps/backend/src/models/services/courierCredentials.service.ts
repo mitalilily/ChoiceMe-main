@@ -3,7 +3,7 @@ import { db } from '../client'
 import { courierCredentials } from '../schema/courierCredentials'
 
 export type BusinessType = 'b2b' | 'b2c'
-export type ServiceProviderId = 'delhivery' | 'shipway' | 'xpressbees' | 'ekart'
+export type ServiceProviderId = 'delhivery' | 'shipway' | 'xpressbees' | 'ekart' | 'deliveryone'
 
 export type DelhiveryConfig = {
   apiKey?: string
@@ -27,6 +27,15 @@ export type EkartConfig = {
   password?: string
   baseApi?: string
   baseAuth?: string
+}
+
+export type DeliveryOneConfig = {
+  apiBase?: string
+  apiKey?: string
+  clientId?: string
+  username?: string
+  password?: string
+  webhookSecret?: string
 }
 
 export type SmartshipConfig = {
@@ -53,6 +62,7 @@ export type CourierConfig =
   | ShipwayConfig
   | XpressbeesConfig
   | EkartConfig
+  | DeliveryOneConfig
 
 export interface CourierCredentialsUpsertPayload {
   serviceProvider: ServiceProviderId
@@ -80,7 +90,13 @@ export interface CourierCredentialsMeta {
   }
 }
 
-const KNOWN_PROVIDERS: ServiceProviderId[] = ['delhivery', 'shipway', 'xpressbees', 'ekart']
+const KNOWN_PROVIDERS: ServiceProviderId[] = [
+  'delhivery',
+  'shipway',
+  'xpressbees',
+  'ekart',
+  'deliveryone',
+]
 export const DEFAULT_EKART_BASE_URL = 'https://app.elite.ekartlogistics.in'
 
 const hasEnvForProviderAndType = (provider: ServiceProviderId, _type: BusinessType): boolean => {
@@ -103,6 +119,18 @@ const hasEnvForProviderAndType = (provider: ServiceProviderId, _type: BusinessTy
       process.env.EKART_PASSWORD ||
       process.env.EKART_BASE_API ||
       process.env.EKART_BASE_AUTH
+    )
+  }
+  if (provider === 'deliveryone') {
+    return !!(
+      process.env.DELIVERY_ONE_API_BASE ||
+      process.env.DELIVERYONE_API_BASE ||
+      process.env.DELIVERY_ONE_API_KEY ||
+      process.env.DELIVERYONE_API_KEY ||
+      process.env.DELIVERY_ONE_USERNAME ||
+      process.env.DELIVERYONE_USERNAME ||
+      process.env.DELIVERY_ONE_PASSWORD ||
+      process.env.DELIVERYONE_PASSWORD
     )
   }
   return false
@@ -146,6 +174,18 @@ const buildConfigFromRow = (provider: ServiceProviderId, row: typeof courierCred
     const cfg: ShipwayConfig = {
       username: normalize(row.username),
       password: normalize(row.password),
+    }
+    return cfg
+  }
+
+  if (provider === 'deliveryone') {
+    const cfg: DeliveryOneConfig = {
+      apiBase: normalize(row.apiBase),
+      apiKey: normalize(row.apiKey),
+      clientId: normalize(row.clientId),
+      username: normalize(row.username),
+      password: normalize(row.password),
+      webhookSecret: normalize(row.webhookSecret),
     }
     return cfg
   }

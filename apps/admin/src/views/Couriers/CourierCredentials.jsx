@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import {
   useCourierCredentials,
   useUpdateDelhiveryCredentials,
+  useUpdateDeliveryOneCredentials,
   useUpdateEkartCredentials,
   useUpdateXpressbeesCredentials,
 } from 'hooks/useCouriers'
@@ -23,6 +24,7 @@ const CourierCredentials = () => {
   const toast = useToast()
   const { data, isLoading, error } = useCourierCredentials()
   const updateDelhivery = useUpdateDelhiveryCredentials()
+  const updateDeliveryOne = useUpdateDeliveryOneCredentials()
   const updateEkart = useUpdateEkartCredentials()
   const updateXpressbees = useUpdateXpressbeesCredentials()
 
@@ -40,6 +42,14 @@ const CourierCredentials = () => {
   })
   const [xpressbeesForm, setXpressbeesForm] = useState({
     apiBase: '',
+    username: '',
+    password: '',
+    apiKey: '',
+    webhookSecret: '',
+  })
+  const [deliveryOneForm, setDeliveryOneForm] = useState({
+    apiBase: '',
+    clientId: '',
     username: '',
     password: '',
     apiKey: '',
@@ -67,6 +77,16 @@ const CourierCredentials = () => {
       setXpressbeesForm({
         apiBase: data.xpressbees.apiBase || '',
         username: data.xpressbees.username || '',
+        password: '',
+        apiKey: '',
+        webhookSecret: '',
+      })
+    }
+    if (data?.deliveryOne) {
+      setDeliveryOneForm({
+        apiBase: data.deliveryOne.apiBase || '',
+        clientId: data.deliveryOne.clientId || '',
+        username: data.deliveryOne.username || '',
         password: '',
         apiKey: '',
         webhookSecret: '',
@@ -149,6 +169,39 @@ const CourierCredentials = () => {
         onError: (err) => {
           toast({
             title: 'Failed to update Xpressbees credentials',
+            description: err?.message,
+            status: 'error',
+          })
+        },
+      },
+    )
+  }
+
+  const handleSaveDeliveryOne = () => {
+    updateDeliveryOne.mutate(
+      {
+        apiBase: deliveryOneForm.apiBase,
+        clientId: deliveryOneForm.clientId,
+        username: deliveryOneForm.username,
+        ...(deliveryOneForm.password ? { password: deliveryOneForm.password } : {}),
+        ...(deliveryOneForm.apiKey ? { apiKey: deliveryOneForm.apiKey } : {}),
+        ...(deliveryOneForm.webhookSecret
+          ? { webhookSecret: deliveryOneForm.webhookSecret }
+          : {}),
+      },
+      {
+        onSuccess: () => {
+          toast({ title: 'Delivery One credentials updated', status: 'success' })
+          setDeliveryOneForm((prev) => ({
+            ...prev,
+            password: '',
+            apiKey: '',
+            webhookSecret: '',
+          }))
+        },
+        onError: (err) => {
+          toast({
+            title: 'Failed to update Delivery One credentials',
             description: err?.message,
             status: 'error',
           })
@@ -398,6 +451,115 @@ const CourierCredentials = () => {
               alignSelf="flex-start"
             >
               Save Xpressbees Credentials
+            </Button>
+          </VStack>
+        </Box>
+
+        <Box borderWidth="1px" borderRadius="lg" p={5} minW="320px" flex="1" maxW="520px">
+          <VStack spacing={4} align="stretch">
+            <Flex justify="space-between" align="center">
+              <Text fontWeight="semibold">Delivery One</Text>
+              <Badge colorScheme={data?.deliveryOne?.hasApiKey ? 'green' : 'orange'}>
+                {data?.deliveryOne?.hasApiKey ? 'API key set' : 'Missing API key'}
+              </Badge>
+            </Flex>
+
+            <FormControl>
+              <FormLabel>API Base URL</FormLabel>
+              <Input
+                value={deliveryOneForm.apiBase}
+                onChange={(e) =>
+                  setDeliveryOneForm((prev) => ({ ...prev, apiBase: e.target.value }))
+                }
+                placeholder="https://api.deliveryone.co.in"
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Client ID</FormLabel>
+              <Input
+                value={deliveryOneForm.clientId}
+                onChange={(e) =>
+                  setDeliveryOneForm((prev) => ({ ...prev, clientId: e.target.value }))
+                }
+                placeholder="Delivery One client ID"
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Username / Email</FormLabel>
+              <Input
+                value={deliveryOneForm.username}
+                onChange={(e) =>
+                  setDeliveryOneForm((prev) => ({ ...prev, username: e.target.value }))
+                }
+                placeholder="Delivery One username or email"
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Password</FormLabel>
+              <Input
+                type="password"
+                value={deliveryOneForm.password}
+                onChange={(e) =>
+                  setDeliveryOneForm((prev) => ({ ...prev, password: e.target.value }))
+                }
+                placeholder="Leave blank to keep existing password"
+              />
+              {data?.deliveryOne?.hasPassword && (
+                <Text fontSize="xs" color="gray.500" mt={1}>
+                  Password already configured on Delivery One.
+                </Text>
+              )}
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>API Key / Token</FormLabel>
+              <Input
+                type="password"
+                value={deliveryOneForm.apiKey}
+                onChange={(e) =>
+                  setDeliveryOneForm((prev) => ({ ...prev, apiKey: e.target.value }))
+                }
+                placeholder={data?.deliveryOne?.apiKeyMasked || 'Enter Delivery One API key'}
+              />
+              {!!data?.deliveryOne?.apiKeyMasked && (
+                <Text fontSize="xs" color="gray.500" mt={1}>
+                  Current key: {data.deliveryOne.apiKeyMasked}
+                </Text>
+              )}
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Webhook Secret</FormLabel>
+              <Input
+                type="password"
+                value={deliveryOneForm.webhookSecret}
+                onChange={(e) =>
+                  setDeliveryOneForm((prev) => ({ ...prev, webhookSecret: e.target.value }))
+                }
+                placeholder="Leave blank to keep existing webhook secret"
+              />
+              {data?.deliveryOne?.hasWebhookSecret && (
+                <Text fontSize="xs" color="gray.500" mt={1}>
+                  Webhook secret already configured on Delivery One.
+                </Text>
+              )}
+            </FormControl>
+
+            <Text fontSize="xs" color="gray.500">
+              Delivery One credentials are stored for the upcoming API integration. Leave password,
+              API key, or webhook secret blank to keep the saved value.
+            </Text>
+
+            <Button
+              colorScheme="blue"
+              onClick={handleSaveDeliveryOne}
+              isLoading={updateDeliveryOne.isPending}
+              alignSelf="flex-start"
+            >
+              Save Delivery One Credentials
             </Button>
           </VStack>
         </Box>
