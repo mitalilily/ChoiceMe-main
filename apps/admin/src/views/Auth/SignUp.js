@@ -57,7 +57,7 @@ function SignUp() {
         bg={shellBg}
         border="1px solid"
         borderColor={shellBorder}
-        borderRadius={{ base: '24px', lg: '30px' }}
+        borderRadius={{ base: '14px', lg: '16px' }}
         boxShadow={useColorModeValue(brandTokens.shadow, '0 28px 72px rgba(0,0,0,0.38)')}
         overflow="hidden"
         direction={{ base: 'column', lg: 'row' }}
@@ -106,7 +106,7 @@ function SignUp() {
                 key={item.label}
                 px={4}
                 py={3}
-                borderRadius="20px"
+                borderRadius="10px"
                 bg={useColorModeValue('rgba(255,255,255,0.68)', 'rgba(255,255,255,0.06)')}
                 border={`1px solid ${useColorModeValue('rgba(13,27,77,0.14)', 'rgba(255,255,255,0.14)')}`}
               >
@@ -151,7 +151,7 @@ function SignUp() {
                   <Input
                     placeholder="Operations manager"
                     h="52px"
-                    borderRadius="18px"
+                    borderRadius="10px"
                     bg={inputBg}
                     borderColor={inputBorder}
                     _focus={{ borderColor: 'accent.500', boxShadow: '0 0 0 4px rgba(255,138,40,0.16)' }}
@@ -164,7 +164,7 @@ function SignUp() {
                   <Input
                     placeholder="ChoiceMe operations"
                     h="52px"
-                    borderRadius="18px"
+                    borderRadius="10px"
                     bg={inputBg}
                     borderColor={inputBorder}
                     _focus={{ borderColor: 'accent.500', boxShadow: '0 0 0 4px rgba(255,138,40,0.16)' }}
@@ -180,7 +180,7 @@ function SignUp() {
                   type="email"
                   placeholder="team@company.com"
                   h="52px"
-                  borderRadius="18px"
+                  borderRadius="10px"
                   bg={inputBg}
                   borderColor={inputBorder}
                   _focus={{ borderColor: 'accent.500', boxShadow: '0 0 0 4px rgba(255,138,40,0.16)' }}
@@ -195,7 +195,7 @@ function SignUp() {
                   type="password"
                   placeholder="Create a secure password"
                   h="52px"
-                  borderRadius="18px"
+                  borderRadius="10px"
                   bg={inputBg}
                   borderColor={inputBorder}
                   _focus={{ borderColor: 'accent.500', boxShadow: '0 0 0 4px rgba(255,138,40,0.16)' }}
@@ -210,7 +210,7 @@ function SignUp() {
 
               <Button
                 h="52px"
-                borderRadius="999px"
+                borderRadius="10px"
                 bg={brandGradients.button}
                 color="white"
                 fontWeight="700"

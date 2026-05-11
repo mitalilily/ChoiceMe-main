@@ -143,7 +143,7 @@ function SignIn() {
         bg={shellBg}
         border="1px solid"
         borderColor={shellBorder}
-        borderRadius={{ base: '24px', lg: '32px' }}
+        borderRadius={{ base: '14px', lg: '16px' }}
         boxShadow={useColorModeValue(
           brandTokens.shadow,
           '0 28px 72px rgba(0,0,0,0.38)',
@@ -173,7 +173,7 @@ function SignIn() {
                   key={tag}
                   px={3}
                   py={1.5}
-                  borderRadius="999px"
+                  borderRadius="10px"
                   bg={chipBg}
                   border={`1px solid ${chipBorder}`}
                 >
@@ -269,7 +269,7 @@ function SignIn() {
                     key={pill}
                     px={3}
                     py={1.5}
-                    borderRadius="999px"
+                    borderRadius="10px"
                     bg="rgba(255,255,255,0.78)"
                     border="1px solid rgba(13,27,77,0.08)"
                   >
@@ -290,7 +290,7 @@ function SignIn() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter admin email"
                   h="54px"
-                  borderRadius="18px"
+                  borderRadius="10px"
                   bg={inputBg}
                   borderColor={inputBorder}
                   _hover={{ borderColor: 'brand.400' }}
@@ -312,7 +312,7 @@ function SignIn() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     h="54px"
-                    borderRadius="18px"
+                    borderRadius="10px"
                     bg={inputBg}
                     borderColor={inputBorder}
                     pr="48px"
@@ -339,7 +339,7 @@ function SignIn() {
               <Button
                 type="submit"
                 h="54px"
-                borderRadius="999px"
+                borderRadius="10px"
                 bg={brandGradients.button}
                 color="white"
                 fontWeight="700"

@@ -1,6 +1,7 @@
 import { Box, FormControlLabel, Link, Stack, Typography } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import { useMemo, useState } from 'react'
-import { FiMail, FiUser } from 'react-icons/fi'
+import { FiArrowRight, FiMail, FiUser } from 'react-icons/fi'
 import { MdPassword } from 'react-icons/md'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/auth/AuthContext'
@@ -20,9 +21,37 @@ import { brand } from '../../theme/brand'
 
 interface CredentialAuthFormProps {
   mode: 'login' | 'signup'
+  showIntro?: boolean
+  compactLogin?: boolean
 }
 
-export default function CredentialAuthForm({ mode }: CredentialAuthFormProps) {
+const AUTH_NAVY = '#0D1B4D'
+const AUTH_ORANGE = '#E86F00'
+
+const loginButtonStyles = {
+  width: '100%',
+  minHeight: 58,
+  borderRadius: '7px',
+  background: AUTH_NAVY,
+  color: '#FFFFFF',
+  boxShadow: `0 10px 20px ${alpha(AUTH_NAVY, 0.28)}`,
+  '&:hover': {
+    background: '#071643',
+    transform: 'translateY(-1px)',
+  },
+  '&:disabled': {
+    background: AUTH_NAVY,
+    color: '#FFFFFF',
+    opacity: 1,
+    boxShadow: `0 10px 20px ${alpha(AUTH_NAVY, 0.2)}`,
+  },
+}
+
+export default function CredentialAuthForm({
+  mode,
+  showIntro = true,
+  compactLogin = false,
+}: CredentialAuthFormProps) {
   const navigate = useNavigate()
   const { setTokens, setUserId } = useAuth()
   const [step, setStep] = useState<'form' | 'verify'>('form')
@@ -158,15 +187,17 @@ export default function CredentialAuthForm({ mode }: CredentialAuthFormProps) {
       : 'Sign in with your email and password to access bookings, tracking, and courier operations.'
 
   return (
-    <Stack spacing={2.2}>
-      <Stack spacing={0.8}>
-        <Typography sx={{ color: brand.ink, fontWeight: 800, fontSize: '1.18rem' }}>
-          {heading}
-        </Typography>
-        <Typography sx={{ color: brand.inkSoft, lineHeight: 1.7, fontSize: '0.92rem' }}>
-          {description}
-        </Typography>
-      </Stack>
+    <Stack spacing={compactLogin ? 2 : 2.2}>
+      {showIntro ? (
+        <Stack spacing={0.8}>
+          <Typography sx={{ color: brand.ink, fontWeight: 800, fontSize: '1.18rem' }}>
+            {heading}
+          </Typography>
+          <Typography sx={{ color: brand.inkSoft, lineHeight: 1.7, fontSize: '0.92rem' }}>
+            {description}
+          </Typography>
+        </Stack>
+      ) : null}
 
       <AuthCodePreview
         title={mode === 'signup' ? 'Verification Code' : 'Verification Code'}
@@ -190,13 +221,15 @@ export default function CredentialAuthForm({ mode }: CredentialAuthFormProps) {
               autoFocus
               required
               topMargin={false}
+              authVariant={compactLogin ? 'reference' : undefined}
             />
           ) : null}
 
           <CustomInput
-            label="Email"
+            label={compactLogin ? 'Username' : 'Email'}
             name="email"
             type="email"
+            placeholder={compactLogin ? 'e.g., yourname@choice.mee' : ''}
             value={email}
             onChange={(event) => {
               setEmail(event.target.value)
@@ -204,15 +237,17 @@ export default function CredentialAuthForm({ mode }: CredentialAuthFormProps) {
             }}
             helperText={email ? emailError : ''}
             error={Boolean(email) && Boolean(emailError)}
-            prefix={<FiMail color={brand.ink} size={15} />}
+            prefix={<FiMail color={compactLogin ? AUTH_NAVY : brand.ink} size={compactLogin ? 20 : 15} />}
             required
             topMargin={mode !== 'signup'}
+            authVariant={compactLogin ? 'reference' : undefined}
           />
 
           <CustomInput
             label="Password"
             name="password"
             type="password"
+            placeholder={compactLogin ? 'view password' : ''}
             value={password}
             onChange={(event) => {
               setPassword(event.target.value)
@@ -220,8 +255,9 @@ export default function CredentialAuthForm({ mode }: CredentialAuthFormProps) {
             }}
             helperText={password ? passwordError : ''}
             error={Boolean(password) && Boolean(passwordError)}
-            prefix={<MdPassword color={brand.ink} size={16} />}
+            prefix={<MdPassword color={compactLogin ? AUTH_NAVY : brand.ink} size={compactLogin ? 20 : 16} />}
             required
+            authVariant={compactLogin ? 'reference' : undefined}
           />
 
           {error ? (
@@ -240,13 +276,13 @@ export default function CredentialAuthForm({ mode }: CredentialAuthFormProps) {
               />
             }
             label={
-              <Typography sx={{ color: brand.inkSoft, fontSize: '0.86rem', mt: 0.25 }}>
+              <Typography sx={{ color: compactLogin ? '#111111' : brand.inkSoft, fontSize: '0.86rem', mt: 0.25 }}>
                 I agree to{' '}
                 <Link
                   component="button"
                   underline="hover"
                   onClick={() => setOpenTerms(true)}
-                  sx={{ color: brand.ink, fontWeight: 700 }}
+                  sx={{ color: compactLogin ? AUTH_ORANGE : brand.ink, fontWeight: 700 }}
                 >
                   Terms and Conditions
                 </Link>
@@ -256,11 +292,13 @@ export default function CredentialAuthForm({ mode }: CredentialAuthFormProps) {
 
           <CustomIconLoadingButton
             type="submit"
-            text={mode === 'signup' ? 'Create account' : 'Continue with password'}
+            text={compactLogin ? 'Log In' : mode === 'signup' ? 'Create account' : 'Continue with password'}
             loading={requesting}
-            loadingText={mode === 'signup' ? 'Creating...' : 'Checking...'}
+            loadingText={compactLogin ? 'Logging in...' : mode === 'signup' ? 'Creating...' : 'Checking...'}
             disabled={Boolean(nameError || emailError || passwordError) || !termsChecked}
-            styles={{ width: '100%' }}
+            styles={compactLogin ? loginButtonStyles : { width: '100%' }}
+            textColor={compactLogin ? '#FFFFFF' : undefined}
+            endIconNode={compactLogin ? <FiArrowRight size={28} /> : undefined}
           />
         </Stack>
       ) : (

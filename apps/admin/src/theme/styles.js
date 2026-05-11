@@ -28,6 +28,24 @@ export const globalStyles = {
       '*': {
         boxSizing: 'border-box',
       },
+      '.chakra-button': {
+        borderRadius: '10px !important',
+        minHeight: '40px',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      '.chakra-icon-button': {
+        borderRadius: '10px !important',
+      },
+      '.admin-card': {
+        borderRadius: '14px !important',
+      },
+      '.chakra-modal__content': {
+        borderRadius: '16px !important',
+      },
+      '.chakra-input, .chakra-select, .chakra-textarea': {
+        borderRadius: '10px !important',
+      },
       '::selection': {
         background: mode('brand.100', 'accent.600')(props),
       },

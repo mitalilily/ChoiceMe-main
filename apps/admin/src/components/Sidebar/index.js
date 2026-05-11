@@ -18,7 +18,7 @@ function Sidebar(props) {
           ms={{ sm: '18px' }}
           my={{ sm: '18px' }}
           h="calc(100vh - 36px)"
-          borderRadius="30px"
+          borderRadius="16px"
           background="linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(248,250,254,0.9) 100%)"
           border="1px solid rgba(13,27,77,0.1)"
           boxShadow="0 28px 60px rgba(68,92,138,0.14)"

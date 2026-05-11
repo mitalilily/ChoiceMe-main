@@ -1,11 +1,7 @@
-import { Box, Chip, Container, Grid, Stack, Typography } from '@mui/material'
+import { Box, Grid, Stack, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
-import { FiCheckCircle, FiShield } from 'react-icons/fi'
-import { TbChartBar, TbRouteSquare, TbTruckDelivery } from 'react-icons/tb'
-import BrandSurface from '../brand/BrandSurface'
-import PublicNavbar from '../public/PublicNavbar'
-import PublicFooter from '../public/PublicFooter'
-import { brand, brandGradients, brandIdentity } from '../../theme/brand'
+import BrandLogo from '../brand/BrandLogo'
+import { brand } from '../../theme/brand'
 
 interface AuthShellProps {
   eyebrow: string
@@ -20,23 +16,16 @@ interface AuthShellProps {
   children: React.ReactNode
 }
 
-const authHighlights = [
-  {
-    title: 'Smart shipping workspace',
-    text: 'Orders, couriers, tracking, billing, and support in one clean seller panel.',
-    icon: <TbTruckDelivery size={18} />,
-  },
-  {
-    title: 'Live verification preview',
-    text: 'Inline OTP and verification codes are surfaced on-screen for local and console-driven auth flows.',
-    icon: <FiShield size={18} />,
-  },
-  {
-    title: 'Actionable insights',
-    text: 'The app shell mirrors the public landing experience while preserving the current auth and dashboard logic.',
-    icon: <TbChartBar size={18} />,
-  },
-]
+const authPalette = {
+  navy: '#0D1B4D',
+  orange: '#E86F00',
+  text: '#111111',
+  muted: '#3C465F',
+  blob: '#E8F7FF',
+  blobEdge: '#DDF0FC',
+}
+
+const deliveryArtwork = '/images/client-auth-delivery-van-theme.png'
 
 export default function AuthShell({
   eyebrow,
@@ -45,265 +34,219 @@ export default function AuthShell({
   helperTitle,
   helperText,
   variant = 'default',
-  showChrome = true,
-  showNavbar = showChrome,
-  showFooter = showChrome,
   children,
 }: AuthShellProps) {
-  if (variant === 'compact') {
-    return (
-      <Box sx={{ minHeight: '100vh' }}>
-        {showNavbar && (
-          <PublicNavbar
-            links={[
-              { label: 'Tracking', to: '/tracking' },
-              { label: 'Rate Calculator', to: '/rate-calculator' },
-            ]}
-          />
-        )}
+  const isCompact = variant === 'compact'
 
-        <Container maxWidth="sm" sx={{ px: { xs: 2, sm: 3 }, pb: 6 }}>
-          <BrandSurface
-            variant="card"
-            sx={{
-              p: { xs: 2.4, md: 3.2 },
-              mt: showNavbar ? { xs: 2.5, md: 3 } : { xs: 1, md: 1.5 },
-            }}
-          >
-            <Stack spacing={2.4}>
-              <Stack spacing={1.1}>
-                <Typography
-                  sx={{
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.22em',
-                    textTransform: 'uppercase',
-                    color: brand.inkSoft,
-                  }}
-                >
-                  {eyebrow}
-                </Typography>
-                <Typography
-                  sx={{
-                    color: brand.ink,
-                    fontSize: { xs: '2rem', sm: '2.6rem' },
-                    fontWeight: 800,
-                    lineHeight: 1.05,
-                    letterSpacing: '-0.05em',
-                  }}
-                >
-                  {title}
-                </Typography>
-                <Typography
-                  sx={{
-                    color: brand.inkSoft,
-                    fontSize: { xs: '0.95rem', md: '1rem' },
-                    lineHeight: 1.75,
-                  }}
-                >
-                  {subtitle}
-                </Typography>
-              </Stack>
+  return (
+    <Box
+      aria-label={eyebrow}
+      sx={{
+        minHeight: '100vh',
+        width: '100%',
+        bgcolor: '#FFFFFF',
+        color: authPalette.text,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        p: { xs: 1.2, sm: 2, md: 2.8 },
+      }}
+    >
+      <Box
+        sx={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: isCompact ? 920 : 1740,
+          minHeight: isCompact
+            ? { xs: 'auto', md: 'min(780px, calc(100vh - 48px))' }
+            : { xs: 'auto', lg: 'min(900px, calc(100vh - 48px))' },
+          borderRadius: { xs: '22px', md: '34px' },
+          overflow: 'hidden',
+          bgcolor: '#FFFFFF',
+          boxShadow: {
+            xs: '0 16px 38px rgba(13, 27, 77, 0.08)',
+            md: '0 26px 70px rgba(13, 27, 77, 0.1)',
+          },
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            zIndex: 0,
+            inset: { xs: '18px -44% 18px -30%', lg: '0 4% 0 6%' },
+            bgcolor: authPalette.blob,
+            background: `linear-gradient(145deg, ${authPalette.blob} 0%, #F4FBFF 48%, ${authPalette.blobEdge} 100%)`,
+            borderRadius: {
+              xs: '42% 58% 48% 52% / 12% 16% 84% 88%',
+              lg: '46% 54% 50% 50% / 16% 18% 82% 84%',
+            },
+            transform: { xs: 'rotate(-1.5deg)', md: 'rotate(-2deg)' },
+          }}
+        />
 
-              <BrandSurface
-                variant="soft"
+        <Grid
+          container
+          sx={{
+            position: 'relative',
+            zIndex: 1,
+            minHeight: 'inherit',
+            minWidth: 0,
+            width: '100%',
+            boxSizing: 'border-box',
+            px: { xs: 2, sm: 3, md: 5, lg: 8 },
+            py: { xs: 3, sm: 4, md: 5, lg: 6 },
+          }}
+        >
+          {!isCompact && (
+            <Grid
+              size={{ xs: 12, lg: 7 }}
+              sx={{
+                display: 'flex',
+                alignItems: { xs: 'center', lg: 'stretch' },
+                minHeight: { xs: 'auto', lg: 720 },
+                minWidth: 0,
+              }}
+            >
+              <Stack
                 sx={{
-                  p: 1.8,
-                  borderRadius: '24px',
-                  border: `1px solid ${alpha(brand.sky, 0.34)}`,
+                  width: '100%',
+                  justifyContent: 'space-between',
+                  alignItems: { xs: 'center', lg: 'flex-start' },
+                  textAlign: { xs: 'center', lg: 'left' },
+                  pt: { xs: 1, lg: 9 },
+                  pb: { xs: 2.5, lg: 4 },
                 }}
               >
-                <Stack spacing={0.6}>
-                  <Typography sx={{ fontWeight: 700, color: brand.ink }}>
+                <Stack
+                  spacing={{ xs: 1.4, md: 1.8 }}
+                  sx={{ width: '100%', maxWidth: 730, minWidth: 0 }}
+                >
+                  <Typography
+                    sx={{
+                      color: authPalette.navy,
+                      fontSize: { xs: '1.35rem', sm: '2.35rem', md: '2.75rem' },
+                      lineHeight: 1.22,
+                      fontWeight: 800,
+                      letterSpacing: 0,
+                      whiteSpace: 'pre-line',
+                      overflowWrap: 'break-word',
+                    }}
+                  >
+                    {title}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      color: authPalette.muted,
+                      fontSize: { xs: '0.88rem', sm: '1.14rem', md: '1.28rem' },
+                      lineHeight: 1.68,
+                      maxWidth: { xs: 310, sm: 560 },
+                      overflowWrap: 'break-word',
+                    }}
+                  >
+                    {subtitle}
+                  </Typography>
+                </Stack>
+
+                <Box
+                  component="img"
+                  src={deliveryArtwork}
+                  alt="Delivery van with courier team"
+                  sx={{
+                    width: { xs: '88%', sm: '86%', lg: '88%' },
+                    maxWidth: { xs: 300, sm: 640, lg: 760 },
+                    mt: { xs: 3, lg: 0 },
+                    ml: { lg: -2 },
+                    objectFit: 'contain',
+                    mixBlendMode: 'multiply',
+                    filter: 'saturate(1.04) contrast(1.02)',
+                    userSelect: 'none',
+                    pointerEvents: 'none',
+                  }}
+                />
+              </Stack>
+            </Grid>
+          )}
+
+          <Grid
+            size={{ xs: 12, lg: isCompact ? 12 : 5 }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: { xs: 'auto', lg: 720 },
+              minWidth: 0,
+            }}
+          >
+            <Box
+              sx={{
+                width: '100%',
+                maxWidth: { xs: 'calc(100vw - 52px)', sm: isCompact ? 520 : 540 },
+                mx: 'auto',
+                pt: { xs: 0, lg: isCompact ? 1 : 2 },
+                pb: { xs: 1, lg: 0 },
+              }}
+            >
+              <Stack spacing={{ xs: 2, md: 2.3 }} alignItems="center" sx={{ mb: { xs: 2, md: 2.8 } }}>
+                <BrandLogo
+                  sx={{
+                    width: { xs: 150, sm: 205, md: 225 },
+                    filter: 'drop-shadow(0 10px 18px rgba(13, 27, 77, 0.08))',
+                  }}
+                />
+                <Stack spacing={0.8} alignItems="center" textAlign="center">
+                  <Typography
+                    sx={{
+                      color: authPalette.orange,
+                      fontSize: { xs: '1.08rem', sm: '1.85rem', md: '2.18rem' },
+                      lineHeight: 1.18,
+                      fontWeight: 800,
+                      letterSpacing: 0,
+                      maxWidth: '100%',
+                      overflowWrap: 'break-word',
+                    }}
+                  >
                     {helperTitle}
                   </Typography>
-                  <Typography sx={{ color: brand.inkSoft, fontSize: '0.9rem', lineHeight: 1.65 }}>
+                  <Typography
+                    sx={{
+                      color: authPalette.text,
+                      fontSize: { xs: '0.9rem', sm: '1.08rem', md: '1.18rem' },
+                      fontWeight: 700,
+                      lineHeight: 1.45,
+                    }}
+                  >
                     {helperText}
                   </Typography>
                 </Stack>
-              </BrandSurface>
+              </Stack>
 
-              <Box>{children}</Box>
-            </Stack>
-          </BrandSurface>
-        </Container>
-
-        {showFooter && <PublicFooter />}
-      </Box>
-    )
-  }
-
-  return (
-    <Box sx={{ minHeight: '100vh' }}>
-      {showNavbar && (
-        <PublicNavbar
-          links={[
-            { label: 'Tracking', to: '/tracking' },
-            { label: 'Rate Calculator', to: '/rate-calculator' },
-            { label: 'Weight Calculator', to: '/weight-calculator' },
-          ]}
-        />
-      )}
-
-      <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3 }, pb: 4 }}>
-        <BrandSurface
-          variant="glass"
-          sx={{
-            p: { xs: 2, md: 3 },
-            overflow: 'hidden',
-            mt: showNavbar ? 0 : { xs: -0.5, md: -1 },
-          }}
-        >
-          <Grid container spacing={{ xs: 2, md: 3 }}>
-            <Grid size={{ xs: 12, lg: 7 }}>
-              <BrandSurface
-                variant="hero"
+              <Box
                 sx={{
-                  height: '100%',
-                  p: { xs: 2.5, md: 4 },
-                  background: `
-                    radial-gradient(circle at 15% 12%, rgba(255,255,255,0.76), transparent 24%),
-                    radial-gradient(circle at 90% 0%, rgba(255,221,174,0.68), transparent 28%),
-                    ${brandGradients.hero}
-                  `,
+                  p: { xs: 0, sm: 0.2 },
+                  borderRadius: '8px',
+                  bgcolor: alpha('#FFFFFF', 0.58),
                 }}
               >
-                <Stack spacing={3.2} sx={{ position: 'relative', zIndex: 1 }}>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {['Built for ecommerce teams', 'Secure account access', `${brandIdentity.shortName} dashboard`].map((pill) => (
-                      <Chip
-                        key={pill}
-                        label={pill}
-                        sx={{
-                          bgcolor: alpha('#FFFFFF', 0.66),
-                          color: brand.ink,
-                          border: `1px solid ${alpha('#FFFFFF', 0.6)}`,
-                          fontWeight: 700,
-                        }}
-                      />
-                    ))}
-                  </Stack>
+                {children}
+              </Box>
 
-                  <Stack spacing={1.5}>
-                    <Typography
-                      sx={{
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.22em',
-                        textTransform: 'uppercase',
-                        color: brand.inkSoft,
-                      }}
-                    >
-                      {eyebrow}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        color: brand.ink,
-                        fontSize: { xs: '2.35rem', sm: '3.1rem', lg: '4.45rem' },
-                        fontWeight: 800,
-                        lineHeight: { xs: 1.02, lg: 0.96 },
-                        letterSpacing: '-0.05em',
-                        maxWidth: 740,
-                      }}
-                    >
-                      {title}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        color: brand.inkSoft,
-                        fontSize: { xs: '0.98rem', md: '1.05rem' },
-                        lineHeight: 1.75,
-                        maxWidth: 640,
-                      }}
-                    >
-                      {subtitle}
-                    </Typography>
-                  </Stack>
-
-                  <Grid container spacing={1.6}>
-                    {authHighlights.map((item) => (
-                      <Grid key={item.title} size={{ xs: 12, sm: 4 }}>
-                        <BrandSurface variant="soft" sx={{ height: '100%', p: 2.1, borderRadius: '28px' }}>
-                          <Stack spacing={1.2}>
-                            <Box
-                              sx={{
-                                width: 42,
-                                height: 42,
-                                borderRadius: '16px',
-                                display: 'grid',
-                                placeItems: 'center',
-                                bgcolor: alpha(brand.sky, 0.76),
-                                color: brand.ink,
-                              }}
-                            >
-                              {item.icon}
-                            </Box>
-                            <Typography sx={{ fontWeight: 700, color: brand.ink, lineHeight: 1.2 }}>
-                              {item.title}
-                            </Typography>
-                            <Typography sx={{ color: brand.inkSoft, fontSize: '0.88rem', lineHeight: 1.68 }}>
-                              {item.text}
-                            </Typography>
-                          </Stack>
-                        </BrandSurface>
-                      </Grid>
-                    ))}
-                  </Grid>
-
-                  <BrandSurface variant="glass" sx={{ p: 2.1, borderRadius: '28px' }}>
-                    <Stack direction="row" spacing={1.2} alignItems="flex-start">
-                      <Box
-                        sx={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: '16px',
-                          display: 'grid',
-                          placeItems: 'center',
-                          bgcolor: alpha(brand.warning, 0.16),
-                          color: brand.ink,
-                          flexShrink: 0,
-                        }}
-                      >
-                        <TbRouteSquare size={18} />
-                      </Box>
-                      <Box>
-                        <Typography sx={{ fontWeight: 700, color: brand.ink, mb: 0.5 }}>
-                          {helperTitle}
-                        </Typography>
-                        <Typography sx={{ color: brand.inkSoft, lineHeight: 1.72, fontSize: '0.92rem' }}>
-                          {helperText}
-                        </Typography>
-                        <Stack direction="row" spacing={0.8} alignItems="center" sx={{ mt: 1.25 }}>
-                          <FiCheckCircle size={14} color={brand.success} />
-                          <Typography sx={{ color: brand.ink, fontSize: '0.82rem', fontWeight: 600 }}>
-                            Existing token storage and auth guards remain unchanged
-                          </Typography>
-                        </Stack>
-                      </Box>
-                    </Stack>
-                  </BrandSurface>
-                </Stack>
-              </BrandSurface>
-            </Grid>
-
-            <Grid size={{ xs: 12, lg: 5 }}>
-              <BrandSurface
-                variant="card"
+              <Box
+                component="span"
                 sx={{
-                  height: '100%',
-                  p: { xs: 2.4, md: 3 },
-                  display: 'flex',
-                  alignItems: 'center',
+                  display: { xs: 'block', lg: 'none' },
+                  mt: 2.5,
+                  mx: 'auto',
+                  width: 92,
+                  height: 4,
+                  borderRadius: 999,
+                  bgcolor: alpha(brand.ink, 0.12),
                 }}
-              >
-                <Box sx={{ width: '100%' }}>{children}</Box>
-              </BrandSurface>
-            </Grid>
+              />
+            </Box>
           </Grid>
-        </BrandSurface>
-      </Container>
-
-      {showFooter && <PublicFooter />}
+        </Grid>
+      </Box>
     </Box>
   )
 }

@@ -14,6 +14,7 @@ interface CustomInputProps extends Omit<TextFieldProps, 'variant' | 'prefix' | '
   helpText?: string
   topMargin?: boolean
   maxLength?: number
+  authVariant?: 'reference'
 }
 
 const CustomInput = forwardRef<HTMLInputElement, CustomInputProps>(
@@ -32,6 +33,7 @@ const CustomInput = forwardRef<HTMLInputElement, CustomInputProps>(
       helpText,
       topMargin = true,
       maxLength,
+      authVariant,
       ...props
     },
     ref,
@@ -41,6 +43,7 @@ const CustomInput = forwardRef<HTMLInputElement, CustomInputProps>(
     const internalRef = useRef<HTMLInputElement>(null)
 
     const isPasswordType = type === 'password'
+    const isReferenceAuth = authVariant === 'reference'
 
     useEffect(() => {
       if (value) setIsFocused(true)
@@ -51,12 +54,12 @@ const CustomInput = forwardRef<HTMLInputElement, CustomInputProps>(
         {label && (
           <Typography
             sx={{
-              mb: 0.9,
-              fontSize: '0.74rem',
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: isFocused ? brand.ink : brand.inkSoft,
+              mb: isReferenceAuth ? 0.7 : 0.9,
+              fontSize: isReferenceAuth ? '0.98rem' : '0.74rem',
+              fontWeight: isReferenceAuth ? 500 : 700,
+              letterSpacing: 0,
+              textTransform: isReferenceAuth ? 'none' : 'uppercase',
+              color: isReferenceAuth ? '#111111' : isFocused ? brand.ink : brand.inkSoft,
               cursor: 'pointer',
               transition: 'color 0.2s ease',
             }}
@@ -86,20 +89,29 @@ const CustomInput = forwardRef<HTMLInputElement, CustomInputProps>(
           sx={{
             width,
             '& .MuiOutlinedInput-root': {
-              borderRadius: '24px',
-              bgcolor: alpha('#FFFFFF', 0.9),
-              backgroundImage:
-                'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,251,255,0.98) 100%)',
-              boxShadow: isFocused
-                ? '0 0 0 4px rgba(198,231,255,0.34), 0 16px 30px rgba(15,44,67,0.08)'
-                : '0 10px 24px rgba(15,44,67,0.045)',
+              borderRadius: isReferenceAuth ? '7px' : '24px',
+              bgcolor: '#FFFFFF',
+              backgroundImage: isReferenceAuth
+                ? 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(253,253,253,1) 100%)'
+                : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,251,255,0.98) 100%)',
+              boxShadow: isReferenceAuth
+                ? 'none'
+                : isFocused
+                  ? '0 0 0 4px rgba(198,231,255,0.34), 0 16px 30px rgba(15,44,67,0.08)'
+                  : '0 10px 24px rgba(15,44,67,0.045)',
               transition: 'all 0.2s ease',
               '& fieldset': {
-                borderColor: isFocused ? alpha(brand.ink, 0.28) : alpha(brand.ink, 0.1),
+                borderColor: isReferenceAuth
+                  ? isFocused
+                    ? alpha(brand.ink, 0.5)
+                    : alpha(brand.ink, 0.36)
+                  : isFocused
+                    ? alpha(brand.ink, 0.28)
+                    : alpha(brand.ink, 0.1),
                 borderWidth: isFocused ? 1.5 : 1,
               },
               '&:hover fieldset': {
-                borderColor: alpha(brand.ink, 0.24),
+                borderColor: isReferenceAuth ? alpha(brand.ink, 0.52) : alpha(brand.ink, 0.24),
               },
               '&.Mui-error': {
                 boxShadow: '0 0 0 3px rgba(209, 67, 67, 0.08)',
@@ -112,10 +124,10 @@ const CustomInput = forwardRef<HTMLInputElement, CustomInputProps>(
               },
             },
             '& .MuiInputBase-input': {
-              py: 1.22,
+              py: isReferenceAuth ? 1.25 : 1.22,
               color: brand.ink,
               fontWeight: 600,
-              fontSize: '0.94rem',
+              fontSize: isReferenceAuth ? '1.02rem' : '0.94rem',
               lineHeight: 1.4,
             },
             '& .MuiFormHelperText-root': {

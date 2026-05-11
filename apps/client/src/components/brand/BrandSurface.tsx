@@ -54,7 +54,7 @@ export default function BrandSurface({
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
-          borderRadius: { xs: '28px', sm: '34px' },
+          borderRadius: { xs: '14px', sm: '16px' },
         },
         variantStyles[variant],
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),

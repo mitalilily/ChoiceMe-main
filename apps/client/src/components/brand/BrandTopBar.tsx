@@ -28,7 +28,7 @@ export default function BrandTopBar({
         sx={{
           px: { xs: 2, sm: 2.5, lg: 3 },
           py: { xs: 0.95, sm: 1.1 },
-          borderRadius: { xs: '26px', sm: '999px' },
+          borderRadius: { xs: '14px', sm: '14px' },
           ...innerSx,
         }}
       >

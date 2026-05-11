@@ -65,7 +65,7 @@ const theme = createTheme({
     divider: alpha(brand.ink, 0.08),
   },
   shape: {
-    borderRadius: 22,
+    borderRadius: 10,
   },
   typography: {
     fontFamily: brandFonts.body,
@@ -160,6 +160,21 @@ const theme = createTheme({
           backgroundColor: alpha(brand.sky, 0.92),
           color: brand.ink,
         },
+        '.MuiButton-root': {
+          borderRadius: '10px !important',
+          minHeight: 40,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        '.MuiCard-root': {
+          borderRadius: '14px !important',
+        },
+        '.MuiPaper-root': {
+          borderRadius: '14px',
+        },
+        '.MuiIconButton-root': {
+          borderRadius: '10px',
+        },
       },
     },
     MuiCard: {
@@ -168,8 +183,8 @@ const theme = createTheme({
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          borderRadius: 30,
-          boxShadow: brand.shadow,
+          borderRadius: 14,
+          boxShadow: '0 14px 30px rgba(15, 44, 67, 0.07)',
           border: `1px solid ${alpha('#FFFFFF', 0.82)}`,
           background: brandGradients.surface,
         },
@@ -186,7 +201,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           background: brandGradients.surface,
-          borderRadius: 30,
+          borderRadius: 14,
         },
         elevation1: {
           boxShadow: '0 18px 38px rgba(15, 44, 67, 0.06)',
@@ -199,8 +214,8 @@ const theme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 999,
-          padding: '11px 22px',
+          borderRadius: 10,
+          padding: '10px 18px',
           fontSize: '0.88rem',
           fontWeight: 700,
           boxShadow: 'none',
@@ -243,7 +258,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
-            borderRadius: 20,
+            borderRadius: 10,
             backgroundColor: alpha('#FFFFFF', 0.88),
             '& fieldset': {
               borderColor: alpha(brand.ink, 0.12),
@@ -271,7 +286,7 @@ const theme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 999,
+          borderRadius: 8,
           fontWeight: 700,
         },
         filled: {
@@ -287,7 +302,7 @@ const theme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 30,
+          borderRadius: 16,
           border: `1px solid ${alpha(brand.ink, 0.1)}`,
           boxShadow: '0 32px 68px rgba(15, 44, 67, 0.16)',
           background: brandGradients.surface,

@@ -14,7 +14,7 @@ import { breakpoints } from './foundations/breakpoints'
 import { globalStyles } from './styles'
 
 const fieldBase = {
-  borderRadius: '18px',
+  borderRadius: '10px',
   borderColor: 'rgba(13,27,77,0.12)',
   bg: 'rgba(255,255,255,0.86)',
   fontWeight: '600',
@@ -128,12 +128,12 @@ const componentOverrides = {
                 py: '16px',
               },
               '& td:first-of-type': {
-                borderTopLeftRadius: '18px',
-                borderBottomLeftRadius: '18px',
+                borderTopLeftRadius: '10px',
+                borderBottomLeftRadius: '10px',
               },
               '& td:last-of-type': {
-                borderTopRightRadius: '18px',
-                borderBottomRightRadius: '18px',
+                borderTopRightRadius: '10px',
+                borderBottomRightRadius: '10px',
               },
             },
           },
@@ -143,7 +143,7 @@ const componentOverrides = {
     Tabs: {
       baseStyle: {
         tab: {
-          borderRadius: '999px',
+          borderRadius: '10px',
           px: '18px',
           py: '10px',
           fontWeight: '700',
@@ -156,7 +156,7 @@ const componentOverrides = {
         },
         tablist: {
           p: '6px',
-          borderRadius: '999px',
+          borderRadius: '12px',
           bg: 'rgba(255,255,255,0.72)',
           border: '1px solid rgba(13,27,77,0.08)',
           boxShadow: '0 14px 28px rgba(68,92,138,0.06)',
@@ -166,7 +166,7 @@ const componentOverrides = {
     Modal: {
       baseStyle: {
         dialog: {
-          borderRadius: '30px',
+          borderRadius: '16px',
           borderWidth: '1px',
           borderColor: 'rgba(13,27,77,0.12)',
           boxShadow: '0 34px 72px rgba(13,27,77,0.18)',
@@ -195,7 +195,7 @@ const componentOverrides = {
     },
     Badge: {
       baseStyle: {
-        borderRadius: 'full',
+        borderRadius: '8px',
         textTransform: 'none',
         px: '2.5',
         py: '1',

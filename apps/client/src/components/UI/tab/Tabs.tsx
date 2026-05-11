@@ -50,7 +50,7 @@ const StyledTab = styled(Tab)(({ theme }) => ({
   minHeight: 0,
   minWidth: 0,
   textTransform: 'none',
-  borderRadius: 999,
+  borderRadius: 10,
   padding: '10px 18px',
   fontWeight: 700,
   fontSize: '0.92rem',
@@ -74,7 +74,7 @@ const StyledTab = styled(Tab)(({ theme }) => ({
 const CounterChip = styled('span')(({ theme }) => ({
   fontSize: '0.72rem',
   padding: '3px 8px',
-  borderRadius: 999,
+  borderRadius: 8,
   background: alpha(theme.palette.primary.main, 0.08),
   color: theme.palette.primary.main,
   fontWeight: 800,
@@ -114,7 +114,7 @@ export function SmartTabs<T extends string = string>({
           left: 14,
           right: 14,
           zIndex: 999,
-          borderRadius: 999,
+          borderRadius: '14px',
           overflow: 'hidden',
           border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
           background: alpha('#fff9f3', 0.92),
@@ -153,7 +153,7 @@ export function SmartTabs<T extends string = string>({
               sx={{
                 '&.Mui-selected': {
                   bgcolor: alpha(theme.palette.secondary.main, 0.12),
-                  borderRadius: 999,
+                  borderRadius: '10px',
                 },
               }}
             />
@@ -169,7 +169,7 @@ export function SmartTabs<T extends string = string>({
                 sx={{
                   '&.Mui-selected': {
                     bgcolor: alpha(theme.palette.primary.main, 0.12),
-                    borderRadius: 999,
+                    borderRadius: '10px',
                   },
                 }}
               />
@@ -217,7 +217,7 @@ export function SmartTabs<T extends string = string>({
       <Box
         sx={{
           p: 1,
-          borderRadius: 999,
+          borderRadius: '12px',
           display: 'inline-flex',
           alignItems: 'center',
           background: alpha('#fff9f3', 0.86),

@@ -60,7 +60,7 @@ export default function AdminNavbar(props) {
       backdropFilter={secondary ? "none" : "blur(14px)"}
       transition="all 0.3s ease"
       alignItems="center"
-      borderRadius="20px"
+      borderRadius="14px"
       minH="64px"
       left={{ base: "10px", md: "14px", xl: `${sidebarWidth + 24}px` }}
       right="14px"
@@ -117,7 +117,7 @@ export default function AdminNavbar(props) {
           spacing={1}
           px="6px"
           py="4px"
-          borderRadius="999px"
+          borderRadius="12px"
           border="1px solid"
           borderColor={navShellBorder}
           bg={navShellBg}
@@ -126,7 +126,7 @@ export default function AdminNavbar(props) {
             <NavLink key={item.label} to={item.path}>
               <Button
                 variant="ghost"
-                borderRadius="999px"
+                borderRadius="10px"
                 px="12px"
                 minH="34px"
                 fontSize="13px"

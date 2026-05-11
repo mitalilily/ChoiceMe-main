@@ -65,7 +65,7 @@ function SidebarResponsive(props) {
               mb="10px"
               px="14px"
               py="13px"
-              borderRadius="18px"
+              borderRadius="10px"
               w="100%"
               border="1px solid"
               borderColor={isActive ? 'rgba(255, 138, 40, 0.22)' : 'transparent'}
@@ -81,7 +81,7 @@ function SidebarResponsive(props) {
                   h="34px"
                   w="34px"
                   me="12px"
-                  borderRadius="14px"
+                  borderRadius="10px"
                 >
                   {prop.icon}
                 </IconBox>
@@ -98,7 +98,7 @@ function SidebarResponsive(props) {
   const { logoText, routes } = props
   const links = <>{createLinks(routes)}</>
 
-  const brand = (
+  const brandHeader = (
     <Box pt="26px" mb="12px">
       <Flex align="center" justify="center" gap="10px" mb="18px" fontWeight="bold" direction="column">
         <Box as="img" src={brandIdentity.logoPath} alt={brandIdentity.name} h="56px" w="168px" objectFit="contain" />
@@ -119,7 +119,7 @@ function SidebarResponsive(props) {
         cursor="pointer"
         onClick={onOpen}
         p="9px"
-        borderRadius="16px"
+        borderRadius="10px"
         bg={hamburgerSurface}
         border="1px solid"
         borderColor={hamburgerBorder}
@@ -137,7 +137,7 @@ function SidebarResponsive(props) {
         <DrawerContent
           w="296px"
           maxW="296px"
-          borderRadius="0 26px 26px 0"
+          borderRadius="0 14px 14px 0"
           bg={drawerBg}
           borderRight="1px solid rgba(13,27,77,0.08)"
           boxShadow="0 28px 56px rgba(68,92,138,0.16)"
@@ -145,7 +145,7 @@ function SidebarResponsive(props) {
           <DrawerCloseButton _focus={{ boxShadow: 'none' }} color={textColor} />
           <DrawerBody px="14px" pt="2">
             <Box maxW="100%" h="100vh">
-              {brand}
+              {brandHeader}
               <Stack direction="column" mb="40px">
                 <Box>{links}</Box>
               </Stack>

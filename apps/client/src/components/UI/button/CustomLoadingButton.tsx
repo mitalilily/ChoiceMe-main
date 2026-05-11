@@ -16,6 +16,7 @@ interface CustomIconLoadingButtonProps
   styles?: Record<string, unknown>
   variant?: ButtonVisualVariant
   textColor?: string
+  endIconNode?: React.ReactNode
 }
 
 export default function CustomIconLoadingButton({
@@ -28,6 +29,7 @@ export default function CustomIconLoadingButton({
   type = 'button',
   styles,
   textColor,
+  endIconNode,
   variant = 'solid',
   ...rest
 }: CustomIconLoadingButtonProps) {
@@ -39,13 +41,13 @@ export default function CustomIconLoadingButton({
       onClick={onClick}
       disabled={isDisabled}
       sx={{
-        ...styles,
         px: 3,
         py: 1.25,
+        position: 'relative',
         textTransform: 'none',
         fontWeight: 700,
         gap: 1,
-        borderRadius: 999,
+        borderRadius: '10px',
         background: variant === 'solid' ? brandGradients.button : 'rgba(255,255,255,0.72)',
         color: textColor ?? (variant === 'solid' ? brand.ink : brand.ink),
         border:
@@ -70,6 +72,7 @@ export default function CustomIconLoadingButton({
           color: textColor ?? alpha(brand.ink, 0.62),
           borderColor: variant === 'text' ? alpha(brand.ink, 0.08) : alpha('#FFFFFF', 0.18),
         },
+        ...styles,
       }}
       {...rest}
     >
@@ -86,6 +89,22 @@ export default function CustomIconLoadingButton({
           <Typography variant="body2" sx={{ color: 'inherit', fontWeight: 700 }}>
             {text}
           </Typography>
+          {endIconNode ? (
+            <Typography
+              component="span"
+              sx={{
+                position: 'absolute',
+                right: 22,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                color: 'inherit',
+              }}
+            >
+              {endIconNode}
+            </Typography>
+          ) : null}
         </>
       )}
     </Button>

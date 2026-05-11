@@ -64,7 +64,7 @@ const SidebarContent = ({ logoText, routes, sidebarWidth }) => {
         justifyContent={collapsed ? 'center' : 'flex-start'}
         w="100%"
         bg={isActive ? activeBg : 'transparent'}
-        borderRadius="16px"
+        borderRadius="10px"
         mb="1.5"
         px={collapsed ? '2' : '3.5'}
         py="11px"
@@ -86,7 +86,7 @@ const SidebarContent = ({ logoText, routes, sidebarWidth }) => {
             <Box
               w={collapsed ? '42px' : '38px'}
               h={collapsed ? '42px' : '38px'}
-              borderRadius="12px"
+              borderRadius="10px"
               bg={isActive ? `${accent}22` : `${accent}14`}
               color={isActive ? accent : iconColor}
               fontSize={collapsed ? '20px' : '18px'}
@@ -127,7 +127,7 @@ const SidebarContent = ({ logoText, routes, sidebarWidth }) => {
                 justifyContent={collapsed ? 'center' : 'space-between'}
                 w="100%"
                 bg={isChildActive ? activeBg : 'transparent'}
-                borderRadius="18px"
+                borderRadius="10px"
                 mb="1"
                 px={collapsed ? '2' : '3.5'}
                 py="12px"
@@ -143,7 +143,7 @@ const SidebarContent = ({ logoText, routes, sidebarWidth }) => {
                 <Flex align="center" gap="12px" w="100%">
                   <Box
                     p="8px"
-                    borderRadius="14px"
+                    borderRadius="10px"
                     bg={isChildActive ? `${accent}22` : `${accent}14`}
                     color={isChildActive ? accent : iconColor}
                     fontSize={collapsed ? '20px' : '18px'}
@@ -232,7 +232,7 @@ const SidebarContent = ({ logoText, routes, sidebarWidth }) => {
           <Box
             px="14px"
             py="14px"
-            borderRadius="26px"
+            borderRadius="14px"
             bg={`linear-gradient(180deg, ${brand.ink} 0%, #163E59 100%)`}
             color="white"
             boxShadow="0 18px 36px rgba(13,27,77,0.18)"
@@ -252,7 +252,7 @@ const SidebarContent = ({ logoText, routes, sidebarWidth }) => {
               mt="12px"
               px="10px"
               py="8px"
-              borderRadius="16px"
+              borderRadius="10px"
               bg="rgba(255,255,255,0.08)"
               border="1px solid rgba(255,255,255,0.1)"
             >
@@ -288,7 +288,7 @@ const SidebarContent = ({ logoText, routes, sidebarWidth }) => {
       <Stack direction="column" spacing="0.5" px="10px">
         <Box
           p={showText ? '10px' : '4px'}
-          borderRadius="24px"
+          borderRadius="14px"
           bg={panelBg}
           border="1px solid"
           borderColor={dividerColor}

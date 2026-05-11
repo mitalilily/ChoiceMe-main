@@ -39,7 +39,7 @@ export default function AuthNavbar(props) {
       border={navbarBorder}
       boxShadow={navbarShadow}
       backdropFilter={secondary ? 'none' : 'blur(14px)'}
-      borderRadius="20px"
+      borderRadius="14px"
       px={{ base: '12px', md: '16px' }}
       py="8px"
       mx="auto"
@@ -66,7 +66,7 @@ export default function AuthNavbar(props) {
           spacing={1}
           px="6px"
           py="4px"
-          borderRadius="999px"
+          borderRadius="12px"
           border="1px solid"
           borderColor={navShellBorder}
           bg={navShellBg}
@@ -75,7 +75,7 @@ export default function AuthNavbar(props) {
             <NavLink to={item.to} key={item.label}>
               <Button
                 variant="ghost"
-                borderRadius="999px"
+                borderRadius="10px"
                 px="12px"
                 minH="34px"
                 fontSize="13px"
@@ -98,7 +98,7 @@ export default function AuthNavbar(props) {
             bg="brand.500"
             color="white"
             fontSize="13px"
-            borderRadius="999px"
+            borderRadius="10px"
             px="16px"
             minH="36px"
             _hover={{ bg: 'brand.600' }}

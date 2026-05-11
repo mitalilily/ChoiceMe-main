@@ -1,7 +1,7 @@
 import { Box, FormControlLabel, Link, Stack, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { useMemo, useState } from 'react'
-import { FiMail } from 'react-icons/fi'
+import { FiArrowRight, FiMail } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/auth/AuthContext'
 import { useRequestOtp, useVerifyOtp } from '../../hooks/useOTP'
@@ -17,7 +17,37 @@ import CodeInput from './CodeInput'
 import { extractInlineCode } from './inlineCode'
 import { brand } from '../../theme/brand'
 
-export default function OtpLoginPanel() {
+interface OtpLoginPanelProps {
+  showIntro?: boolean
+  compactLogin?: boolean
+}
+
+const AUTH_NAVY = '#0D1B4D'
+const AUTH_ORANGE = '#E86F00'
+
+const loginButtonStyles = {
+  width: '100%',
+  minHeight: 58,
+  borderRadius: '7px',
+  background: AUTH_NAVY,
+  color: '#FFFFFF',
+  boxShadow: `0 10px 20px ${alpha(AUTH_NAVY, 0.28)}`,
+  '&:hover': {
+    background: '#071643',
+    transform: 'translateY(-1px)',
+  },
+  '&:disabled': {
+    background: AUTH_NAVY,
+    color: '#FFFFFF',
+    opacity: 1,
+    boxShadow: `0 10px 20px ${alpha(AUTH_NAVY, 0.2)}`,
+  },
+}
+
+export default function OtpLoginPanel({
+  showIntro = true,
+  compactLogin = false,
+}: OtpLoginPanelProps) {
   const navigate = useNavigate()
   const { setTokens, setUserId } = useAuth()
   const [step, setStep] = useState<'request' | 'verify'>('request')
@@ -99,15 +129,17 @@ export default function OtpLoginPanel() {
   }
 
   return (
-    <Stack spacing={2.2}>
-      <Stack spacing={0.8}>
-        <Typography sx={{ color: brand.ink, fontWeight: 800, fontSize: '1.18rem' }}>
-          Continue with email OTP
-        </Typography>
-        <Typography sx={{ color: brand.inkSoft, lineHeight: 1.7, fontSize: '0.92rem' }}>
-          Use your registered email for a quick passwordless login into your courier dashboard.
-        </Typography>
-      </Stack>
+    <Stack spacing={compactLogin ? 2 : 2.2}>
+      {showIntro ? (
+        <Stack spacing={0.8}>
+          <Typography sx={{ color: brand.ink, fontWeight: 800, fontSize: '1.18rem' }}>
+            Continue with email OTP
+          </Typography>
+          <Typography sx={{ color: brand.inkSoft, lineHeight: 1.7, fontSize: '0.92rem' }}>
+            Use your registered email for a quick passwordless login into your courier dashboard.
+          </Typography>
+        </Stack>
+      ) : null}
 
       <AuthCodePreview
         title="OTP"
@@ -118,7 +150,8 @@ export default function OtpLoginPanel() {
         <Box component="form" onSubmit={handleRequest}>
           <CustomInput
             type="email"
-            label="Work Email"
+            label={compactLogin ? 'Username' : 'Work Email'}
+            placeholder={compactLogin ? 'e.g., yourname@choice.mee' : ''}
             value={email}
             name="email"
             id="otp-email"
@@ -128,14 +161,15 @@ export default function OtpLoginPanel() {
             }}
             error={Boolean(error || emailError) && Boolean(email)}
             helperText={error || (email ? emailError : '')}
-            prefix={<FiMail color={brand.ink} size={15} />}
+            prefix={<FiMail color={compactLogin ? AUTH_NAVY : brand.ink} size={compactLogin ? 20 : 15} />}
             autoFocus
             required
             topMargin={false}
+            authVariant={compactLogin ? 'reference' : undefined}
           />
 
           <FormControlLabel
-            sx={{ mt: 1.2, mb: 2.2, alignItems: 'flex-start' }}
+            sx={{ mt: compactLogin ? 1 : 1.2, mb: compactLogin ? 2 : 2.2, alignItems: 'flex-start' }}
             control={
               <CustomCheckbox
                 checked={termsChecked}
@@ -144,13 +178,13 @@ export default function OtpLoginPanel() {
               />
             }
             label={
-              <Typography sx={{ color: brand.inkSoft, fontSize: '0.86rem', mt: 0.25 }}>
+              <Typography sx={{ color: compactLogin ? '#111111' : brand.inkSoft, fontSize: '0.86rem', mt: 0.25 }}>
                 I agree to{' '}
                 <Link
                   component="button"
                   underline="hover"
                   onClick={() => setOpenTerms(true)}
-                  sx={{ color: brand.ink, fontWeight: 700 }}
+                  sx={{ color: compactLogin ? AUTH_ORANGE : brand.ink, fontWeight: 700 }}
                 >
                   Terms and Conditions
                 </Link>
@@ -160,11 +194,13 @@ export default function OtpLoginPanel() {
 
           <CustomIconLoadingButton
             type="submit"
-            text="Send verification code"
+            text={compactLogin ? 'Log In' : 'Send verification code'}
             loading={requesting}
             loadingText="Sending..."
             disabled={Boolean(emailError) || !termsChecked}
-            styles={{ width: '100%' }}
+            styles={compactLogin ? loginButtonStyles : { width: '100%' }}
+            textColor={compactLogin ? '#FFFFFF' : undefined}
+            endIconNode={compactLogin ? <FiArrowRight size={28} /> : undefined}
           />
         </Box>
       ) : (
@@ -192,11 +228,13 @@ export default function OtpLoginPanel() {
 
           <CustomIconLoadingButton
             type="submit"
-            text="Verify and enter app"
+            text={compactLogin ? 'Verify and Log In' : 'Verify and enter app'}
             loading={verifying}
             loadingText="Verifying..."
             disabled={code.length !== 6}
-            styles={{ width: '100%' }}
+            styles={compactLogin ? loginButtonStyles : { width: '100%' }}
+            textColor={compactLogin ? '#FFFFFF' : undefined}
+            endIconNode={compactLogin ? <FiArrowRight size={28} /> : undefined}
           />
 
           <CustomIconLoadingButton

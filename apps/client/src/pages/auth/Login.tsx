@@ -1,4 +1,5 @@
 import { Box, Button, Stack, Typography } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import { useState } from 'react'
 import { Navigate, Link as RouterLink } from 'react-router-dom'
 import AuthShell from '../../components/auth/AuthShell'
@@ -6,7 +7,10 @@ import CredentialAuthForm from '../../components/auth/CredentialAuthForm'
 import OtpLoginPanel from '../../components/auth/OtpLoginPanel'
 import FullScreenLoader from '../../components/UI/loader/FullScreenLoader'
 import { useAuth } from '../../context/auth/AuthContext'
-import { brand, brandGradients } from '../../theme/brand'
+import { brand } from '../../theme/brand'
+
+const AUTH_NAVY = '#0D1B4D'
+const AUTH_ORANGE = '#E86F00'
 
 export default function Login() {
   const { loading, isAuthenticated } = useAuth()
@@ -17,57 +21,75 @@ export default function Login() {
 
   return (
     <AuthShell
-      eyebrow="Portal Login"
-      title="Book, track, and manage every shipment in one place."
-      subtitle="Access the ChoiceMe courier portal to compare rates, follow deliveries, and keep your shipping operations moving without delays."
-      helperTitle="Faster courier access"
-      helperText="Sign in to reach your shipment dashboard, courier tools, and live tracking flow from a single screen."
+      eyebrow="Client Auth"
+      title={'Ship with Confidence.\nWe Deliver Commitment.'}
+      subtitle="Manage your shipments, track deliveries, and stay updated - all in one place."
+      helperTitle="Welcome Back to ChoiceMe"
+      helperText="Please log in to manage your shipments"
       showChrome
       showNavbar={false}
     >
-      <Stack spacing={2.4}>
-        <Stack spacing={0.8}>
-          <Typography sx={{ color: brand.ink, fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.05em' }}>
-            Login
-          </Typography>
-        </Stack>
-
+      <Stack spacing={2.2}>
         <Box
           sx={{
-            p: 0.6,
-            borderRadius: 999,
-            backgroundColor: 'rgba(198,231,255,0.18)',
+            borderRadius: '7px',
+            border: `1px solid ${alpha(AUTH_NAVY, 0.18)}`,
+            backgroundColor: alpha('#FFFFFF', 0.7),
+            overflow: 'hidden',
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: 0.6,
+            boxShadow: `0 8px 20px ${alpha(AUTH_NAVY, 0.05)}`,
           }}
         >
           {[
             { value: 'otp', label: 'Email OTP' },
-            { value: 'password', label: 'Password' },
+            { value: 'password', label: 'Email + Password', mobileLabel: 'Password' },
           ].map((item) => (
             <Button
               key={item.value}
               type="button"
               onClick={() => setMode(item.value as 'otp' | 'password')}
               sx={{
-                borderRadius: 999,
-                py: 1.2,
-                background: mode === item.value ? brandGradients.button : 'transparent',
-                color: brand.ink,
-                fontWeight: 700,
+                borderRadius: 0,
+                py: { xs: 1.15, sm: 1.35 },
+                px: { xs: 0.5, sm: 1 },
+                minHeight: 56,
+                background: mode === item.value ? '#FFFFFF' : 'rgba(247,248,252,0.72)',
+                color: mode === item.value ? AUTH_ORANGE : alpha(AUTH_NAVY, 0.72),
+                fontWeight: 800,
+                fontSize: { xs: '0.68rem', sm: '0.96rem' },
+                textTransform: 'none',
+                whiteSpace: 'nowrap',
+                borderBottom: `3px solid ${mode === item.value ? AUTH_ORANGE : 'transparent'}`,
+                borderRight:
+                  item.value === 'otp'
+                    ? `1px solid ${alpha(AUTH_NAVY, 0.14)}`
+                    : '1px solid transparent',
+                '&:hover': {
+                  background: '#FFFFFF',
+                  color: mode === item.value ? AUTH_ORANGE : AUTH_NAVY,
+                },
               }}
             >
-              {item.label}
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                {item.label}
+              </Box>
+              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                {item.mobileLabel ?? item.label}
+              </Box>
             </Button>
           ))}
         </Box>
 
-        {mode === 'otp' ? <OtpLoginPanel /> : <CredentialAuthForm mode="login" />}
+        {mode === 'otp' ? (
+          <OtpLoginPanel showIntro={false} compactLogin />
+        ) : (
+          <CredentialAuthForm mode="login" showIntro={false} compactLogin />
+        )}
 
-        <Typography sx={{ color: brand.inkSoft, textAlign: 'center', fontSize: '0.88rem' }}>
+        <Typography sx={{ color: brand.inkSoft, textAlign: 'center', fontSize: '0.86rem' }}>
           New to ChoiceMe?{' '}
-          <Box component={RouterLink} to="/signup" sx={{ color: brand.ink, fontWeight: 700 }}>
+          <Box component={RouterLink} to="/signup" sx={{ color: AUTH_ORANGE, fontWeight: 800 }}>
             Create an account
           </Box>
         </Typography>
