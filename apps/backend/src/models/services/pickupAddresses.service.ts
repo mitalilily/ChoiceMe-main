@@ -46,6 +46,41 @@ function isCourierAuthOrConfigError(rawError: any, err?: any) {
   )
 }
 
+type CourierAddressLike = {
+  addressLine1?: string | number | null
+  addressLine2?: string | number | null
+  landmark?: string | number | null
+  city?: string | number | null
+  state?: string | number | null
+  country?: string | number | null
+  pincode?: string | number | null
+}
+
+function cleanAddressPart(value: string | number | null | undefined) {
+  return String(value ?? '').trim()
+}
+
+function buildCourierAddress(address: CourierAddressLike | null | undefined) {
+  const seen = new Set<string>()
+  const parts = [
+    address?.addressLine1,
+    address?.addressLine2,
+    address?.landmark,
+    address?.city,
+    address?.state,
+    address?.country,
+    address?.pincode,
+  ]
+    .map(cleanAddressPart)
+    .filter((part) => {
+      if (!part || seen.has(part.toLowerCase())) return false
+      seen.add(part.toLowerCase())
+      return true
+    })
+
+  return parts.join(', ')
+}
+
 /**
  * Create Pickup + optional RTO
  */
@@ -110,6 +145,9 @@ export async function createPickupAddressService(data: CreatePickupDto, userId: 
       })
       .returning()
 
+    const pickupAddressText = buildCourierAddress(pickupAddr)
+    const returnAddressText = buildCourierAddress(rtoAddressData) || pickupAddressText
+
     // 🚚 Register pickup in Delhivery
     try {
       const delhivery = new DelhiveryService()
@@ -118,11 +156,11 @@ export async function createPickupAddressService(data: CreatePickupDto, userId: 
         registered_name: 'ChoiceMe',
         phone: pickupAddr.contactPhone,
         email: pickupAddr.contactEmail ?? '',
-        address: pickupAddr.addressLine1,
+        address: pickupAddressText || pickupAddr.addressLine1,
         city: pickupAddr.city,
         pin: pickupAddr.pincode.toString(),
         country: pickupAddr.country ?? 'India',
-        return_address: rtoAddressData.addressLine1 ?? pickupAddr.addressLine1,
+        return_address: returnAddressText || pickupAddressText || pickupAddr.addressLine1,
         return_city: rtoAddressData.city ?? pickupAddr.city,
         return_pin: rtoAddressData.pincode?.toString() ?? pickupAddr.pincode?.toString(),
         return_state: rtoAddressData.state ?? pickupAddr.state,
@@ -190,11 +228,11 @@ export async function createPickupAddressService(data: CreatePickupDto, userId: 
         registered_name: 'ChoiceMe',
         phone: pickupAddr.contactPhone,
         email: pickupAddr.contactEmail ?? '',
-        address: pickupAddr.addressLine1,
+        address: pickupAddressText || pickupAddr.addressLine1,
         city: pickupAddr.city,
         pin: pickupAddr.pincode.toString(),
         country: pickupAddr.country ?? 'India',
-        return_address: rtoAddressData.addressLine1 ?? pickupAddr.addressLine1,
+        return_address: returnAddressText || pickupAddressText || pickupAddr.addressLine1,
         return_city: rtoAddressData.city ?? pickupAddr.city,
         return_pin: rtoAddressData.pincode?.toString() ?? pickupAddr.pincode?.toString(),
         return_state: rtoAddressData.state ?? pickupAddr.state,

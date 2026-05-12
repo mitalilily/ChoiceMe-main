@@ -1213,12 +1213,15 @@ export class DeliveryOneService {
     }
 
     const address = sanitizeString(params.address)
+    const returnAddress = sanitizeString(params.return_address ?? params.returnAddress) || address
+    const resolvedAddress = address || returnAddress
     const country = sanitizeString(params.country) || 'India'
     const payload: DeliveryOneWarehouseResponse['payload'] = {
       name: sanitizeString(params.name),
       phone: sanitizePhone(params.phone),
       pin: sanitizePincode(params.pin ?? params.pincode, 'pin'),
-      return_address: sanitizeString(params.return_address ?? params.returnAddress) || address,
+      address: resolvedAddress,
+      return_address: returnAddress || resolvedAddress,
     }
 
     if (!payload.name) {
@@ -1229,6 +1232,9 @@ export class DeliveryOneService {
     }
     if (!payload.return_address) {
       throw new HttpError(400, 'return_address is required for Delivery One warehouse registration.')
+    }
+    if (!payload.address) {
+      throw new HttpError(400, 'address is required for Delivery One warehouse registration.')
     }
 
     const registeredName = sanitizeString(params.registered_name ?? params.registeredName)
@@ -1242,7 +1248,6 @@ export class DeliveryOneService {
 
     if (registeredName) payload.registered_name = registeredName
     if (email) payload.email = email
-    if (address) payload.address = address
     if (city) payload.city = city
     if (country) payload.country = country
     if (returnCity) payload.return_city = returnCity
