@@ -45,7 +45,7 @@ const RevenueBarChart = ({ data = [] }) => {
       type: 'solid',
       opacity: 0.95,
     },
-    colors: ['#2563EB'],
+    colors: ['#FF8A28'],
     xaxis: {
       categories: data.map((item) => formatChartDate(item.date)),
       labels: {

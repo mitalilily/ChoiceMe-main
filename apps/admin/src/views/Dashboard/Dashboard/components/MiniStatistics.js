@@ -22,9 +22,8 @@ const MiniStatistics = ({ title, amount, percentage, icon, trend, gradient }) =>
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
   
-  // Use blue as primary accent color, with subtle variations
-  const iconBg = useColorModeValue("blue.50", "blue.900");
-  const iconColor = useColorModeValue("blue.600", "blue.300");
+  const iconBg = useColorModeValue("accent.50", "rgba(255,138,40,0.16)");
+  const iconColor = useColorModeValue("accent.600", "accent.300");
 
   return (
     <Card
@@ -37,7 +36,7 @@ const MiniStatistics = ({ title, amount, percentage, icon, trend, gradient }) =>
       transition="all 0.2s"
       _hover={{
         boxShadow: "md",
-        borderColor: useColorModeValue("blue.200", "blue.700"),
+        borderColor: useColorModeValue("accent.200", "accent.700"),
       }}
     >
       <CardBody p={5}>

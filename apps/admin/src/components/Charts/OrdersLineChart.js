@@ -38,7 +38,7 @@ const OrdersLineChart = ({ data = [] }) => {
       curve: 'smooth',
       width: 3,
       lineCap: 'round',
-      colors: ['#2563EB'],
+      colors: ['#FF8A28'],
     },
     fill: {
       type: 'gradient',
@@ -50,7 +50,7 @@ const OrdersLineChart = ({ data = [] }) => {
         stops: [0, 100],
       },
     },
-    colors: ['#2563EB'],
+    colors: ['#FF8A28'],
     markers: {
       size: 0,
       hover: { size: 5 },
