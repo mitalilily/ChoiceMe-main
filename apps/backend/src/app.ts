@@ -21,6 +21,7 @@ import b2bAdminRoutes from './routes/adminRoutes/b2b.routes'
 import adminBillingInvoiceRoutes from './routes/adminRoutes/billingInvoice.admin.routes'
 import adminBillingPreferencesRoutes from './routes/adminRoutes/billingPreferences.admin.routes'
 import adminCodRemittanceRoutes from './routes/adminRoutes/codRemittance.admin.routes'
+import adminDashboardRoutes from './routes/adminRoutes/dashboard.admin.routes'
 import adminDeveloperRoutes from './routes/adminRoutes/developer.routes'
 import locationRoutes from './routes/adminRoutes/location.routes'
 import adminOrderRoutes from './routes/adminRoutes/order.routes'
@@ -174,6 +175,7 @@ app.use('/api/couriers', courierRoutes)
 app.use('/api/courier', courierPriorityRoutes)
 app.use('/api/support', supportRoutes)
 app.use('/api/admin', adminSupportRoutes)
+app.use('/api/admin', adminDashboardRoutes)
 app.use('/api/admin/users', adminUserRoutes)
 app.use('/api/admin/orders', adminOrderRoutes)
 app.use('/api/admin/developer', adminDeveloperRoutes)

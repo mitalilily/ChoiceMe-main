@@ -5,6 +5,7 @@ import {
   getInvoiceStatus,
   getTopDestinations,
   getCourierDistribution,
+  getPublicLandingStats,
   getMerchantDashboardStats,
 } from '../models/services/dashboard.service'
 
@@ -91,6 +92,17 @@ export const getDashboardCourierDistribution = async (req: any, res: Response) =
   } catch (error) {
     console.error('Error fetching courier distribution:', error)
     return res.status(500).json({ success: false, message: 'Failed to fetch courier distribution' })
+  }
+}
+
+export const getPublicLandingStatsController = async (_req: any, res: Response) => {
+  try {
+    const stats = await getPublicLandingStats()
+
+    return res.json({ success: true, data: stats })
+  } catch (error) {
+    console.error('Error fetching public landing stats:', error)
+    return res.status(500).json({ success: false, message: 'Failed to fetch public landing stats' })
   }
 }
 

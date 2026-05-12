@@ -4,6 +4,7 @@ import { db } from '../client'
 import { b2b_orders } from '../schema/b2bOrders'
 import { b2c_orders } from '../schema/b2cOrders'
 import { codRemittances } from '../schema/codRemittance'
+import { couriers } from '../schema/couriers'
 import { invoices } from '../schema/invoices'
 import { ndr_events } from '../schema/ndr'
 import { rto_events } from '../schema/rto'
@@ -203,6 +204,130 @@ export const getCourierDistribution = async (userId: string) => {
   return Array.from(courierMap.entries())
     .map(([courier, count]) => ({ courier, count }))
     .sort((a, b) => b.count - a.count)
+}
+
+export const getPublicLandingStats = async () => {
+  const [b2cOrders, b2bOrders, enabledCouriers] = await Promise.all([
+    db
+      .select({
+        id: b2c_orders.id,
+        orderDate: b2c_orders.order_date,
+        orderStatus: b2c_orders.order_status,
+        pickupStatus: b2c_orders.pickup_status,
+        courierPartner: b2c_orders.courier_partner,
+        awbNumber: b2c_orders.awb_number,
+        shipmentId: b2c_orders.shipment_id,
+        label: b2c_orders.label,
+        createdAt: b2c_orders.created_at,
+        updatedAt: b2c_orders.updated_at,
+      })
+      .from(b2c_orders),
+    db
+      .select({
+        id: b2b_orders.id,
+        orderDate: b2b_orders.order_date,
+        orderStatus: b2b_orders.order_status,
+        pickupStatus: sql<string | null>`NULL`,
+        courierPartner: b2b_orders.courier_partner,
+        awbNumber: b2b_orders.awb_number,
+        shipmentId: b2b_orders.shipment_id,
+        label: b2b_orders.label,
+        createdAt: b2b_orders.created_at,
+        updatedAt: b2b_orders.updated_at,
+      })
+      .from(b2b_orders),
+    db
+      .select({
+        id: couriers.id,
+        serviceProvider: couriers.serviceProvider,
+      })
+      .from(couriers)
+      .where(eq(couriers.isEnabled, true)),
+  ])
+
+  const allOrders = [...b2cOrders, ...b2bOrders]
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const yearStart = new Date(today)
+  yearStart.setDate(yearStart.getDate() - 365)
+
+  const getFirstValidDate = (...values: unknown[]) => {
+    for (const value of values) {
+      if (!value) continue
+      const parsed = new Date(value as string | number | Date)
+      if (!Number.isNaN(parsed.getTime())) return parsed
+    }
+    return new Date(0)
+  }
+
+  const getOrderTimestamp = (order: (typeof allOrders)[number]) =>
+    getFirstValidDate(order.orderDate, order.createdAt, order.updatedAt)
+
+  const isInRange = (date: Date, start: Date, end: Date) => date >= start && date <= end
+  const isSameLocalDay = (date: Date, target: Date) =>
+    date.getFullYear() === target.getFullYear() &&
+    date.getMonth() === target.getMonth() &&
+    date.getDate() === target.getDate()
+
+  const statusIncludes = (order: (typeof allOrders)[number], values: string[]) => {
+    const status = `${order.orderStatus || ''} ${order.pickupStatus || ''}`.toLowerCase()
+    return values.some((value) => status.includes(value))
+  }
+
+  const livePickups = allOrders.filter((order) =>
+    statusIncludes(order, ['pickup_initiated', 'pickup scheduled', 'pickup_pending', 'scheduled']),
+  ).length
+
+  const todayPickups = allOrders.filter((order) => {
+    const orderDate = getOrderTimestamp(order)
+    return statusIncludes(order, ['pickup_initiated', 'pickup scheduled', 'pickup_pending', 'scheduled']) &&
+      !Number.isNaN(orderDate.getTime()) &&
+      isSameLocalDay(orderDate, today)
+  }).length
+
+  const deliveredOrders = allOrders.filter((order) => (order.orderStatus || '').toLowerCase() === 'delivered')
+  const monthlyDeliveredShipments = deliveredOrders.filter((order) => {
+    const orderDate = getFirstValidDate(order.updatedAt, order.createdAt, order.orderDate)
+    return !Number.isNaN(orderDate.getTime()) && isInRange(orderDate, monthStart, now)
+  }).length
+
+  const monthlyOrders = allOrders.filter((order) => {
+    const orderDate = getOrderTimestamp(order)
+    return !Number.isNaN(orderDate.getTime()) && isInRange(orderDate, monthStart, now)
+  }).length
+
+  const annualShipments = allOrders.filter((order) => {
+    const orderDate = getOrderTimestamp(order)
+    return !Number.isNaN(orderDate.getTime()) && isInRange(orderDate, yearStart, now)
+  }).length
+
+  const ordersWithTracking = allOrders.filter(
+    (order) => Boolean(order.awbNumber) || Boolean(order.shipmentId) || Boolean(order.label),
+  ).length
+
+  const activeCourierNames = new Set(
+    allOrders
+      .map((order) => (order.courierPartner || '').trim())
+      .filter(Boolean),
+  )
+  const enabledCourierNetworks = new Set(
+    enabledCouriers.map((courier) => `${courier.serviceProvider}:${courier.id}`),
+  )
+
+  return {
+    livePickups,
+    todayPickups,
+    monthlyDeliveredShipments,
+    monthlyOrders,
+    annualShipments,
+    totalShipments: allOrders.length,
+    activeCouriers: activeCourierNames.size,
+    enabledCouriers: enabledCourierNetworks.size,
+    trackingVisibilityRate:
+      allOrders.length > 0 ? Math.round((ordersWithTracking / allOrders.length) * 100) : 0,
+    updatedAt: now.toISOString(),
+  }
 }
 
 // Comprehensive merchant dashboard stats

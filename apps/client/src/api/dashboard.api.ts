@@ -35,6 +35,29 @@ export interface CourierDistribution {
   count: number
 }
 
+export interface PublicLandingStats {
+  livePickups: number
+  todayPickups: number
+  monthlyDeliveredShipments: number
+  monthlyOrders: number
+  annualShipments: number
+  totalShipments: number
+  activeCouriers: number
+  enabledCouriers: number
+  trackingVisibilityRate: number
+  updatedAt: string
+}
+
+export const getPublicLandingStats = async (
+  config?: AxiosRequestConfig,
+): Promise<PublicLandingStats> => {
+  const { data } = await axiosInstance.get('/dashboard/public-stats', config)
+  if (!data.success) {
+    throw new Error(data.message || 'Failed to fetch landing stats')
+  }
+  return data.data
+}
+
 export const getIncomingPickups = async (config?: AxiosRequestConfig): Promise<Pickup[]> => {
   const { data } = await axiosInstance.get('/dashboard/incoming', config)
   return data.success ? data.pickups : []

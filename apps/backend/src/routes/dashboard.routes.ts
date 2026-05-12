@@ -6,6 +6,7 @@ import {
   getDashboardInvoiceStatus,
   getDashboardTopDestinations,
   getDashboardCourierDistribution,
+  getPublicLandingStatsController,
   getMerchantDashboardStatsController,
 } from '../controllers/dashboard.controller'
 import {
@@ -16,6 +17,7 @@ import { requireAuth } from '../middlewares/requireAuth'
 
 const router = express.Router()
 
+router.get('/public-stats', getPublicLandingStatsController)
 router.get('/incoming', requireAuth, getHomePickups)
 router.get('/pending-actions', requireAuth, getDashboardPendingActions)
 router.get('/invoice-status', requireAuth, getDashboardInvoiceStatus)

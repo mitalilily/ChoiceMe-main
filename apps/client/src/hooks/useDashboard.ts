@@ -5,14 +5,25 @@ import {
   getInvoiceStatus,
   getTopDestinations,
   getCourierDistribution,
+  getPublicLandingStats,
   getMerchantDashboardStats,
   type Pickup,
   type PendingActions,
   type InvoiceStatus,
   type TopDestination,
   type CourierDistribution,
+  type PublicLandingStats,
   type MerchantDashboardStats,
 } from '../api/dashboard.api'
+
+export const usePublicLandingStats = () => {
+  return useQuery<PublicLandingStats, Error>({
+    queryKey: ['publicLandingStats'],
+    queryFn: getPublicLandingStats,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  })
+}
 
 export const useIncomingPickups = () => {
   return useQuery<Pickup[], Error>({

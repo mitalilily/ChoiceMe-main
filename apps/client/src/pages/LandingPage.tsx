@@ -16,6 +16,7 @@ import { Link as RouterLink } from 'react-router-dom'
 import BrandSurface from '../components/brand/BrandSurface'
 import PublicFooter from '../components/public/PublicFooter'
 import PublicNavbar from '../components/public/PublicNavbar'
+import { usePublicLandingStats } from '../hooks/useDashboard'
 import { brand, brandGradients, brandIdentity } from '../theme/brand'
 
 const partnerLogos = [
@@ -71,13 +72,6 @@ const featureCards = [
     text: 'Use your existing integrations and APIs without changing your current backend contracts or order logic.',
     icon: <TbPlugConnected size={24} />,
   },
-]
-
-const proofPoints = [
-  { value: '27+', label: 'Courier networks orchestrated' },
-  { value: '98.7%', label: 'On-time delivery visibility' },
-  { value: '4.2M', label: 'Annual shipment capacity' },
-  { value: '11m', label: 'Time to print a label' },
 ]
 
 const testimonials = [
@@ -136,6 +130,42 @@ const fadeUp = {
 }
 
 export default function LandingPage() {
+  const {
+    data: landingStats,
+    isLoading: landingStatsLoading,
+    error: landingStatsError,
+  } = usePublicLandingStats()
+
+  const liveValue = (value?: number, suffix = '') => {
+    if (landingStatsLoading) return 'Syncing'
+    if (landingStatsError) return 'Unavailable'
+    return `${new Intl.NumberFormat('en-IN').format(value ?? 0)}${suffix}`
+  }
+
+  const livePickupsLabel = landingStatsError
+    ? 'Live data unavailable'
+    : landingStatsLoading
+      ? 'Syncing pickups'
+      : `${liveValue(landingStats?.livePickups)} live pickups`
+
+  const proofPoints = [
+    { value: liveValue(landingStats?.enabledCouriers), label: 'Enabled courier networks' },
+    { value: liveValue(landingStats?.trackingVisibilityRate, '%'), label: 'Orders with AWB visibility' },
+    { value: liveValue(landingStats?.annualShipments), label: 'Shipments in the last 365 days' },
+    { value: liveValue(landingStats?.monthlyOrders), label: 'Orders created this month' },
+  ]
+
+  const dashboardPreviewMetrics = [
+    {
+      label: 'Shipments delivered this month',
+      value: liveValue(landingStats?.monthlyDeliveredShipments),
+    },
+    {
+      label: 'Courier partners active in orders',
+      value: liveValue(landingStats?.activeCouriers),
+    },
+  ]
+
   return (
     <Box className="site-shell">
       <PublicNavbar />
@@ -254,7 +284,7 @@ export default function LandingPage() {
                     </Box>
                       <Chip
                       icon={<TbTruckDelivery size={16} />}
-                      label="184 live pickups"
+                      label={livePickupsLabel}
                       sx={{
                         bgcolor: alpha('#FFFFFF', 0.84),
                         color: brand.ink,
@@ -270,10 +300,7 @@ export default function LandingPage() {
                       gap: 1.2,
                     }}
                   >
-                    {[
-                      { label: 'Shipments delivered every month', value: '1,82,000+' },
-                      { label: 'Time to print a shipping label', value: '11 min' },
-                    ].map((item) => (
+                    {dashboardPreviewMetrics.map((item) => (
                       <BrandSurface key={item.label} variant="glass" sx={{ p: 1.8, borderRadius: '24px' }}>
                         <Typography sx={{ color: brand.inkSoft, fontSize: '0.82rem', lineHeight: 1.6 }}>
                           {item.label}
@@ -450,7 +477,7 @@ export default function LandingPage() {
                           Today&apos;s network pulse
                         </Typography>
                       </Box>
-                      <Chip label="184 live pickups" sx={{ bgcolor: alpha('#FFFFFF', 0.84), color: brand.ink, fontWeight: 800 }} />
+                      <Chip label={livePickupsLabel} sx={{ bgcolor: alpha('#FFFFFF', 0.84), color: brand.ink, fontWeight: 800 }} />
                     </Stack>
 
                     <Box
@@ -460,10 +487,7 @@ export default function LandingPage() {
                         gap: 1.2,
                       }}
                     >
-                      {[
-                        { label: 'Shipments delivered every month', value: '1,82,000+' },
-                        { label: 'Time to print a shipping label', value: '11 min' },
-                      ].map((item) => (
+                      {dashboardPreviewMetrics.map((item) => (
                         <BrandSurface key={item.label} variant="glass" sx={{ p: 1.8, borderRadius: '24px' }}>
                           <Typography sx={{ color: brand.inkSoft, fontSize: '0.82rem' }}>{item.label}</Typography>
                           <Typography sx={{ color: brand.ink, fontWeight: 900, fontSize: '1.75rem', mt: 0.6 }}>

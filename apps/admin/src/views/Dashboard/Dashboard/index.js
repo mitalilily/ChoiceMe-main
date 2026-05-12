@@ -227,7 +227,7 @@ export default function Dashboard() {
                 </Flex>
                 <Box>
                   <Heading size="sm" color={textPrimary}>Operational Focus</Heading>
-                  <Text fontSize="sm" color={textSecondary}>Static health snapshot</Text>
+                  <Text fontSize="sm" color={textSecondary}>Live health snapshot</Text>
                 </Box>
               </HStack>
               <VStack align="stretch" spacing={4}>
