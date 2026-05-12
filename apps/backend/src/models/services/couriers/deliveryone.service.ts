@@ -181,6 +181,23 @@ export type DeliveryOneShippingCostResponse = {
   raw: any
 }
 
+export type DeliveryOneLabelParams = {
+  waybill?: string
+  wbns?: string
+  pdf?: boolean | string
+  pdf_size?: 'A4' | '4R' | string
+  pdfSize?: 'A4' | '4R' | string
+}
+
+export type DeliveryOneLabelResponse = {
+  waybill: string
+  pdf: boolean
+  pdfSize?: 'A4' | '4R'
+  labelUrl: string | null
+  packages: any[]
+  raw: any
+}
+
 export class DeliveryOneService {
   private apiBase =
     process.env.DELIVERY_ONE_API_BASE ||
@@ -793,6 +810,163 @@ export class DeliveryOneService {
         refIds: refIds.join(',') || null,
         status,
         response: error?.response?.data || null,
+        message,
+      })
+
+      throw new HttpError(status, message)
+    }
+  }
+
+  async generateLabel(
+    params: string | DeliveryOneLabelParams,
+    options: Omit<DeliveryOneLabelParams, 'waybill' | 'wbns'> = {},
+  ): Promise<DeliveryOneLabelResponse> {
+    const sanitizeString = (value?: string | number | boolean | null) => {
+      if (value === undefined || value === null) return ''
+      return String(value).trim()
+    }
+    const normalizeBoolean = (value: unknown, fallback: boolean) => {
+      if (value === undefined || value === null || value === '') return fallback
+      if (typeof value === 'boolean') return value
+      const normalized = String(value).trim().toLowerCase()
+      if (['true', '1', 'yes', 'y'].includes(normalized)) return true
+      if (['false', '0', 'no', 'n'].includes(normalized)) return false
+      throw new HttpError(400, 'pdf must be true or false when provided.')
+    }
+    const normalizePdfSize = (value: unknown): 'A4' | '4R' | undefined => {
+      const normalized = sanitizeString(value as any).toUpperCase()
+      if (!normalized) return undefined
+      if (normalized === 'A4' || normalized === '4R') return normalized
+      throw new HttpError(400, 'pdf_size must be A4 or 4R when provided.')
+    }
+    const parseRaw = (raw: any) => {
+      if (typeof raw !== 'string') return raw
+      const trimmed = raw.trim()
+      if (!trimmed) return raw
+      try {
+        return JSON.parse(trimmed)
+      } catch {
+        return raw
+      }
+    }
+    const getPackages = (raw: any) => {
+      if (Array.isArray(raw?.packages)) return raw.packages
+      if (Array.isArray(raw?.data?.packages)) return raw.data.packages
+      if (Array.isArray(raw?.Package)) return raw.Package
+      if (Array.isArray(raw)) return raw
+      if (raw?.packages) return [raw.packages]
+      if (raw?.data?.packages) return [raw.data.packages]
+      return []
+    }
+    const extractFirstUrl = (value: any): string | null => {
+      if (!value) return null
+      if (typeof value === 'string') {
+        const directMatch = value.match(/https?:\/\/[^\s"'<>]+/i)
+        return directMatch?.[0] ?? null
+      }
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const url = extractFirstUrl(item)
+          if (url) return url
+        }
+        return null
+      }
+      if (typeof value === 'object') {
+        const preferredKeys = [
+          'label',
+          'label_url',
+          'labelUrl',
+          'pdf_url',
+          'pdfUrl',
+          'pdf_download_link',
+          'download_url',
+          's3_url',
+          'url',
+        ]
+        for (const key of preferredKeys) {
+          const url = extractFirstUrl(value[key])
+          if (url) return url
+        }
+        for (const nestedValue of Object.values(value)) {
+          const url = extractFirstUrl(nestedValue)
+          if (url) return url
+        }
+      }
+      return null
+    }
+
+    const source =
+      typeof params === 'string'
+        ? { waybill: params, ...options }
+        : { ...(params || {}), ...options }
+    const waybill = sanitizeString(source.waybill || source.wbns)
+    if (!waybill) {
+      throw new HttpError(400, 'waybill is required to generate a Delivery One shipping label.')
+    }
+
+    const pdf = normalizeBoolean(source.pdf, false)
+    const pdfSize = normalizePdfSize(source.pdf_size ?? source.pdfSize)
+    const headers = await this.getHeaders()
+
+    try {
+      const response = await axios.get(`${this.apiBase}/api/p/packing_slip`, {
+        headers,
+        params: {
+          wbns: waybill,
+          pdf,
+          ...(pdfSize ? { pdf_size: pdfSize } : {}),
+        },
+        timeout: 30000,
+      })
+      const raw = parseRaw(response.data)
+      const explicitFailure =
+        raw?.error === true ||
+        typeof raw?.error === 'string' ||
+        raw?.success === false ||
+        raw?.Success === false ||
+        String(raw?.status || '').toLowerCase() === 'fail'
+
+      this.log(explicitFailure ? 'Generate label rejected' : 'Generate label succeeded', {
+        waybill,
+        pdf,
+        pdfSize: pdfSize || null,
+        status: response.status,
+        response: explicitFailure ? raw : undefined,
+      })
+
+      if (explicitFailure) {
+        throw new HttpError(
+          502,
+          this.extractErrorMessage(raw, 'Delivery One shipping label generation failed.'),
+        )
+      }
+
+      return {
+        waybill,
+        pdf,
+        pdfSize,
+        labelUrl: pdf ? extractFirstUrl(raw) : null,
+        packages: getPackages(raw),
+        raw,
+      }
+    } catch (error: any) {
+      if (error instanceof HttpError) {
+        throw error
+      }
+
+      const status = Number(error?.response?.status || 502)
+      const responseData = parseRaw(error?.response?.data)
+      const message =
+        this.extractErrorMessage(responseData, '') ||
+        error?.message ||
+        'Delivery One shipping label generation failed'
+
+      this.log('Generate label failed', {
+        waybill,
+        pdf,
+        pdfSize: pdfSize || null,
+        status,
+        response: responseData || null,
         message,
       })
 

@@ -5,6 +5,7 @@ import {
   calculateDeliveryOneShippingCostController,
   editDeliveryOneShipmentController,
   fetchDeliveryOneWaybillsController,
+  generateDeliveryOneLabelController,
   getCourierCredentialsController,
   deleteShippingRateController,
   fetchAvailableCouriersForAdmin,
@@ -79,6 +80,18 @@ router.post(
   isAdminMiddleware,
   calculateDeliveryOneShippingCostController,
 )
+router.get(
+  '/delivery-one/labels',
+  requireAuth,
+  isAdminMiddleware,
+  generateDeliveryOneLabelController,
+)
+router.post(
+  '/delivery-one/labels',
+  requireAuth,
+  isAdminMiddleware,
+  generateDeliveryOneLabelController,
+)
 router.post(
   '/delivery-one/shipments/edit',
   requireAuth,
@@ -135,6 +148,12 @@ router.get(
   requireAuth,
   isAdminMiddleware,
   trackDeliveryOneShipmentController,
+)
+router.get(
+  '/delivery-one/shipments/:waybill/label',
+  requireAuth,
+  isAdminMiddleware,
+  generateDeliveryOneLabelController,
 )
 router.put(
   '/credentials/ekart',

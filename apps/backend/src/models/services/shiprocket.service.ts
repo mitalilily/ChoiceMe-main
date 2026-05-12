@@ -6138,7 +6138,77 @@ export const generateManifestService = async (params: {
               console.log(
                 `🖨️ Generating label for order ${order.order_number} during manifest (AWB: ${order.awb_number})`,
               )
-              const labelKey = await generateLabelForOrder(order, order.user_id, tx)
+              let orderForLabel: any = order
+              let deliveryOneSortCode: string | null = null
+              const isDeliveryOneOrder =
+                String(order.integration_type || integrationType || '').toLowerCase() ===
+                'deliveryone'
+
+              if (isDeliveryOneOrder) {
+                try {
+                  const deliveryOne = new DeliveryOneService()
+                  const labelResp: any = await deliveryOne.generateLabel(order.awb_number, {
+                    pdf: false,
+                  })
+                  const pkg = Array.isArray(labelResp?.packages)
+                    ? labelResp.packages[0]
+                    : labelResp?.raw?.packages
+                      ? Array.isArray(labelResp.raw.packages)
+                        ? labelResp.raw.packages[0]
+                        : labelResp.raw.packages
+                      : labelResp?.raw || labelResp
+
+                  if (pkg) {
+                    deliveryOneSortCode =
+                      (pkg.sort_code ||
+                        pkg.sortCode ||
+                        pkg.routing_code ||
+                        pkg.routingCode ||
+                        pkg.destination_code ||
+                        pkg.destinationCode) ??
+                      null
+
+                    orderForLabel = {
+                      ...order,
+                      barcode_img:
+                        pkg.barcode ||
+                        pkg.barcode_img ||
+                        pkg.barcodeImage ||
+                        pkg.waybill_barcode ||
+                        null,
+                      oid_barcode: pkg.oid_barcode || pkg.order_barcode || null,
+                      sort_code: deliveryOneSortCode || order.sort_code || null,
+                      deliveryone_label_meta: pkg,
+                    }
+                  }
+                } catch (metaErr: any) {
+                  console.warn(
+                    `[Delivery One] Failed to fetch packing_slip JSON for order ${order.order_number}:`,
+                    metaErr?.message || metaErr,
+                  )
+                }
+              }
+
+              const labelKey = await generateLabelForOrder(orderForLabel, orderForLabel.user_id, tx)
+
+              if (isDeliveryOneOrder) {
+                try {
+                  const deliveryOne = new DeliveryOneService()
+                  const providerLabel = await deliveryOne.generateLabel(order.awb_number, {
+                    pdf: true,
+                    pdf_size: '4R',
+                  })
+                  console.log(
+                    `[Delivery One] Provider label generated for AWB ${order.awb_number}`,
+                    { labelUrl: providerLabel.labelUrl || null },
+                  )
+                } catch (providerLabelErr: any) {
+                  console.warn(
+                    `[Delivery One] Failed to generate provider label for AWB ${order.awb_number}:`,
+                    providerLabelErr?.message || providerLabelErr,
+                  )
+                }
+              }
 
               // Validate and save label if generated
               // Ensure we store R2 key, not a full URL
@@ -6149,6 +6219,7 @@ export const generateManifestService = async (params: {
                     .update(table)
                     .set({
                       label: normalizedLabelKey,
+                      ...(deliveryOneSortCode ? { sort_code: deliveryOneSortCode } : {}),
                       updated_at: new Date(),
                     })
                     .where(eq(table.id, order.id))

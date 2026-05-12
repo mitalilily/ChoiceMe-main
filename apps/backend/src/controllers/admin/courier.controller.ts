@@ -744,6 +744,28 @@ export const calculateDeliveryOneShippingCostController = async (
   }
 }
 
+export const generateDeliveryOneLabelController = async (req: Request, res: Response) => {
+  try {
+    const source = req.method === 'GET' ? req.query : req.body
+    const result = await new DeliveryOneService().generateLabel({
+      ...(source || {}),
+      waybill: req.params?.waybill || (source as any)?.waybill || (source as any)?.wbns,
+      pdf: (source as any)?.pdf ?? true,
+    })
+
+    res.json({
+      success: true,
+      data: result,
+    })
+  } catch (err: any) {
+    console.error('Failed to generate Delivery One shipping label:', err?.message || err)
+    res.status(err?.statusCode || 500).json({
+      success: false,
+      message: err?.message || 'Failed to generate Delivery One shipping label',
+    })
+  }
+}
+
 export const updateEkartCredentialsController = async (req: Request, res: Response) => {
   const { apiBase, clientId, username, password, webhookSecret } = req.body || {}
 
