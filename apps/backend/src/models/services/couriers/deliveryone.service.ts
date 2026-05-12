@@ -309,8 +309,17 @@ export class DeliveryOneService {
     console.log(`[DeliveryOne] ${prefix}`, details)
   }
 
+  private useEnvOnlyConfig() {
+    return ['1', 'true', 'yes', 'y'].includes(
+      String(process.env.DELIVERY_ONE_FORCE_ENV_CONFIG || '').trim().toLowerCase(),
+    )
+  }
+
   private async ensureConfigLoaded() {
-    if (DeliveryOneService.cachedConfig === undefined) {
+    const forceEnvOnly = this.useEnvOnlyConfig()
+    if (forceEnvOnly) {
+      DeliveryOneService.cachedConfig = null
+    } else if (DeliveryOneService.cachedConfig === undefined) {
       DeliveryOneService.cachedConfig = await getEffectiveCourierConfig<DeliveryOneConfig>(
         'deliveryone',
         'b2c',
@@ -328,7 +337,11 @@ export class DeliveryOneService {
       apiBase: this.apiBase,
       hasApiKey: Boolean(this.apiKey),
       apiKey: this.maskToken(this.apiKey),
-      source: cfg ? 'courier_credentials_or_env_fallback' : 'env_only',
+      source: forceEnvOnly
+        ? 'forced_env'
+        : cfg
+          ? 'courier_credentials_or_env_fallback'
+          : 'env_only',
     })
   }
 
@@ -2003,9 +2016,7 @@ export class DeliveryOneService {
     } catch (error: any) {
       const status = Number(error?.response?.status || 502)
       const message =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
+        this.extractErrorMessage(error?.response?.data, '') ||
         error?.message ||
         'Delivery One pincode serviceability failed'
 
@@ -2130,9 +2141,7 @@ export class DeliveryOneService {
     } catch (error: any) {
       const status = Number(error?.response?.status || 502)
       const message =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
+        this.extractErrorMessage(error?.response?.data, '') ||
         error?.message ||
         'Delivery One heavy pincode serviceability failed'
 
