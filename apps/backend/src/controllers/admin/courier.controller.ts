@@ -721,6 +721,29 @@ export const trackDeliveryOneShipmentController = async (req: Request, res: Resp
   }
 }
 
+export const calculateDeliveryOneShippingCostController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const source = req.method === 'GET' ? req.query : req.body
+    const result = await new DeliveryOneService().calculateShippingCost({
+      ...(source || {}),
+    })
+
+    res.json({
+      success: true,
+      data: result,
+    })
+  } catch (err: any) {
+    console.error('Failed to calculate Delivery One shipping cost:', err?.message || err)
+    res.status(err?.statusCode || 500).json({
+      success: false,
+      message: err?.message || 'Failed to calculate Delivery One shipping cost',
+    })
+  }
+}
+
 export const updateEkartCredentialsController = async (req: Request, res: Response) => {
   const { apiBase, clientId, username, password, webhookSecret } = req.body || {}
 

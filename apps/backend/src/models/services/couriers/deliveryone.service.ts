@@ -126,6 +126,61 @@ export type DeliveryOneTrackingParams = {
   refIds?: string | string[]
 }
 
+export type DeliveryOneShippingCostParams = {
+  md?: string
+  billing_mode?: string
+  billingMode?: string
+  cgm?: number | string
+  chargeable_weight?: number | string
+  chargeableWeight?: number | string
+  weight?: number | string
+  o_pin?: number | string
+  origin_pincode?: number | string
+  originPincode?: number | string
+  origin?: number | string
+  d_pin?: number | string
+  destination_pincode?: number | string
+  destinationPincode?: number | string
+  destination?: number | string
+  ss?: string
+  status?: string
+  pt?: string
+  payment_type?: string
+  paymentType?: string
+  l?: number | string
+  length?: number | string
+  b?: number | string
+  breadth?: number | string
+  width?: number | string
+  h?: number | string
+  height?: number | string
+  ipkg_type?: string
+  package_type?: string
+  packageType?: string
+}
+
+export type DeliveryOneShippingCostResponse = {
+  params: {
+    md: 'E' | 'S'
+    cgm: number
+    o_pin: string
+    d_pin: string
+    ss: 'Delivered' | 'RTO' | 'DTO'
+    pt: 'Pre-paid' | 'COD'
+    l?: number
+    b?: number
+    h?: number
+    ipkg_type?: string
+  }
+  charges: {
+    total: number | null
+    freight: number | null
+    cod: number | null
+    chargeableWeight: number | null
+  }
+  raw: any
+}
+
 export class DeliveryOneService {
   private apiBase =
     process.env.DELIVERY_ONE_API_BASE ||
@@ -736,6 +791,205 @@ export class DeliveryOneService {
       this.log('Track shipment failed', {
         waybill: waybills.join(',') || null,
         refIds: refIds.join(',') || null,
+        status,
+        response: error?.response?.data || null,
+        message,
+      })
+
+      throw new HttpError(status, message)
+    }
+  }
+
+  async calculateShippingCost(
+    params: DeliveryOneShippingCostParams,
+  ): Promise<DeliveryOneShippingCostResponse> {
+    const sanitizeString = (value?: string | number | null) => {
+      if (value === undefined || value === null) return ''
+      return String(value).trim()
+    }
+    const sanitizePincode = (value?: string | number | null) =>
+      sanitizeString(value).replace(/\D/g, '').slice(0, 6)
+    const toInteger = (value: unknown, field: string, required = false) => {
+      if (value === undefined || value === null || value === '') {
+        if (required) throw new HttpError(400, `${field} is required.`)
+        return undefined
+      }
+      const parsed = Number(value)
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new HttpError(400, `${field} must be a non-negative number.`)
+      }
+      return Math.round(parsed)
+    }
+    const normalizeBillingMode = (value: unknown): 'E' | 'S' => {
+      const normalized = sanitizeString(value as any).toLowerCase()
+      if (['e', 'express'].includes(normalized)) return 'E'
+      if (['s', 'surface'].includes(normalized)) return 'S'
+      throw new HttpError(400, 'md billing mode must be E/Express or S/Surface.')
+    }
+    const normalizeStatus = (value: unknown): 'Delivered' | 'RTO' | 'DTO' => {
+      const normalized = sanitizeString(value as any).toLowerCase()
+      if (normalized === 'delivered') return 'Delivered'
+      if (normalized === 'rto') return 'RTO'
+      if (normalized === 'dto') return 'DTO'
+      throw new HttpError(400, 'ss shipment status must be Delivered, RTO, or DTO.')
+    }
+    const normalizePaymentType = (value: unknown): 'Pre-paid' | 'COD' => {
+      const normalized = sanitizeString(value as any).toLowerCase()
+      if (['cod', 'cash on delivery'].includes(normalized)) return 'COD'
+      if (['pre-paid', 'prepaid', 'pre paid'].includes(normalized)) return 'Pre-paid'
+      throw new HttpError(400, 'pt payment type must be Pre-paid or COD.')
+    }
+    const normalizePackageType = (value: unknown) => {
+      const normalized = sanitizeString(value as any).toLowerCase()
+      if (!normalized) return undefined
+      if (['box', 'flyer'].includes(normalized)) return normalized
+      throw new HttpError(400, 'ipkg_type must be box or flyer when provided.')
+    }
+    const firstRecord = (raw: any) => {
+      if (Array.isArray(raw)) return raw[0] ?? null
+      if (Array.isArray(raw?.data)) return raw.data[0] ?? null
+      if (Array.isArray(raw?.charges)) return raw.charges[0] ?? null
+      if (raw?.data && typeof raw.data === 'object') return raw.data
+      return raw && typeof raw === 'object' ? raw : null
+    }
+    const pickNumber = (record: any, keys: string[]) => {
+      if (!record) return null
+      for (const key of keys) {
+        const value = record?.[key]
+        if (value === undefined || value === null || value === '') continue
+        const parsed = Number(String(value).replace(/,/g, ''))
+        if (Number.isFinite(parsed)) return parsed
+      }
+      return null
+    }
+
+    const originPincode = sanitizePincode(
+      params.o_pin ?? params.origin_pincode ?? params.originPincode ?? params.origin,
+    )
+    const destinationPincode = sanitizePincode(
+      params.d_pin ??
+        params.destination_pincode ??
+        params.destinationPincode ??
+        params.destination,
+    )
+    if (!/^\d{6}$/.test(originPincode)) {
+      throw new HttpError(400, 'A valid 6-digit origin pincode is required.')
+    }
+    if (!/^\d{6}$/.test(destinationPincode)) {
+      throw new HttpError(400, 'A valid 6-digit destination pincode is required.')
+    }
+
+    const requestParams: DeliveryOneShippingCostResponse['params'] = {
+      md: normalizeBillingMode(params.md ?? params.billing_mode ?? params.billingMode),
+      cgm: toInteger(
+        params.cgm ?? params.chargeable_weight ?? params.chargeableWeight ?? params.weight,
+        'cgm chargeable weight',
+        true,
+      )!,
+      o_pin: originPincode,
+      d_pin: destinationPincode,
+      ss: normalizeStatus(params.ss ?? params.status),
+      pt: normalizePaymentType(params.pt ?? params.payment_type ?? params.paymentType),
+    }
+
+    const length = toInteger(params.l ?? params.length, 'l length')
+    const breadth = toInteger(params.b ?? params.breadth ?? params.width, 'b breadth')
+    const height = toInteger(params.h ?? params.height, 'h height')
+    const packageType = normalizePackageType(
+      params.ipkg_type ?? params.package_type ?? params.packageType,
+    )
+
+    if (length !== undefined) requestParams.l = length
+    if (breadth !== undefined) requestParams.b = breadth
+    if (height !== undefined) requestParams.h = height
+    if (packageType) requestParams.ipkg_type = packageType
+
+    const headers = await this.getHeaders()
+
+    try {
+      const response = await axios.get(`${this.apiBase}/api/kinko/v1/invoice/charges/.json`, {
+        headers,
+        params: requestParams,
+        timeout: 30000,
+      })
+      const raw = response.data
+      const explicitFailure =
+        raw?.error === true ||
+        typeof raw?.error === 'string' ||
+        raw?.success === false ||
+        raw?.Success === false ||
+        String(raw?.status || '').toLowerCase() === 'fail'
+
+      this.log(explicitFailure ? 'Shipping cost rejected' : 'Shipping cost calculated', {
+        origin: requestParams.o_pin,
+        destination: requestParams.d_pin,
+        billingMode: requestParams.md,
+        paymentType: requestParams.pt,
+        status: response.status,
+        response: explicitFailure ? raw : undefined,
+      })
+
+      if (explicitFailure) {
+        throw new HttpError(
+          502,
+          this.extractErrorMessage(raw, 'Delivery One shipping cost calculation failed.'),
+        )
+      }
+
+      const record = firstRecord(raw)
+      return {
+        params: requestParams,
+        charges: {
+          total: pickNumber(record, [
+            'total_amount',
+            'total_charge',
+            'total_charges',
+            'Total Amount',
+            'Total Charge',
+            'Total Charges',
+            'amount',
+          ]),
+          freight: pickNumber(record, [
+            'freight_charge',
+            'freight_charges',
+            'Freight Charge',
+            'Freight Charges',
+            'shipping_charge',
+            'Shipping Charge',
+          ]),
+          cod: pickNumber(record, [
+            'cod_charge',
+            'cod_charges',
+            'COD Charge',
+            'COD Charges',
+          ]),
+          chargeableWeight: pickNumber(record, [
+            'chargeable_weight',
+            'Chargeable Weight',
+            'ChargeableWeight',
+            'Charge_Billable_Weight',
+            'Charge_Weight',
+            'cgm',
+          ]),
+        },
+        raw,
+      }
+    } catch (error: any) {
+      if (error instanceof HttpError) {
+        throw error
+      }
+
+      const status = Number(error?.response?.status || 502)
+      const message =
+        this.extractErrorMessage(error?.response?.data, '') ||
+        error?.message ||
+        'Delivery One shipping cost calculation failed'
+
+      this.log('Shipping cost failed', {
+        origin: requestParams.o_pin,
+        destination: requestParams.d_pin,
+        billingMode: requestParams.md,
+        paymentType: requestParams.pt,
         status,
         response: error?.response?.data || null,
         message,

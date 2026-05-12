@@ -2,6 +2,7 @@
 import { Router } from 'express'
 import {
   cancelDeliveryOneShipmentController,
+  calculateDeliveryOneShippingCostController,
   editDeliveryOneShipmentController,
   fetchDeliveryOneWaybillsController,
   getCourierCredentialsController,
@@ -65,6 +66,18 @@ router.post(
   requireAuth,
   isAdminMiddleware,
   fetchDeliveryOneWaybillsController,
+)
+router.get(
+  '/delivery-one/shipping-cost',
+  requireAuth,
+  isAdminMiddleware,
+  calculateDeliveryOneShippingCostController,
+)
+router.post(
+  '/delivery-one/shipping-cost',
+  requireAuth,
+  isAdminMiddleware,
+  calculateDeliveryOneShippingCostController,
 )
 router.post(
   '/delivery-one/shipments/edit',
