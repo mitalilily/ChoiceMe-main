@@ -8,7 +8,9 @@ import path from 'path'
 
 // Load correct .env based on NODE_ENV
 const env = process.env.NODE_ENV || 'development'
-dotenv.config({ path: path.resolve(__dirname, `../../.env.${env}`) })
+const backendRoot = path.resolve(__dirname, '../..')
+dotenv.config({ path: path.resolve(backendRoot, `.env.${env}`) })
+dotenv.config({ path: path.resolve(backendRoot, '.env') })
 
 export const generate8DigitsVerificationToken = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -69,14 +71,29 @@ export function buildPatch<T extends Record<string, unknown>>(existing: T, merge
 }
 
 export const getBucketName = () => {
+  const fallbackBucket = process.env.R2_BUCKET?.trim()
+  let bucket: string | undefined
+
   switch (process.env.NODE_ENV) {
     case 'production':
-      return process.env.PROD_BUCKET!
+      bucket = process.env.PROD_BUCKET?.trim()
+      break
     case 'staging':
-      return process.env.STAGING_BUCKET!
+      bucket = process.env.STAGING_BUCKET?.trim()
+      break
     default:
-      return process.env.DEV_BUCKET!
+      bucket = process.env.DEV_BUCKET?.trim()
+      break
   }
+
+  const resolvedBucket = bucket || fallbackBucket
+  if (!resolvedBucket) {
+    throw new Error(
+      'R2 bucket is not configured. Set R2_BUCKET or the environment-specific bucket variable.',
+    )
+  }
+
+  return resolvedBucket
 }
 
 export const hash = (plain: string) => bcrypt.hash(plain, 10)

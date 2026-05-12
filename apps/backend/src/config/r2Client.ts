@@ -5,8 +5,10 @@ import path from 'path'
 // Determine environment
 const env = process.env.NODE_ENV || 'development'
 
-// Load the correct .env file
-dotenv.config({ path: path.resolve(__dirname, `../.env.${env}`) })
+// Load backend env files when this module is used directly from scripts/tests.
+const backendRoot = path.resolve(__dirname, '../..')
+dotenv.config({ path: path.resolve(backendRoot, `.env.${env}`) })
+dotenv.config({ path: path.resolve(backendRoot, '.env') })
 
 export const r2 = new S3Client({
   region: 'auto',

@@ -84,7 +84,9 @@ import { calculateFreight } from './pricing/chargeableFreight'
 
 // Load correct .env based on NODE_ENV
 const env = process.env.NODE_ENV || 'development'
-dotenv.config({ path: path.resolve(__dirname, `../../.env.${env}`) })
+const backendRoot = path.resolve(__dirname, '../../..')
+dotenv.config({ path: path.resolve(backendRoot, `.env.${env}`) })
+dotenv.config({ path: path.resolve(backendRoot, '.env') })
 
 const pdfFonts = {
   Helvetica: {
@@ -97,6 +99,15 @@ const pdfFonts = {
 
 const MAX_MANIFEST_RETRY_ATTEMPTS = 3
 const ORIGINAL_WALLET_DEBIT_REASONS = ['B2C Prepaid Order Payment', 'B2C COD Service Charges']
+
+const compactStorageToken = (...values: Array<string | number | null | undefined>) => {
+  const raw = values.find((value) => value !== null && value !== undefined && String(value).trim())
+  const cleaned = String(raw ?? Date.now())
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(-12)
+
+  return cleaned || Date.now().toString(36)
+}
 
 const truncateColumnValue = (value: string, maxLength = 255) => {
   if (value.length <= maxLength) return value
@@ -4025,7 +4036,7 @@ export const createB2CShipmentService = async (
 
                 // Upload to R2
                 const { uploadUrl, key } = await presignUpload({
-                  filename: `label-${params.order_number}.pdf`,
+                  filename: `l-${compactStorageToken(params.order_number, newOrder.id)}.pdf`,
                   contentType: 'application/pdf',
                   userId,
                   folderKey: 'labels',
@@ -5040,7 +5051,7 @@ export const generateManifestService = async (params: {
           })
 
           const { uploadUrl, key } = await presignUpload({
-            filename: `manifest-${integrationType}-${Date.now()}.pdf`,
+            filename: `m-${compactStorageToken(integrationType)}.pdf`,
             contentType: 'application/pdf',
             userId: fetchedOrders[0].user_id,
             folderKey: 'manifests',
@@ -5260,6 +5271,105 @@ export const generateManifestService = async (params: {
             console.error(`❌ Failed to parse URL for key extraction: ${trimmed}`, err)
             return null
           }
+        }
+
+        async function generateLocalManifestPdf(
+          manifestOrders: any[],
+          providerName: string,
+        ): Promise<Buffer> {
+          const printer = new PdfPrinter(pdfFonts)
+          const generatedAt = dayjs().format('DD MMM YYYY, hh:mm A')
+          const firstPickup = normalizePickupDetails(manifestOrders[0]?.pickup_details)
+          const pickupAddress = formatPickupAddress(firstPickup)
+
+          const body = [
+            [
+              { text: '#', bold: true },
+              { text: 'Order', bold: true },
+              { text: 'AWB', bold: true },
+              { text: 'Customer', bold: true },
+              { text: 'Destination', bold: true },
+              { text: 'Payment', bold: true },
+              { text: 'Amount', bold: true },
+            ],
+            ...manifestOrders.map((order, index) => [
+              String(index + 1),
+              String(order.order_number ?? '-'),
+              String(order.awb_number ?? '-'),
+              String(order.buyer_name ?? order.consignee_name ?? '-'),
+              [order.city, order.state, order.pincode].filter(Boolean).join(', ') || '-',
+              String(order.order_type ?? order.payment_type ?? '-').toUpperCase(),
+              String(order.order_amount ?? '0'),
+            ]),
+          ]
+
+          const docDefinition: any = {
+            defaultStyle: { font: 'Helvetica', fontSize: 8 },
+            pageSize: 'A4',
+            pageOrientation: 'landscape',
+            pageMargins: [30, 34, 30, 34],
+            content: [
+              {
+                columns: [
+                  {
+                    stack: [
+                      { text: 'Manifest', fontSize: 18, bold: true, color: '#1f2a44' },
+                      {
+                        text: `${providerName.toUpperCase()} | ${generatedAt}`,
+                        fontSize: 9,
+                        margin: [0, 4, 0, 0],
+                      },
+                    ],
+                  },
+                  {
+                    stack: [
+                      {
+                        text: `Total Shipments: ${manifestOrders.length}`,
+                        alignment: 'right',
+                        fontSize: 10,
+                        bold: true,
+                      },
+                      {
+                        text: `User ID: ${manifestOrders[0]?.user_id ?? '-'}`,
+                        alignment: 'right',
+                        fontSize: 8,
+                        margin: [0, 4, 0, 0],
+                      },
+                    ],
+                  },
+                ],
+                margin: [0, 0, 0, 12],
+              },
+              {
+                text: `Pickup: ${firstPickup?.warehouse_name ?? '-'}${
+                  pickupAddress ? `, ${pickupAddress}` : ''
+                }`,
+                fontSize: 8,
+                margin: [0, 0, 0, 12],
+              },
+              {
+                table: {
+                  headerRows: 1,
+                  widths: [24, 96, 96, '*', '*', 60, 60],
+                  body,
+                },
+                layout: {
+                  fillColor: (rowIndex: number) => (rowIndex === 0 ? '#eef3ff' : null),
+                  hLineColor: () => '#d9e1f2',
+                  vLineColor: () => '#d9e1f2',
+                },
+              },
+            ],
+          }
+
+          const pdfDoc = printer.createPdfKitDocument(docDefinition)
+          const chunks: Buffer[] = []
+          return await new Promise<Buffer>((resolve, reject) => {
+            pdfDoc.on('data', (chunk) => chunks.push(chunk))
+            pdfDoc.on('end', () => resolve(Buffer.concat(chunks)))
+            pdfDoc.on('error', (err) => reject(err))
+            pdfDoc.end()
+          })
         }
 
         // Helper function to generate invoice for an order
@@ -5926,7 +6036,7 @@ export const generateManifestService = async (params: {
           })
 
           const { uploadUrl, key } = await presignUpload({
-            filename: `manifest-delhivery-${Date.now()}.pdf`,
+            filename: 'm-delhivery.pdf',
             contentType: 'application/pdf',
             userId: fetchedOrders[0].user_id,
             folderKey: 'manifests',
@@ -6165,14 +6275,28 @@ export const generateManifestService = async (params: {
         }
 
         const deliveryOnePickupWarnings: string[] = []
+        const localManifestOrdersById = new Map<string, any>()
 
         for (const awb of params.awbs) {
-          let order: any = orders.find((o) => o.awb_number === awb)
-          if (!order) {
-            const [fetched] = await tx.select().from(table).where(eq(table.awb_number, awb))
+          const ref = String(awb ?? '').trim()
+          const matchedOrder = orders.find(
+            (o) => String(o.awb_number ?? '').trim() === ref || String(o.order_number ?? '').trim() === ref,
+          )
+          let order: any
+
+          if (matchedOrder?.id) {
+            const [fetched] = await tx.select().from(table).where(eq(table.id, matchedOrder.id))
+            order = fetched
+          } else {
+            const [fetched] = await tx
+              .select()
+              .from(table)
+              .where(or(eq(table.awb_number, ref), eq(table.order_number, ref)) as any)
             order = fetched
           }
+
           if (!order) continue
+          localManifestOrdersById.set(String(order.id), order)
 
           const [prefs] = await tx
             .select()
@@ -6554,8 +6678,67 @@ export const generateManifestService = async (params: {
           }
         }
 
-        // When using local manifest generation, just resolve and return a pseudo key as manifest info.
-        const manifestKey = `manifest-invoice`
+        const localManifestOrders = Array.from(localManifestOrdersById.values())
+        if (localManifestOrders.length === 0) {
+          throw new HttpError(404, 'No orders available for manifest PDF generation.')
+        }
+
+        const manifestBuffer = await generateLocalManifestPdf(localManifestOrders, integrationType)
+        if (!manifestBuffer || manifestBuffer.length === 0) {
+          throw new Error('Manifest PDF buffer is empty')
+        }
+
+        const { uploadUrl: manifestUploadUrl, key: rawManifestKey } = await presignUpload({
+          filename: `m-${compactStorageToken(integrationType)}.pdf`,
+          contentType: 'application/pdf',
+          userId: localManifestOrders[0].user_id,
+          folderKey: 'manifests',
+        })
+
+        if (!manifestUploadUrl || !rawManifestKey) {
+          throw new Error('Failed to get presigned upload URL for manifest')
+        }
+
+        const manifestPutUrl = Array.isArray(manifestUploadUrl)
+          ? manifestUploadUrl[0]
+          : manifestUploadUrl
+        const manifestUploadResponse = await axios.put(manifestPutUrl, manifestBuffer, {
+          headers: { 'Content-Type': 'application/pdf' },
+          validateStatus: (status) => status >= 200 && status < 300,
+          timeout: 60000,
+        })
+
+        if (manifestUploadResponse.status < 200 || manifestUploadResponse.status >= 300) {
+          throw new Error(`Manifest upload failed with status ${manifestUploadResponse.status}`)
+        }
+
+        const manifestKeyValue = Array.isArray(rawManifestKey) ? rawManifestKey[0] : rawManifestKey
+        if (
+          !manifestKeyValue ||
+          typeof manifestKeyValue !== 'string' ||
+          manifestKeyValue.trim().length === 0
+        ) {
+          throw new Error('Manifest key is invalid or empty after upload')
+        }
+
+        const manifestKey = normalizeToR2Key(manifestKeyValue.trim()) || manifestKeyValue.trim()
+        if (manifestKey.length > 100) {
+          throw new Error(`Generated manifest key is too long for storage: ${manifestKey.length}`)
+        }
+
+        await Promise.all(
+          localManifestOrders.map((order) =>
+            tx
+              .update(table)
+              .set({
+                manifest: manifestKey,
+                order_status: 'pickup_initiated',
+                updated_at: new Date(),
+              })
+              .where(eq(table.id, order.id)),
+          ),
+        )
+
         const manifestDownloadUrl = await resolveManifestUrl(manifestKey)
 
         return {

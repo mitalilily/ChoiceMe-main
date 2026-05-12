@@ -10,6 +10,12 @@ import { userProfiles } from '../schema/userProfile'
 import { getAdminInvoicePreferences } from './invoicePreferences.service'
 import { presignDownload, presignUpload } from './upload.service'
 
+const summarizeFetchError = (err: any) => {
+  const message = err?.message || String(err)
+  const status = err?.response?.status
+  return status ? `${message} (status ${status})` : message
+}
+
 function isValidDataUrl(str: string | null): boolean {
   return typeof str === 'string' && str.startsWith('data:image/')
 }
@@ -74,6 +80,15 @@ const fonts = {
     italics: 'Helvetica-Oblique',
     bolditalics: 'Helvetica-BoldOblique',
   },
+}
+
+const compactStorageToken = (...values: Array<string | number | null | undefined>) => {
+  const raw = values.find((value) => value !== null && value !== undefined && String(value).trim())
+  const cleaned = String(raw ?? Date.now())
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(-12)
+
+  return cleaned || Date.now().toString(36)
 }
 
 const DEFAULT_LABEL_SETTINGS = {
@@ -164,7 +179,7 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
         }
       }
     } catch (err) {
-      console.warn('⚠️ Failed to fetch company logo:', err)
+      console.warn('⚠️ Failed to fetch company logo:', summarizeFetchError(err))
     }
   }
 
@@ -186,7 +201,7 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
       }
     }
   } catch (err) {
-    console.warn('⚠️ Failed to fetch platform logo:', err)
+    console.warn('⚠️ Failed to fetch platform logo:', summarizeFetchError(err))
   }
 
   // Normalize fields
@@ -797,7 +812,7 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
 
     // Upload
     const { uploadUrl, key } = await presignUpload({
-      filename: `label-${order?.order_number ?? order?.id}.pdf`,
+      filename: `l-${compactStorageToken(order?.order_number, order?.id)}.pdf`,
       contentType: 'application/pdf',
       userId,
       folderKey: 'labels',

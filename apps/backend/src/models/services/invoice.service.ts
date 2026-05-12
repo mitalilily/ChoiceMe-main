@@ -7,6 +7,13 @@ import { db } from '../client'
 import { invoices } from '../schema/invoices'
 import { presignDownload } from './upload.service'
 import { getAdminInvoicePreferences } from './invoicePreferences.service'
+
+const summarizeFetchError = (err: any) => {
+  const message = err?.message || String(err)
+  const status = err?.response?.status
+  return status ? `${message} (status ${status})` : message
+}
+
 // Product + Invoice types
 // ----------------------
 export interface Product {
@@ -219,7 +226,10 @@ export const generateInvoicePDF = async (invoice: InvoiceData): Promise<Buffer> 
         logoDataUrl = dataUrl
       }
     } catch (err) {
-      console.warn('⚠️ Failed to process logo buffer, continuing without logo:', err)
+      console.warn(
+        '⚠️ Failed to process logo buffer, continuing without logo:',
+        summarizeFetchError(err),
+      )
     }
   }
 
@@ -239,11 +249,17 @@ export const generateInvoicePDF = async (invoice: InvoiceData): Promise<Buffer> 
           platformLogoDataUrl = dataUrl
         }
       } catch (err) {
-        console.warn('⚠️ Failed to download platform logo, continuing without it:', err)
+        console.warn(
+          '⚠️ Failed to download platform logo, continuing without it:',
+          summarizeFetchError(err),
+        )
       }
     }
   } catch (err) {
-    console.warn('⚠️ Failed to get platform logo URL, continuing without it:', err)
+    console.warn(
+      '⚠️ Failed to get platform logo URL, continuing without it:',
+      summarizeFetchError(err),
+    )
   }
 
   let signatureDataUrl: string | undefined
@@ -258,7 +274,10 @@ export const generateInvoicePDF = async (invoice: InvoiceData): Promise<Buffer> 
         console.warn('⚠️ Signature buffer conversion returned null/undefined')
       }
     } catch (err) {
-      console.warn('⚠️ Failed to process signature buffer, continuing without signature:', err)
+      console.warn(
+        '⚠️ Failed to process signature buffer, continuing without signature:',
+        summarizeFetchError(err),
+      )
     }
   } else {
     console.log('ℹ️ No signature buffer provided for invoice')

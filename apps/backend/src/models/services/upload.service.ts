@@ -9,7 +9,9 @@ import path from 'path'
 
 // Load correct .env based on NODE_ENV
 const env = process.env.NODE_ENV || 'development'
-dotenv.config({ path: path.resolve(__dirname, `../../.env.${env}`) })
+const backendRoot = path.resolve(__dirname, '../../..')
+dotenv.config({ path: path.resolve(backendRoot, `.env.${env}`) })
+dotenv.config({ path: path.resolve(backendRoot, '.env') })
 
 interface PresignParams {
   filename: string
