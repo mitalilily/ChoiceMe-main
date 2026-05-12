@@ -1,9 +1,8 @@
 import { Box, Flex, Link, Text, useColorModeValue } from '@chakra-ui/react'
-import { brandIdentity } from 'theme/brand'
 
 export default function Footer() {
   const textColor = useColorModeValue('rgba(96,115,151,0.94)', 'gray.400')
-  const linkColor = useColorModeValue('brand.500', 'brand.300')
+  const linkColor = useColorModeValue('accent.600', 'accent.300')
   const borderColor = useColorModeValue('rgba(13,27,77,0.08)', 'rgba(255,255,255,0.08)')
 
   return (
@@ -29,15 +28,16 @@ export default function Footer() {
           textAlign={{ base: 'center', xl: 'start' }}
           fontSize="sm"
         >
-          &copy; {new Date().getFullYear()} {brandIdentity.name} admin workspace.
+          crafted by
           <Link
             color={linkColor}
-            href="https://resonant-piroshki-dcb9ff.netlify.app/"
+            href="https://searchcraftdigital.com/"
             target="_blank"
+            rel="noopener noreferrer"
             fontWeight="semibold"
             ms="6px"
           >
-            Updated design system
+            SearchCraft Digital
           </Link>
         </Text>
       </Box>
