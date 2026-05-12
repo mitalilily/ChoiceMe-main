@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { Response } from 'express'
 import { db } from '../../models/client'
 import { DelhiveryService } from '../../models/services/couriers/delhivery.service'
+import { DeliveryOneService } from '../../models/services/couriers/deliveryone.service'
 import { EkartService } from '../../models/services/couriers/ekart.service'
 import { XpressbeesService } from '../../models/services/couriers/xpressbees.service'
 import {
@@ -303,11 +304,11 @@ export const cancelOrderController = async (req: any, res: Response) => {
 
     let cancellationResult: any = null
     const provider = String(order.integration_type || '').toLowerCase()
-    if (!['delhivery', 'ekart', 'xpressbees'].includes(provider)) {
+    if (!['delhivery', 'deliveryone', 'ekart', 'xpressbees'].includes(provider)) {
       return res.status(400).json({
         success: false,
         error: 'Unsupported provider',
-        message: `Only Delhivery, Ekart and Xpressbees are supported for cancellation. Found: ${order.integration_type}`,
+        message: `Only Delhivery, Delivery One, Ekart and Xpressbees are supported for cancellation. Found: ${order.integration_type}`,
       })
     }
 
@@ -323,6 +324,9 @@ export const cancelOrderController = async (req: any, res: Response) => {
       if (provider === 'delhivery') {
         const delhivery = new DelhiveryService()
         cancellationResult = await delhivery.cancelShipment(order.awb_number)
+      } else if (provider === 'deliveryone') {
+        const deliveryOne = new DeliveryOneService()
+        cancellationResult = await deliveryOne.cancelShipment(order.awb_number)
       } else if (provider === 'ekart') {
         const ekart = new EkartService()
         cancellationResult = await ekart.cancelShipment(order.awb_number)
@@ -359,9 +363,9 @@ export const cancelOrderController = async (req: any, res: Response) => {
         message:
           cancellationResult?.error ||
           cancellationResult?.message ||
-          'Delhivery did not confirm cancellation',
+          `${provider} did not confirm cancellation`,
         data: {
-          provider: 'delhivery',
+          provider,
           awb_number: order.awb_number,
           provider_response: cancellationResult,
         },

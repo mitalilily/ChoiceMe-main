@@ -663,6 +663,24 @@ export const editDeliveryOneShipmentController = async (req: Request, res: Respo
   }
 }
 
+export const cancelDeliveryOneShipmentController = async (req: Request, res: Response) => {
+  try {
+    const waybill = req.body?.waybill || req.params?.waybill
+    const result = await new DeliveryOneService().cancelShipment(waybill)
+
+    res.json({
+      success: true,
+      data: result,
+    })
+  } catch (err: any) {
+    console.error('Failed to cancel Delivery One shipment:', err?.message || err)
+    res.status(err?.statusCode || 500).json({
+      success: false,
+      message: err?.message || 'Failed to cancel Delivery One shipment',
+    })
+  }
+}
+
 export const updateEkartCredentialsController = async (req: Request, res: Response) => {
   const { apiBase, clientId, username, password, webhookSecret } = req.body || {}
 

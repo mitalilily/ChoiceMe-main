@@ -215,6 +215,7 @@ export class DeliveryOneService {
     return (
       raw?.detail ||
       raw?.message ||
+      (typeof raw?.error === 'string' ? raw.error : '') ||
       raw?.error_message ||
       raw?.status_message ||
       raw?.reason ||
@@ -459,6 +460,67 @@ export class DeliveryOneService {
 
       this.log('Edit shipment failed', {
         waybill,
+        status,
+        response: error?.response?.data || null,
+        message,
+      })
+
+      throw new HttpError(status, message)
+    }
+  }
+
+  async cancelShipment(waybill: string) {
+    const normalizedWaybill = String(waybill || '').trim()
+    if (!normalizedWaybill) {
+      throw new HttpError(400, 'waybill is required to cancel a Delivery One shipment.')
+    }
+
+    const payload = {
+      waybill: normalizedWaybill,
+      cancellation: 'true',
+    }
+    const headers = await this.getHeaders()
+
+    try {
+      const response = await axios.post(`${this.apiBase}/api/p/edit`, payload, {
+        headers,
+        timeout: 20000,
+      })
+      const raw = response.data
+      const explicitFailure =
+        raw?.error === true ||
+        typeof raw?.error === 'string' ||
+        raw?.success === false ||
+        raw?.Success === false ||
+        String(raw?.status || '').toLowerCase() === 'fail'
+
+      this.log(explicitFailure ? 'Cancel shipment rejected' : 'Cancel shipment succeeded', {
+        waybill: normalizedWaybill,
+        status: response.status,
+        response: explicitFailure ? raw : undefined,
+      })
+
+      if (explicitFailure) {
+        throw new HttpError(
+          502,
+          this.extractErrorMessage(raw, 'Delivery One shipment cancellation failed.'),
+        )
+      }
+
+      return raw
+    } catch (error: any) {
+      if (error instanceof HttpError) {
+        throw error
+      }
+
+      const status = Number(error?.response?.status || 502)
+      const message =
+        this.extractErrorMessage(error?.response?.data, '') ||
+        error?.message ||
+        'Delivery One shipment cancellation failed'
+
+      this.log('Cancel shipment failed', {
+        waybill: normalizedWaybill,
         status,
         response: error?.response?.data || null,
         message,
