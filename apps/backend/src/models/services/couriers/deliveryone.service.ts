@@ -59,6 +59,36 @@ export type DeliveryOneWaybillFetchResponse = {
   raw: any
 }
 
+export type DeliveryOneShipmentEditPayload = {
+  waybill: string
+  name?: string
+  phone?: string | string[]
+  pt?: string
+  payment_mode?: string
+  paymentMode?: string
+  cod?: number | string
+  cod_amount?: number | string
+  codAmount?: number | string
+  add?: string
+  address?: string
+  products_desc?: string
+  productsDesc?: string
+  gm?: number | string
+  weight?: number | string
+  shipment_height?: number | string
+  shipmentHeight?: number | string
+  shipment_width?: number | string
+  shipmentWidth?: number | string
+  shipment_length?: number | string
+  shipmentLength?: number | string
+}
+
+export type DeliveryOneShipmentEditResponse = {
+  waybill: string
+  payload: Record<string, any>
+  raw: any
+}
+
 export class DeliveryOneService {
   private apiBase =
     process.env.DELIVERY_ONE_API_BASE ||
@@ -166,6 +196,32 @@ export class DeliveryOneService {
       },
       timeout: 30000,
     })
+  }
+
+  private extractErrorMessage(raw: any, fallback: string) {
+    if (!raw) return fallback
+    if (typeof raw === 'string') return raw
+    const normalizedRemarks = (remarks: unknown): string[] => {
+      if (!remarks) return []
+      if (Array.isArray(remarks)) return remarks.flatMap((entry) => normalizedRemarks(entry))
+      if (typeof remarks === 'object') {
+        return Object.values(remarks as Record<string, unknown>).flatMap((entry) =>
+          normalizedRemarks(entry),
+        )
+      }
+      return [String(remarks).trim()].filter(Boolean)
+    }
+
+    return (
+      raw?.detail ||
+      raw?.message ||
+      raw?.error_message ||
+      raw?.status_message ||
+      raw?.reason ||
+      normalizedRemarks(raw?.rmk).join(' | ') ||
+      normalizedRemarks(raw?.remarks).join(' | ') ||
+      fallback
+    )
   }
 
   private extractWaybills(raw: any): string[] {
@@ -277,6 +333,139 @@ export class DeliveryOneService {
 
   async fetchSingleWaybill(): Promise<DeliveryOneWaybillFetchResponse> {
     return this.fetchWaybills(1)
+  }
+
+  async editShipment(
+    payload: DeliveryOneShipmentEditPayload,
+  ): Promise<DeliveryOneShipmentEditResponse> {
+    const sanitizeString = (value?: string | number | null) => {
+      if (value === undefined || value === null) return ''
+      return String(value).trim()
+    }
+    const sanitizePhone = (value?: string | number | null) => {
+      const digits = String(value || '').replace(/\D/g, '')
+      return digits.length >= 10 ? digits.slice(-10) : digits
+    }
+    const toNumber = (value: unknown) => {
+      if (value === undefined || value === null || value === '') return undefined
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : undefined
+    }
+    const normalizePaymentMode = (value: unknown) => {
+      const normalized = sanitizeString(value as any).toLowerCase()
+      if (!normalized) return undefined
+      if (normalized === 'cod') return 'COD'
+      if (['prepaid', 'pre-paid', 'pre paid'].includes(normalized)) return 'Pre-paid'
+      throw new HttpError(
+        400,
+        'Delivery One shipment edit payment mode must be COD or Pre-paid.',
+      )
+    }
+
+    const waybill = sanitizeString(payload?.waybill)
+    if (!waybill) {
+      throw new HttpError(400, 'waybill is required to edit a Delivery One shipment.')
+    }
+
+    const editPayload: Record<string, any> = { waybill }
+    const name = sanitizeString(payload.name)
+    if (name) editPayload.name = name
+
+    const phoneValues = Array.isArray(payload.phone) ? payload.phone : [payload.phone]
+    const phones = phoneValues.map((phone) => sanitizePhone(phone)).filter(Boolean)
+    if (phones.length) editPayload.phone = phones
+
+    const paymentMode = normalizePaymentMode(payload.pt ?? payload.payment_mode ?? payload.paymentMode)
+    if (paymentMode) editPayload.pt = paymentMode
+
+    const codAmount = toNumber(payload.cod ?? payload.cod_amount ?? payload.codAmount)
+    if (codAmount !== undefined) editPayload.cod = codAmount
+
+    const address = sanitizeString(payload.add ?? payload.address)
+    if (address) editPayload.add = address
+
+    const productsDesc = sanitizeString(payload.products_desc ?? payload.productsDesc)
+    if (productsDesc) editPayload.products_desc = productsDesc
+
+    const weight = toNumber(payload.gm ?? payload.weight)
+    if (weight !== undefined) editPayload.gm = weight
+
+    const height = toNumber(payload.shipment_height ?? payload.shipmentHeight)
+    if (height !== undefined) editPayload.shipment_height = height
+
+    const width = toNumber(payload.shipment_width ?? payload.shipmentWidth)
+    if (width !== undefined) editPayload.shipment_width = width
+
+    const length = toNumber(payload.shipment_length ?? payload.shipmentLength)
+    if (length !== undefined) editPayload.shipment_length = length
+
+    if (Object.keys(editPayload).length === 1) {
+      throw new HttpError(
+        400,
+        'Provide at least one editable field for Delivery One shipment edit.',
+      )
+    }
+    if (editPayload.pt === 'COD' && !(Number(editPayload.cod) > 0)) {
+      throw new HttpError(
+        400,
+        'Positive COD amount is required when converting a Delivery One shipment to COD.',
+      )
+    }
+
+    const headers = await this.getHeaders()
+
+    try {
+      const response = await axios.post(`${this.apiBase}/api/p/edit`, editPayload, {
+        headers,
+        timeout: 20000,
+      })
+      const raw = response.data
+      const explicitFailure =
+        raw?.error === true ||
+        typeof raw?.error === 'string' ||
+        raw?.success === false ||
+        raw?.Success === false ||
+        String(raw?.status || '').toLowerCase() === 'fail'
+
+      this.log(explicitFailure ? 'Edit shipment rejected' : 'Edit shipment succeeded', {
+        waybill,
+        status: response.status,
+        updatedFields: Object.keys(editPayload).filter((key) => key !== 'waybill'),
+        response: explicitFailure ? raw : undefined,
+      })
+
+      if (explicitFailure) {
+        throw new HttpError(
+          502,
+          this.extractErrorMessage(raw, 'Delivery One shipment edit failed.'),
+        )
+      }
+
+      return {
+        waybill,
+        payload: editPayload,
+        raw,
+      }
+    } catch (error: any) {
+      if (error instanceof HttpError) {
+        throw error
+      }
+
+      const status = Number(error?.response?.status || 502)
+      const message =
+        this.extractErrorMessage(error?.response?.data, '') ||
+        error?.message ||
+        'Delivery One shipment edit failed'
+
+      this.log('Edit shipment failed', {
+        waybill,
+        status,
+        response: error?.response?.data || null,
+        message,
+      })
+
+      throw new HttpError(status, message)
+    }
   }
 
   async createShipment(params: ShipmentParams, providedWaybills?: string | string[]) {

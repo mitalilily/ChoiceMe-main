@@ -646,6 +646,23 @@ export const fetchDeliveryOneWaybillsController = async (req: Request, res: Resp
   }
 }
 
+export const editDeliveryOneShipmentController = async (req: Request, res: Response) => {
+  try {
+    const result = await new DeliveryOneService().editShipment(req.body || {})
+
+    res.json({
+      success: true,
+      data: result,
+    })
+  } catch (err: any) {
+    console.error('Failed to edit Delivery One shipment:', err?.message || err)
+    res.status(err?.statusCode || 500).json({
+      success: false,
+      message: err?.message || 'Failed to edit Delivery One shipment',
+    })
+  }
+}
+
 export const updateEkartCredentialsController = async (req: Request, res: Response) => {
   const { apiBase, clientId, username, password, webhookSecret } = req.body || {}
 

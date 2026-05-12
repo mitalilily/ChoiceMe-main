@@ -1,6 +1,7 @@
 // routes/shippingRateRoutes.ts
 import { Router } from 'express'
 import {
+  editDeliveryOneShipmentController,
   fetchDeliveryOneWaybillsController,
   getCourierCredentialsController,
   deleteShippingRateController,
@@ -61,6 +62,21 @@ router.post(
   requireAuth,
   isAdminMiddleware,
   fetchDeliveryOneWaybillsController,
+)
+router.post(
+  '/delivery-one/shipments/edit',
+  requireAuth,
+  isAdminMiddleware,
+  editDeliveryOneShipmentController,
+)
+router.patch(
+  '/delivery-one/shipments/:waybill',
+  requireAuth,
+  isAdminMiddleware,
+  (req, res) => {
+    req.body = { ...(req.body || {}), waybill: req.params.waybill }
+    return editDeliveryOneShipmentController(req, res)
+  },
 )
 router.put(
   '/credentials/ekart',
