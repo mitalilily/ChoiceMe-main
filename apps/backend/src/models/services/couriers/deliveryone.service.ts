@@ -221,6 +221,48 @@ export type DeliveryOnePickupRequestResponse = {
   raw: any
 }
 
+export type DeliveryOneWarehousePayload = {
+  name?: string
+  registered_name?: string
+  registeredName?: string
+  phone?: string | number
+  email?: string
+  address?: string
+  city?: string
+  pin?: string | number
+  pincode?: string | number
+  country?: string
+  return_address?: string
+  returnAddress?: string
+  return_city?: string
+  returnCity?: string
+  return_pin?: string | number
+  returnPin?: string | number
+  return_state?: string
+  returnState?: string
+  return_country?: string
+  returnCountry?: string
+}
+
+export type DeliveryOneWarehouseResponse = {
+  payload: {
+    name: string
+    registered_name?: string
+    phone: string
+    email?: string
+    address?: string
+    city?: string
+    pin: string
+    country?: string
+    return_address: string
+    return_city?: string
+    return_pin?: string
+    return_state?: string
+    return_country?: string
+  }
+  raw: any
+}
+
 export class DeliveryOneService {
   private apiBase =
     process.env.DELIVERY_ONE_API_BASE ||
@@ -347,7 +389,7 @@ export class DeliveryOneService {
     return (
       raw?.detail ||
       raw?.message ||
-      (typeof raw?.error === 'string' ? raw.error : '') ||
+      (typeof raw?.error === 'string' ? raw.error : normalizedRemarks(raw?.error).join(' | ')) ||
       raw?.error_message ||
       raw?.status_message ||
       raw?.reason ||
@@ -1103,6 +1145,131 @@ export class DeliveryOneService {
         pickupTime: payload.pickup_time,
         pickupLocation: payload.pickup_location,
         expectedPackageCount: payload.expected_package_count,
+        status,
+        response: error?.response?.data || null,
+        message,
+      })
+
+      throw new HttpError(status, message)
+    }
+  }
+
+  async createWarehouse(
+    params: DeliveryOneWarehousePayload,
+  ): Promise<DeliveryOneWarehouseResponse> {
+    const sanitizeString = (value?: string | number | null) => {
+      if (value === undefined || value === null) return ''
+      return String(value).trim()
+    }
+    const sanitizePhone = (value?: string | number | null) => {
+      const digits = String(value || '').replace(/\D/g, '')
+      if (digits.length < 10) {
+        throw new HttpError(400, 'phone must contain at least 10 digits.')
+      }
+      return digits.slice(-10)
+    }
+    const sanitizePincode = (value?: string | number | null, field = 'pin') => {
+      const digits = String(value || '').replace(/\D/g, '').slice(0, 6)
+      if (!/^\d{6}$/.test(digits)) {
+        throw new HttpError(400, `${field} must be a valid 6-digit pincode.`)
+      }
+      return digits
+    }
+    const optionalPincode = (value?: string | number | null, field = 'return_pin') => {
+      if (value === undefined || value === null || value === '') return undefined
+      return sanitizePincode(value, field)
+    }
+
+    const address = sanitizeString(params.address)
+    const country = sanitizeString(params.country) || 'India'
+    const payload: DeliveryOneWarehouseResponse['payload'] = {
+      name: sanitizeString(params.name),
+      phone: sanitizePhone(params.phone),
+      pin: sanitizePincode(params.pin ?? params.pincode, 'pin'),
+      return_address: sanitizeString(params.return_address ?? params.returnAddress) || address,
+    }
+
+    if (!payload.name) {
+      throw new HttpError(
+        400,
+        'name is required and is case-sensitive for Delivery One warehouse registration.',
+      )
+    }
+    if (!payload.return_address) {
+      throw new HttpError(400, 'return_address is required for Delivery One warehouse registration.')
+    }
+
+    const registeredName = sanitizeString(params.registered_name ?? params.registeredName)
+    const email = sanitizeString(params.email)
+    const city = sanitizeString(params.city)
+    const returnCity = sanitizeString(params.return_city ?? params.returnCity) || city
+    const returnState = sanitizeString(params.return_state ?? params.returnState)
+    const returnCountry =
+      sanitizeString(params.return_country ?? params.returnCountry) || country
+    const returnPin = optionalPincode(params.return_pin ?? params.returnPin, 'return_pin')
+
+    if (registeredName) payload.registered_name = registeredName
+    if (email) payload.email = email
+    if (address) payload.address = address
+    if (city) payload.city = city
+    if (country) payload.country = country
+    if (returnCity) payload.return_city = returnCity
+    if (returnPin) payload.return_pin = returnPin
+    if (returnState) payload.return_state = returnState
+    if (returnCountry) payload.return_country = returnCountry
+
+    const headers = await this.getHeaders()
+
+    try {
+      const response = await axios.post(
+        `${this.apiBase}/api/backend/clientwarehouse/create/`,
+        payload,
+        {
+          headers,
+          timeout: 30000,
+        },
+      )
+      const raw = response.data
+      const explicitFailure =
+        raw?.error === true ||
+        typeof raw?.error === 'string' ||
+        (Array.isArray(raw?.error) && raw.error.length > 0) ||
+        raw?.success === false ||
+        raw?.Success === false ||
+        String(raw?.status || '').toLowerCase() === 'fail'
+
+      this.log(explicitFailure ? 'Warehouse creation rejected' : 'Warehouse created', {
+        name: payload.name,
+        pin: payload.pin,
+        status: response.status,
+        response: explicitFailure ? raw : undefined,
+      })
+
+      if (explicitFailure) {
+        throw new HttpError(
+          502,
+          this.extractErrorMessage(raw, 'Delivery One warehouse creation failed.'),
+        )
+      }
+
+      return {
+        payload,
+        raw,
+      }
+    } catch (error: any) {
+      if (error instanceof HttpError) {
+        throw error
+      }
+
+      const status = Number(error?.response?.status || 502)
+      const message =
+        this.extractErrorMessage(error?.response?.data, '') ||
+        error?.message ||
+        'Delivery One warehouse creation failed'
+
+      this.log('Warehouse creation failed', {
+        name: payload.name,
+        pin: payload.pin,
         status,
         response: error?.response?.data || null,
         message,

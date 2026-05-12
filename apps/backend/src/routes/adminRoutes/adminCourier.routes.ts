@@ -4,6 +4,7 @@ import {
   cancelDeliveryOneShipmentController,
   calculateDeliveryOneShippingCostController,
   createDeliveryOnePickupRequestController,
+  createDeliveryOneWarehouseController,
   editDeliveryOneShipmentController,
   fetchDeliveryOneWaybillsController,
   generateDeliveryOneLabelController,
@@ -104,6 +105,18 @@ router.post(
   requireAuth,
   isAdminMiddleware,
   createDeliveryOnePickupRequestController,
+)
+router.post(
+  '/delivery-one/warehouses',
+  requireAuth,
+  isAdminMiddleware,
+  createDeliveryOneWarehouseController,
+)
+router.post(
+  '/delivery-one/client-warehouses',
+  requireAuth,
+  isAdminMiddleware,
+  createDeliveryOneWarehouseController,
 )
 router.post(
   '/delivery-one/shipments/edit',

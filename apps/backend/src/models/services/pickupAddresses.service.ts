@@ -4,6 +4,7 @@ import { CreatePickupDto, HydratedPickupAddress, UpdatePickupDto } from '../../t
 import { db } from '../client'
 import { addresses, pickupAddresses } from '../schema/pickupAddresses'
 import { DelhiveryService } from './couriers/delhivery.service'
+import { DeliveryOneService } from './couriers/deliveryone.service'
 import { EkartService } from './couriers/ekart.service'
 
 function parseCoordinate(value: string | null | undefined, fallback: number) {
@@ -140,7 +141,33 @@ export async function createPickupAddressService(data: CreatePickupDto, userId: 
       throw genericErr
     }
 
-    // 🔹 Register pickup in Ekart (mirror our warehouse)
+    // Delivery One uses the same warehouse registration contract. Keep this best-effort so
+    // missing Delivery One credentials do not block local pickup address creation.
+    try {
+      const deliveryOne = new DeliveryOneService()
+      await deliveryOne.createWarehouse({
+        name: pickupAddr.addressNickname ?? pickupAddr.contactName ?? 'Default Warehouse',
+        registered_name: 'ChoiceMe',
+        phone: pickupAddr.contactPhone,
+        email: pickupAddr.contactEmail ?? '',
+        address: pickupAddr.addressLine1,
+        city: pickupAddr.city,
+        pin: pickupAddr.pincode.toString(),
+        country: pickupAddr.country ?? 'India',
+        return_address: rtoAddressData.addressLine1 ?? pickupAddr.addressLine1,
+        return_city: rtoAddressData.city ?? pickupAddr.city,
+        return_pin: rtoAddressData.pincode?.toString() ?? pickupAddr.pincode?.toString(),
+        return_state: rtoAddressData.state ?? pickupAddr.state,
+        return_country: 'India',
+      })
+      console.log(`✅ Delivery One warehouse registered: ${pickupAddr.addressNickname}`)
+    } catch (err: any) {
+      console.warn(
+        '⚠️ Failed to register Delivery One warehouse:',
+        err?.response?.data || err?.message || err,
+      )
+    }
+
     try {
       const ekart = new EkartService()
       const alias = pickupAddr.addressNickname || pickupAddr.contactName || `warehouse-${pickupAddr.id}`
