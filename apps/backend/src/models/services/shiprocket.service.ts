@@ -48,6 +48,11 @@ import * as dotenv from 'dotenv'
 import { PgTransaction } from 'drizzle-orm/pg-core'
 import path from 'path'
 import PdfPrinter from 'pdfmake'
+import {
+  INTEGRATED_SERVICE_PROVIDERS,
+  normalizeServiceProviderKey,
+  supportedServiceProviderList,
+} from '../../utils/courierProviders'
 import { requireMerchantOrderReadiness } from '../../utils/merchantReadiness'
 import { courierPriorityProfiles } from '../schema/courierPriority'
 import { couriers } from '../schema/couriers'
@@ -997,7 +1002,7 @@ export const fetchAvailableCouriersWithRates = async (
 
     // Build registry of enabled couriers by service provider
     // Filter by business type: check if business_type JSONB array contains 'b2c'
-    const SUPPORTED_PROVIDERS = ['delhivery', 'ekart', 'xpressbees', 'deliveryone']
+    const SUPPORTED_PROVIDERS = [...INTEGRATED_SERVICE_PROVIDERS]
     const systemCourierRows = await db
       .select({
         id: couriers.id,
@@ -1010,7 +1015,7 @@ export const fetchAvailableCouriersWithRates = async (
 
     const normalizeProviderKey = (value?: string | null) => {
       if (!value) return ''
-      return value.trim().toLowerCase()
+      return normalizeServiceProviderKey(value)
     }
 
     const makeCourierIdentityKey = (courier: {
@@ -1045,7 +1050,7 @@ export const fetchAvailableCouriersWithRates = async (
 
     for (const row of systemCourierRows) {
       const providerKey = normalizeProviderKey(row.serviceProvider)
-      if (!providerKey || !SUPPORTED_PROVIDERS.includes(providerKey)) continue
+      if (!providerKey || !SUPPORTED_PROVIDERS.includes(providerKey as any)) continue
       if (providerKey === 'delhivery' && !DELHIVERY_ALLOWED_COURIER_IDS.includes(Number(row.id))) {
         continue
       }
@@ -2477,7 +2482,7 @@ export const createB2CShipmentService = async (
     } else {
       throw new HttpError(
         400,
-        `Invalid provider_code: ${params.provider_code}. Please provide a valid provider_code from the serviceability API response (XC7K9).`,
+        `Invalid provider_code: ${params.provider_code}. Please provide a valid provider_code from the serviceability API response.`,
       )
     }
   }
@@ -2613,8 +2618,8 @@ export const createB2CShipmentService = async (
       } else if (matchingCouriers.length === 1) {
         // Only one courier with this ID - use it directly
         const matchedCourier = matchingCouriers[0]
-        const serviceProvider = matchedCourier.serviceProvider?.toLowerCase().trim()
-        if (['delhivery', 'ekart', 'xpressbees', 'deliveryone'].includes(serviceProvider || '')) {
+        const serviceProvider = normalizeServiceProviderKey(matchedCourier.serviceProvider)
+        if (INTEGRATED_SERVICE_PROVIDERS.includes(serviceProvider as any)) {
           params.integration_type = serviceProvider
           console.log(
             `✅ Derived integration_type: ${params.integration_type} from courier_id: ${params.courier_id} (courier: ${matchedCourier.name})`,
@@ -2622,7 +2627,7 @@ export const createB2CShipmentService = async (
         } else {
           throw new HttpError(
             400,
-            `Unsupported serviceProvider: ${serviceProvider}. Supported providers: delhivery, ekart, xpressbees, deliveryone.`,
+            `Unsupported serviceProvider: ${serviceProvider}. Supported providers: ${supportedServiceProviderList()}.`,
           )
         }
       } else {
@@ -3116,11 +3121,14 @@ export const createB2CShipmentService = async (
 
   try {
     // 1️⃣ CREATE SHIPMENT
-    const requestedIntegrationType = String(params.integration_type || '').toLowerCase()
-    const allowedIntegrationTypes = ['delhivery', 'ekart', 'xpressbees', 'deliveryone']
-    if (!requestedIntegrationType || !allowedIntegrationTypes.includes(requestedIntegrationType)) {
+    const requestedIntegrationType = normalizeServiceProviderKey(params.integration_type)
+    const allowedIntegrationTypes = [...INTEGRATED_SERVICE_PROVIDERS]
+    if (
+      !requestedIntegrationType ||
+      !allowedIntegrationTypes.includes(requestedIntegrationType as any)
+    ) {
       throw new Error(
-        `Invalid integration_type: ${params.integration_type}. Supported values: delhivery, ekart, xpressbees, deliveryone.`,
+        `Invalid integration_type: ${params.integration_type}. Supported values: ${supportedServiceProviderList()}.`,
       )
     }
 
@@ -4983,8 +4991,8 @@ export const generateManifestService = async (params: {
           }
         }
 
-        if (integrationType !== 'delhivery') {
-          throw new Error('Only Delhivery is supported for manifest generation')
+        if (!['delhivery', 'deliveryone'].includes(integrationType)) {
+          throw new Error('Only Delhivery and Delivery One are supported for manifest generation')
         }
 
         async function resolveManifestUrl(value: string | null): Promise<string | null> {
@@ -6407,11 +6415,11 @@ export const retryFailedManifestService = async (
     throw new HttpError(404, 'Order not found.')
   }
 
-  const provider = String(order.integration_type || '').trim().toLowerCase()
-  if (provider !== 'delhivery') {
+  const provider = normalizeServiceProviderKey(order.integration_type)
+  if (!['delhivery', 'deliveryone'].includes(provider)) {
     throw new HttpError(
       400,
-      'Manifest retry is currently supported only for Delhivery failed orders.',
+      'Manifest retry is currently supported only for Delhivery and Delivery One failed orders.',
     )
   }
 
@@ -6922,7 +6930,7 @@ export const trackByAwbService = async (awb: string): Promise<TrackingServiceRes
     throw new HttpError(404, `No order found for AWB: ${awb}`)
   }
 
-  let providerKey = sanitizeString(order.integration_type ?? 'delhivery').toLowerCase()
+  let providerKey = normalizeServiceProviderKey(order.integration_type ?? 'delhivery')
 
   if (!['delhivery', 'deliveryone'].includes(providerKey) && order.courier_partner) {
     const partner = order.courier_partner.toLowerCase()

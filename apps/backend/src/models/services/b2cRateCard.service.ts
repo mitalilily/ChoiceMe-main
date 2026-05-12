@@ -2,6 +2,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '../client'
 import { shippingRates, shippingRateSlabs } from '../schema/shippingRates'
 import { calculateFreight } from './pricing/chargeableFreight'
+import { normalizeServiceProviderKey } from '../../utils/courierProviders'
 
 export interface RateCardSlabInput {
   weight_from: number
@@ -60,9 +61,7 @@ export function normalizeB2CShippingMode(value: unknown): string {
 }
 
 export function normalizeB2CServiceProvider(value: unknown): string {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
+  return normalizeServiceProviderKey(value)
 }
 
 function toNumber(value: unknown, fallback = 0) {

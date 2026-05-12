@@ -2,11 +2,13 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { Response } from 'express'
 import { db } from '../../models/client'
 import { DelhiveryService } from '../../models/services/couriers/delhivery.service'
+import { DeliveryOneService } from '../../models/services/couriers/deliveryone.service'
 import {
   createPickupAddressService,
   updatePickupAddressService,
 } from '../../models/services/pickupAddresses.service'
 import { addresses, b2c_orders, pickupAddresses } from '../../schema/schema'
+import { getServiceProviderLabel, normalizeServiceProviderKey } from '../../utils/courierProviders'
 
 /**
  * Create/Register pickup address
@@ -432,16 +434,30 @@ export const requestPickupController = async (req: any, res: Response) => {
       })
     }
 
+    const supportedPickupProviders = ['delhivery', 'deliveryone']
     const unsupportedOrder = orders.find(
-      (o) => String(o.integration_type || '').trim().toLowerCase() !== 'delhivery',
+      (o) => !supportedPickupProviders.includes(normalizeServiceProviderKey(o.integration_type)),
     )
     if (unsupportedOrder) {
       return res.status(400).json({
         success: false,
         error: 'Unsupported provider',
-        message: `Order ${unsupportedOrder.order_number} is not configured for Delhivery`,
+        message: `Order ${unsupportedOrder.order_number} is not configured for Delhivery or Delivery One`,
       })
     }
+
+    const providerSet = new Set(
+      orders.map((order) => normalizeServiceProviderKey(order.integration_type || 'delhivery')),
+    )
+    if (providerSet.size > 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mixed providers',
+        message: 'Select orders from only one courier provider when requesting pickup',
+      })
+    }
+
+    const provider = [...providerSet][0] || 'delhivery'
 
     let pickupLocation = ''
     if (pickup_address_id) {
@@ -484,8 +500,9 @@ export const requestPickupController = async (req: any, res: Response) => {
     const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000)
     const defaultPickupTime = oneHourLater.toTimeString().split(' ')[0]
 
-    const delhivery = new DelhiveryService()
-    const delhiveryResponse = await delhivery.createPickupRequest({
+    const providerService =
+      provider === 'deliveryone' ? new DeliveryOneService() : new DelhiveryService()
+    const providerResponse = await providerService.createPickupRequest({
       pickup_date: String(pickup_date || defaultPickupDate),
       pickup_time: String(pickup_time || defaultPickupTime),
       pickup_location: pickupLocation,
@@ -505,7 +522,7 @@ export const requestPickupController = async (req: any, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Pickup request submitted successfully to Delhivery',
+      message: `Pickup request submitted successfully to ${getServiceProviderLabel(provider)}`,
       data: {
         requested_awbs: orders.map((o) => o.awb_number).filter(Boolean),
         requested_order_numbers: orders.map((o) => o.order_number).filter(Boolean),
@@ -514,8 +531,8 @@ export const requestPickupController = async (req: any, res: Response) => {
         pickup_location: pickupLocation,
         expected_package_count: orders.length,
         status: 'pickup_initiated',
-        provider: 'delhivery',
-        provider_response: delhiveryResponse,
+        provider,
+        provider_response: providerResponse,
       },
     })
   } catch (error: any) {

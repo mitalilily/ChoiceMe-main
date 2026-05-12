@@ -1,4 +1,5 @@
 import { presignDownload } from '../models/services/upload.service'
+import { normalizeServiceProviderKey } from './courierProviders'
 
 /**
  * Generates an accessible download URL for stored asset keys.
@@ -49,7 +50,7 @@ export const sanitizeOrderForCustomer = async (order: any): Promise<any> => {
   const sanitized = { ...order }
   const manifestRetryCount = Number(order?.manifest_retry_count ?? 0)
   const manifestRetriesRemaining = Math.max(0, 3 - manifestRetryCount)
-  const provider = String(order?.integration_type || '').trim().toLowerCase()
+  const provider = normalizeServiceProviderKey(order?.integration_type)
 
   delete sanitized.courier_cost
 
@@ -57,7 +58,7 @@ export const sanitizeOrderForCustomer = async (order: any): Promise<any> => {
   sanitized.manifest_retries_remaining = manifestRetriesRemaining
   sanitized.can_retry_manifest =
     String(order?.order_status || '').trim().toLowerCase() === 'manifest_failed' &&
-    provider === 'delhivery' &&
+    ['delhivery', 'deliveryone'].includes(provider) &&
     manifestRetriesRemaining > 0
 
   // Always expose stored document keys so clients can reliably use the same regenerated keys

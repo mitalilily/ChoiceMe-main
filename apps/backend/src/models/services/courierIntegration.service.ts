@@ -8,6 +8,11 @@ import { shippingRates } from '../schema/shippingRates'
 import { userPlans } from '../schema/userPlans'
 import { zones } from '../schema/zones'
 import {
+  INTEGRATED_SERVICE_PROVIDERS,
+  normalizeServiceProviderKey,
+  supportedServiceProviderList,
+} from '../../utils/courierProviders'
+import {
   fetchShippingRateSlabs,
   normalizeB2CShippingMode,
   normalizeB2CServiceProvider,
@@ -619,12 +624,11 @@ export const createCourier = async (data: {
   if (!data?.courierName || !data?.courierName?.trim()) throw new Error('Courier name is required')
   if (!data?.serviceProvider) throw new Error('Service provider is required')
   
-  // Validate service provider is one of the allowed providers
-  const allowedProviders = ['delhivery', 'ekart', 'xpressbees', 'deliveryone']
-  const normalizedProvider = (data.serviceProvider || '').toLowerCase().trim()
-  if (!allowedProviders.includes(normalizedProvider)) {
+  const allowedProviders = [...INTEGRATED_SERVICE_PROVIDERS]
+  const normalizedProvider = normalizeServiceProviderKey(data.serviceProvider)
+  if (!allowedProviders.includes(normalizedProvider as any)) {
     throw new Error(
-      `Service provider must be one of: ${allowedProviders.join(', ')}. Received: ${data.serviceProvider}`
+      `Service provider must be one of: ${supportedServiceProviderList()}. Received: ${data.serviceProvider}`
     )
   }
 
@@ -736,13 +740,14 @@ export const deleteShippingRate = async (
 }
 
 export const deleteCourierService = async (id: string, serviceProvider: string) => {
+  const normalizedProvider = normalizeServiceProviderKey(serviceProvider)
   const exists = await db
     .select()
     .from(couriers)
-    .where(and(eq(couriers.id, Number(id)), eq(couriers.serviceProvider, serviceProvider)))
+    .where(and(eq(couriers.id, Number(id)), eq(couriers.serviceProvider, normalizedProvider)))
   if (exists.length === 0) throw new Error('Courier not found')
 
   await db
     .delete(couriers)
-    .where(and(eq(couriers.id, Number(id)), eq(couriers.serviceProvider, serviceProvider)))
+    .where(and(eq(couriers.id, Number(id)), eq(couriers.serviceProvider, normalizedProvider)))
 }

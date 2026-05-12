@@ -17,6 +17,11 @@ import { presignDownload } from '../../models/services/upload.service'
 import { applyCancellationRefundOnce } from '../../models/services/webhookProcessor'
 import { b2c_orders } from '../../schema/schema'
 import { sendWebhookEvent } from '../../services/webhookDelivery.service'
+import {
+  INTEGRATED_SERVICE_PROVIDERS,
+  normalizeServiceProviderKey,
+  supportedServiceProviderList,
+} from '../../utils/courierProviders'
 import { getOpaqueProviderCode } from '../../utils/externalApiHelpers'
 
 /**
@@ -303,12 +308,12 @@ export const cancelOrderController = async (req: any, res: Response) => {
     }
 
     let cancellationResult: any = null
-    const provider = String(order.integration_type || '').toLowerCase()
-    if (!['delhivery', 'deliveryone', 'ekart', 'xpressbees'].includes(provider)) {
+    const provider = normalizeServiceProviderKey(order.integration_type)
+    if (!INTEGRATED_SERVICE_PROVIDERS.includes(provider as any)) {
       return res.status(400).json({
         success: false,
         error: 'Unsupported provider',
-        message: `Only Delhivery, Delivery One, Ekart and Xpressbees are supported for cancellation. Found: ${order.integration_type}`,
+        message: `Supported providers for cancellation: ${supportedServiceProviderList()}. Found: ${order.integration_type}`,
       })
     }
 

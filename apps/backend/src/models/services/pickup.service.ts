@@ -6,6 +6,11 @@ import { DeliveryOneService } from './couriers/deliveryone.service'
 import { EkartService } from './couriers/ekart.service'
 import { XpressbeesService } from './couriers/xpressbees.service'
 import { applyCancellationRefundOnce } from './webhookProcessor'
+import {
+  INTEGRATED_SERVICE_PROVIDERS,
+  normalizeServiceProviderKey,
+  supportedServiceProviderList,
+} from '../../utils/courierProviders'
 
 export async function cancelOrderShipment(orderId: string) {
   console.log('🔍 Starting cancellation for orderId:', orderId)
@@ -26,10 +31,10 @@ export async function cancelOrderShipment(orderId: string) {
     currentStatus: order.order_status,
   })
 
-  const integration = (order.integration_type || '').toLowerCase()
-  if (!['delhivery', 'deliveryone', 'ekart', 'xpressbees'].includes(integration)) {
+  const integration = normalizeServiceProviderKey(order.integration_type)
+  if (!INTEGRATED_SERVICE_PROVIDERS.includes(integration as any)) {
     console.error('❌ Unsupported integration type:', { orderId, integration })
-    throw new Error('Only Delhivery, Delivery One, Ekart and Xpressbees are supported for cancellation')
+    throw new Error(`Supported cancellation providers: ${supportedServiceProviderList()}`)
   }
 
   if (!order.awb_number) {

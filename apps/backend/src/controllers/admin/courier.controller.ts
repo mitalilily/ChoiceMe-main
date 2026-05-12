@@ -21,6 +21,10 @@ import { fetchAvailableCouriersWithRatesAdmin } from '../../models/services/ship
 import { courier_credentials } from '../../models/schema/courierCredentials'
 import { couriers } from '../../models/schema/couriers'
 import { getAllZones } from '../../models/services/zone.service'
+import {
+  INTEGRATED_SERVICE_PROVIDERS,
+  normalizeServiceProviderKey,
+} from '../../utils/courierProviders'
 
 export interface ShippingRateFilters {
   courier_name?: string[]
@@ -148,7 +152,7 @@ export const getAllCouriersListController = async (req: Request, res: Response) 
 
     // Filter by service provider
     if (serviceProvider && typeof serviceProvider === 'string' && serviceProvider.trim()) {
-      whereClauses.push(eq(couriers.serviceProvider, serviceProvider.trim()))
+      whereClauses.push(eq(couriers.serviceProvider, normalizeServiceProviderKey(serviceProvider)))
     }
 
     // Filter by business type (b2c or b2b)
@@ -225,10 +229,11 @@ export const updateCourierStatusController = async (req: Request, res: Response)
       })
     }
 
+    const normalizedServiceProvider = normalizeServiceProviderKey(serviceProvider)
     const updated = await db
       .update(couriers)
       .set(updateData)
-      .where(and(eq(couriers.id, Number(id)), eq(couriers.serviceProvider, serviceProvider)))
+      .where(and(eq(couriers.id, Number(id)), eq(couriers.serviceProvider, normalizedServiceProvider)))
       .returning()
 
     if (!updated.length) {
@@ -245,7 +250,7 @@ export const updateCourierStatusController = async (req: Request, res: Response)
 export const getServiceProvidersController = async (req: Request, res: Response) => {
   try {
     // Only expose the main integrated service providers in the enable/disable UI
-    const allowedProviders = ['delhivery', 'ekart', 'xpressbees', 'deliveryone']
+    const allowedProviders = [...INTEGRATED_SERVICE_PROVIDERS]
 
     const rows = await db
       .select({
@@ -291,7 +296,7 @@ export const updateServiceProviderStatusController = async (req: Request, res: R
   const { isEnabled } = req.body
 
   try {
-    const allowedProviders = ['delhivery', 'ekart', 'xpressbees', 'deliveryone']
+    const allowedProviders = [...INTEGRATED_SERVICE_PROVIDERS]
 
     if (!serviceProvider || typeof isEnabled !== 'boolean') {
       return res.status(400).json({
@@ -299,7 +304,8 @@ export const updateServiceProviderStatusController = async (req: Request, res: R
         message: 'serviceProvider (param) and boolean isEnabled (body) are required',
       })
     }
-    if (!allowedProviders.includes(String(serviceProvider).toLowerCase())) {
+    const normalizedProvider = normalizeServiceProviderKey(serviceProvider)
+    if (!allowedProviders.includes(normalizedProvider as any)) {
       return res.status(400).json({
         success: false,
         message: `Only these providers are supported: ${allowedProviders.join(', ')}`,
@@ -312,7 +318,7 @@ export const updateServiceProviderStatusController = async (req: Request, res: R
         isEnabled,
         updatedAt: new Date(),
       })
-      .where(eq(couriers.serviceProvider, serviceProvider))
+      .where(eq(couriers.serviceProvider, normalizedProvider))
       .returning()
 
     if (!updated.length) {
@@ -322,7 +328,7 @@ export const updateServiceProviderStatusController = async (req: Request, res: R
     res.json({
       success: true,
       data: {
-        serviceProvider,
+        serviceProvider: normalizedProvider,
         isEnabled,
         affectedCouriers: updated.length,
       },
@@ -348,12 +354,7 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
       })
       .from(courier_credentials)
       .where(
-        inArray(courier_credentials.provider, [
-          'delhivery',
-          'ekart',
-          'xpressbees',
-          'deliveryone',
-        ]),
+        inArray(courier_credentials.provider, [...INTEGRATED_SERVICE_PROVIDERS]),
       )
 
     const defaults = {

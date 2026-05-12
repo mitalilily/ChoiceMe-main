@@ -3,14 +3,25 @@
  * These utilities are used across external API controllers
  */
 
+import {
+  IntegratedServiceProvider,
+  normalizeServiceProviderKey,
+} from './courierProviders'
+
 // Map integration types to opaque codes that don't reveal the provider
-const PROVIDER_CODE_MAP: Record<string, string> = {
+const PROVIDER_CODE_MAP: Record<IntegratedServiceProvider, string> = {
   delhivery: 'XC7K9',
+  deliveryone: 'QH8L2',
+  ekart: 'MZ4P8',
+  xpressbees: 'RT6N3',
 }
 
 // Reverse map: provider code -> integration type
 const PROVIDER_CODE_REVERSE_MAP: Record<string, string> = {
   XC7K9: 'delhivery',
+  QH8L2: 'deliveryone',
+  MZ4P8: 'ekart',
+  RT6N3: 'xpressbees',
 }
 
 /**
@@ -19,8 +30,8 @@ const PROVIDER_CODE_REVERSE_MAP: Record<string, string> = {
  * The code is opaque and cannot be reverse-engineered to determine the provider
  */
 export const getOpaqueProviderCode = (integrationType: string | null | undefined): string => {
-  const normalizedType = integrationType?.toLowerCase().trim() || 'delhivery'
-  return PROVIDER_CODE_MAP[normalizedType] || 'XC7K9'
+  const normalizedType = normalizeServiceProviderKey(integrationType) || 'delhivery'
+  return PROVIDER_CODE_MAP[normalizedType as IntegratedServiceProvider] || 'XC7K9'
 }
 
 /**
@@ -29,14 +40,14 @@ export const getOpaqueProviderCode = (integrationType: string | null | undefined
  */
 export const getIntegrationTypeFromProviderCode = (
   providerCode: string | null | undefined,
-): 'delhivery' | null => {
+): IntegratedServiceProvider | null => {
   if (!providerCode) return null
 
   const normalizedCode = providerCode.trim().toUpperCase()
   const integrationType = PROVIDER_CODE_REVERSE_MAP[normalizedCode]
 
   if (integrationType) {
-    return integrationType as 'delhivery'
+    return integrationType as IntegratedServiceProvider
   }
 
   return null
