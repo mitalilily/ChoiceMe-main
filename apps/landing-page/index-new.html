@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camplar Landing Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+</head>
+<body>
+    <header class="bg-blue-600 p-5 text-white">
+        <h1 class="text-3xl font-bold">Welcome to Camplar</h1>
+    </header>
+    <main class="p-5">
+        <section class="my-5">
+            <h2 class="text-2xl font-semibold">About Camplar</h2>
+            <p>Camplar is your ultimate solution for volumetric weight calculation and more!</p>
+        </section>
+        <section class="my-5">
+            <h2 class="text-2xl font-semibold">Volumetric Weight Calculator</h2>
+            <form id="calculator" class="space-y-3">
+                <input type="number" placeholder="Length (cm)" class="border border-gray-400 p-2 w-full">
+                <input type="number" placeholder="Width (cm)" class="border border-gray-400 p-2 w-full">
+                <input type="number" placeholder="Height (cm)" class="border border-gray-400 p-2 w-full">
+                <button type="button" class="bg-blue-500 text-white p-2">Calculate</button>
+            </form>
+            <div id="result" class="mt-3"></div>
+        </section>
+    </main>
+    <script>
+        document.querySelector('button').addEventListener('click', function() {
+            const length = parseFloat(document.querySelector('input[placeholder="Length (cm)"]').value);
+            const width = parseFloat(document.querySelector('input[placeholder="Width (cm)"]').value);
+            const height = parseFloat(document.querySelector('input[placeholder="Height (cm)"]').value);
+            const volumetricWeight = (length * width * height) / 5000;
+            document.getElementById('result').innerHTML = `Volumetric Weight: ${volumetricWeight.toFixed(2)} kg`;
+        });
+    </script>
+</body>
+</html>

@@ -26,7 +26,7 @@ const defaultLinks: NavItem[] = [
 export default function PublicNavbar({
   links = defaultLinks,
   primaryLabel = 'Start Shipping',
-  primaryTo = '/signup',
+  primaryTo = '/login',
 }: PublicNavbarProps) {
   const location = useLocation()
 
@@ -40,7 +40,7 @@ export default function PublicNavbar({
       }}
     >
       <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-        <RouterLink to="/login" aria-label={`${brandIdentity.name} login`}>
+        <RouterLink to="/" aria-label={`${brandIdentity.name} home`}>
           <BrandLogo sx={{ width: { xs: 108, sm: 118, md: 128 } }} />
         </RouterLink>
 

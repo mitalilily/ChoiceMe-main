@@ -226,7 +226,7 @@ export default function LandingPage() {
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.4}>
                     <Button
                       component={RouterLink}
-                      to="/signup"
+                      to="/login"
                       variant="contained"
                       endIcon={<FiArrowRight size={18} />}
                     >
@@ -606,7 +606,7 @@ export default function LandingPage() {
                     Start shipping smarter with {brandIdentity.name}
                   </Typography>
                   <Typography sx={{ mt: 1.4, color: alpha('#FFFFFF', 0.74), lineHeight: 1.8, maxWidth: 680 }}>
-                    Try the free rate calculator, compare couriers, track shipments live, or create your seller account and move straight into the existing auth and dashboard flow.
+                    Try the free rate calculator, compare couriers, track shipments live, or open the seller portal and move straight into the existing auth and dashboard flow.
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
@@ -614,8 +614,8 @@ export default function LandingPage() {
                     <Button component={RouterLink} to="/rate-calculator" variant="contained" color="primary">
                       Explore Rates
                     </Button>
-                    <Button component={RouterLink} to="/signup" variant="outlined" sx={{ borderColor: alpha('#FFFFFF', 0.32), color: '#FFFFFF', '&:hover': { borderColor: alpha('#FFFFFF', 0.58) } }}>
-                      Create Account
+                    <Button component={RouterLink} to="/login" variant="outlined" sx={{ borderColor: alpha('#FFFFFF', 0.32), color: '#FFFFFF', '&:hover': { borderColor: alpha('#FFFFFF', 0.58) } }}>
+                      Open Portal
                     </Button>
                   </Stack>
                 </Grid>

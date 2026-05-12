@@ -7,8 +7,7 @@ import BrandLogo from '../brand/BrandLogo'
 import { brand, brandIdentity } from '../../theme/brand'
 
 const platformLinks = [
-  { label: 'Login', to: '/login' },
-  { label: 'Create Account', to: '/signup' },
+  { label: 'Portal Login', to: '/login' },
   { label: 'Tracking', to: '/tracking' },
   { label: 'Rate Calculator', to: '/rate-calculator' },
   { label: 'Weight Calculator', to: '/weight-calculator' },
@@ -16,7 +15,6 @@ const platformLinks = [
 
 const companyLinks = [
   { label: 'Portal Login', to: '/login' },
-  { label: 'Create Account', to: '/signup' },
   { label: 'Track Shipment', to: '/tracking' },
 ]
 
@@ -43,7 +41,7 @@ export default function PublicFooter() {
             }}
           >
             <Stack spacing={1.5}>
-              <RouterLink to="/login" aria-label={`${brandIdentity.name} login`}>
+              <RouterLink to="/" aria-label={`${brandIdentity.name} home`}>
                 <BrandLogo sx={{ width: { xs: 164, sm: 184 } }} />
               </RouterLink>
               <Typography sx={{ color: brand.inkSoft, lineHeight: 1.75, maxWidth: 360 }}>
