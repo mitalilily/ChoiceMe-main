@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Alert, Box, Button, CircularProgress, Grid, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Grid, Stack, Typography } from "@mui/material";
 import { useForm, Controller } from "react-hook-form";
 import type {
   BusinessStructure,
@@ -7,14 +7,11 @@ import type {
 } from "../../../../types/generic.types";
 import FileUploader from "../../../UI/uploader/FileUploader";
 import CustomInput from "../../../UI/inputs/CustomInput";
-import AadhaarCard from "../../../UI/AadharCard";
-import BankChequeCard from "../../../UI/BankChequeCard";
 import {
   requiredKycDetails,
   requiredKycFieldMap,
 } from "../../../../utils/constants";
 import React from "react";
-import { useKycTextExtractor } from "../../../../hooks/User/useTextExtractor";
 
 export interface AdditionalKYCForm {
   gstin?: string;
@@ -97,29 +94,6 @@ const isFileField = (f: keyof AdditionalKYCForm) =>
     "gstCertificateUrl",
   ]?.includes(f);
 
-type ScanType = "aadhar" | "bankCheque" | "pan" | "gst";
-
-const scanTypes: Partial<Record<keyof AdditionalKYCForm, ScanType>> = {
-  aadhaarUrl: "aadhar",
-  cancelledChequeUrl: "bankCheque",
-  panCardUrl: "pan",
-  businessPanUrl: "pan",
-  gstCertificateUrl: "gst",
-};
-
-const scanLabels: Partial<Record<keyof AdditionalKYCForm, string>> = {
-  aadhaarUrl: "Scan Aadhaar",
-  cancelledChequeUrl: "Scan cheque",
-  panCardUrl: "Scan PAN",
-  businessPanUrl: "Scan business PAN",
-  gstCertificateUrl: "Scan GST certificate",
-};
-
-const isScanSupported = (mime?: string) =>
-  !mime ||
-  mime.startsWith("image/") ||
-  ["application/pdf", "application/x-pdf", "application/octet-stream"].includes(mime);
-
 const mimeFieldByUploadField: Partial<
   Record<keyof AdditionalKYCForm, keyof AdditionalKYCForm>
 > = {
@@ -143,7 +117,6 @@ export default function AdditionalDetailsStep({
   companyType,
   onComplete,
 }: Props) {
-  const { extractedText, loadingKey, errorKey, extract } = useKycTextExtractor();
   const {
     control,
     setValue,
@@ -203,60 +176,6 @@ export default function AdditionalDetailsStep({
     defaultValue?.[
       `${field.replace("Url", "")}RejectionReason` as keyof typeof defaultValue
     ] as string | undefined;
-
-  const scanUploadedFile = async (
-    field: keyof AdditionalKYCForm,
-    fileKey?: string,
-    mime?: string
-  ) => {
-    const scanType = scanTypes[field];
-    if (!scanType || !fileKey || !isScanSupported(mime)) return;
-    await extract(field, fileKey, scanType);
-  };
-
-  const renderScanResult = (field: keyof AdditionalKYCForm) => {
-    const result = extractedText[field as string];
-    if (!result) return null;
-
-    if (field === "aadhaarUrl") {
-      return <AadhaarCard text={result} />;
-    }
-
-    if (field === "cancelledChequeUrl") {
-      return <BankChequeCard text={result} />;
-    }
-
-    if (typeof result === "object" && result !== null) {
-      const entries = Object.entries(result as Record<string, unknown>).filter(([, value]) =>
-        Boolean(value)
-      );
-
-      return (
-        <Alert severity={entries.length ? "success" : "info"} sx={{ mt: 1 }}>
-          <Stack spacing={0.4}>
-            <Typography variant="caption" fontWeight={700}>
-              Document scan complete
-            </Typography>
-            {entries.length ? (
-              entries.map(([key, value]) => (
-                <Typography key={key} variant="caption">
-                  {key}: {String(value)}
-                </Typography>
-              ))
-            ) : (
-              <Typography variant="caption">No matching fields were detected.</Typography>
-            )}
-          </Stack>
-        </Alert>
-      );
-    }
-
-    return (
-      <Alert severity="success" sx={{ mt: 1 }}>
-        <Typography variant="caption">{String(result)}</Typography>
-      </Alert>
-    );
-  };
 
   return (
     <Box component="form" onSubmit={handleSubmit(onComplete)}>
@@ -348,35 +267,8 @@ export default function AdditionalDetailsStep({
                             });
                           }
                           ctrl.onChange(fileKey);
-                          void scanUploadedFile(field, fileKey, file?.mime);
                         }}
                       />
-                      {scanTypes[field] ? (
-                        <Stack mt={1} spacing={0.8}>
-                          <Box display="flex" justifyContent="flex-end">
-                            <Button
-                              size="small"
-                              variant="text"
-                              disabled={!watch(field) || loadingKey === field}
-                              onClick={() =>
-                                void scanUploadedFile(field, watch(field) as string)
-                              }
-                              startIcon={
-                                loadingKey === field ? <CircularProgress size={14} /> : undefined
-                              }
-                              sx={{ textTransform: "none", fontWeight: 700 }}
-                            >
-                              {loadingKey === field
-                                ? "Scanning..."
-                                : scanLabels[field] ?? "Scan document"}
-                            </Button>
-                          </Box>
-                          {errorKey[field] ? (
-                            <Alert severity="warning">{errorKey[field]}</Alert>
-                          ) : null}
-                          {renderScanResult(field)}
-                        </Stack>
-                      ) : null}
                       {!watch(field) || watch(field) === defaultValue?.[field]
                         ? (() => {
                             const status = getStatus(field);

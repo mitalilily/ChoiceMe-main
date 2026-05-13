@@ -5,7 +5,7 @@ import type { BusinessStructure, CompanyType } from '../../../../types/generic.t
 import CustomSelect from '../../../UI/inputs/CustomSelect'
 
 export interface BusinessStructureForm {
-  structure: BusinessStructure
+  structure?: BusinessStructure
   companyType?: CompanyType
 }
 
@@ -73,7 +73,7 @@ interface Props {
 export const BusinessStructureStep: React.FC<Props> = ({ defaultValue, onChange, value }) => {
   const { control, setValue, watch } = useForm<BusinessStructureForm>({
     defaultValues: {
-      structure: defaultValue?.structure ?? 'individual',
+      structure: defaultValue?.structure,
       ...(defaultValue?.companyType && {
         companyType: defaultValue.companyType,
       }),
@@ -87,7 +87,7 @@ export const BusinessStructureStep: React.FC<Props> = ({ defaultValue, onChange,
       setValue('structure', value?.structure)
       setValue('companyType', value?.companyType)
     }
-  }, [value])
+  }, [setValue, value?.companyType, value?.structure])
 
   const selectedStructure = watch('structure')
   const selectedCompanyType = watch('companyType')
@@ -146,7 +146,15 @@ export const BusinessStructureStep: React.FC<Props> = ({ defaultValue, onChange,
                       borderColor: '#333369',
                     },
                   }}
-                  onClick={() => setValue('structure', option.value)}
+                  onClick={() => {
+                    setValue('structure', option.value, { shouldDirty: true, shouldValidate: true })
+                    if (option.value !== 'company') {
+                      setValue('companyType', undefined, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  }}
                 >
                   <CardContent>
                     <Typography

@@ -72,11 +72,22 @@ const KYCVerificationStep: React.FC<{
   }, [editing, existingKyc])
 
   const handleBusinessStructureChange = (value: BusinessStructure | CompanyType, key: string) => {
-    updateKycData({
+    const nextData: Partial<KycDetails> = {
       ...(key === 'structure' ? { structure: value as BusinessStructure } : {}),
       ...(key === 'companyType' ? { companyType: value as CompanyType } : {}),
-    })
-    setIsStepValid(true)
+    }
+
+    if (key === 'structure' && value !== 'company') {
+      nextData.companyType = undefined
+    }
+
+    updateKycData(nextData)
+
+    const updated = { ...kycDataRef.current, ...nextData }
+    setIsStepValid(
+      Boolean(updated.structure) &&
+        (updated.structure !== 'company' || Boolean(updated.companyType)),
+    )
   }
 
   const handleSelfieCapture = (img: string) => {
@@ -188,11 +199,11 @@ const KYCVerificationStep: React.FC<{
         return (
           <BusinessStructureStep
             defaultValue={{
-              structure: kycData.structure ?? 'individual',
+              structure: kycData.structure,
               companyType: kycData.companyType ?? undefined,
             }}
             value={{
-              structure: kycData.structure ?? 'individual',
+              structure: kycData.structure,
               companyType: kycData.companyType ?? undefined,
             }}
             onChange={handleBusinessStructureChange}
