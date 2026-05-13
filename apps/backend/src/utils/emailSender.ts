@@ -84,6 +84,24 @@ const maskEmailForLog = (email: string) => {
   return `${visibleLocal}@${domain}`
 }
 
+const createPlainTextFallback = (htmlContent: string) =>
+  htmlContent
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+
 type AttachmentInput = {
   /** local file path OR Buffer */
   path?: string
@@ -295,6 +313,7 @@ const sendEmail = async (
   subject: string,
   htmlContent: string,
   attachments?: AttachmentInput[],
+  textContent?: string,
 ) => {
   const config = readEmailConfig()
   const candidates = buildTransportCandidates(config)
@@ -302,9 +321,16 @@ const sendEmail = async (
 
   const mailOptions: any = {
     from: `"ChoiceMe Logistics" <${config.emailFrom}>`,
+    sender: config.emailFrom,
+    replyTo: config.emailFrom,
     to,
     subject,
+    text: textContent || createPlainTextFallback(htmlContent),
     html: htmlContent,
+    headers: {
+      'X-ChoiceMe-Message-Type': 'transactional',
+      'X-ChoiceMe-Mailer': 'choiceme-backend',
+    },
   }
 
   if (attachments && attachments.length) {
@@ -391,6 +417,8 @@ export const sendSmtpTestEmail = async (to?: string) => {
         <p>This is a production mailer test from ChoiceMe Logistics.</p>
       </div>
     `,
+    undefined,
+    'SMTP delivery is working. This is a production mailer test from ChoiceMe Logistics.',
   )
 }
 
@@ -511,7 +539,13 @@ export const sendVerificationEmail = async (to: string, token: string) => {
     </div>
   `
 
-  await sendEmail(to, 'Your ChoiceMe Logistics verification code', html)
+  await sendEmail(
+    to,
+    'Your ChoiceMe Logistics verification code',
+    html,
+    undefined,
+    `Your ChoiceMe Logistics verification code is ${token}. It expires in 5 minutes. If you did not request this code, you can ignore this email.`,
+  )
   return { delivered: true }
 }
 
