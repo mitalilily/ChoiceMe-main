@@ -103,15 +103,15 @@ const CustomInput = forwardRef<HTMLInputElement, CustomInputProps>(
               '& fieldset': {
                 borderColor: isReferenceAuth
                   ? isFocused
-                    ? alpha(brand.ink, 0.5)
-                    : alpha(brand.ink, 0.36)
+                    ? alpha(brand.ink, 0.24)
+                    : 'transparent'
                   : isFocused
                     ? alpha(brand.ink, 0.28)
                     : alpha(brand.ink, 0.1),
-                borderWidth: isFocused ? 1.5 : 1,
+                borderWidth: isReferenceAuth ? 1 : isFocused ? 1.5 : 1,
               },
               '&:hover fieldset': {
-                borderColor: isReferenceAuth ? alpha(brand.ink, 0.52) : alpha(brand.ink, 0.24),
+                borderColor: isReferenceAuth ? alpha(brand.ink, 0.16) : alpha(brand.ink, 0.24),
               },
               '&.Mui-error': {
                 boxShadow: '0 0 0 3px rgba(209, 67, 67, 0.08)',

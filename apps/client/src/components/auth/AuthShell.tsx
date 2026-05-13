@@ -56,32 +56,29 @@ export default function AuthShell({
         justifyContent: 'center',
         overflowX: 'hidden',
         overflowY: { xs: 'auto', lg: 'hidden' },
-        p: { xs: 1, sm: 1.25, md: 1.5, lg: 1.25 },
+        p: { xs: 0.9, sm: 1.1, md: 1.25, lg: 0.7 },
       }}
     >
       <Box
         sx={{
           position: 'relative',
-          width: '100%',
-          maxWidth: isCompact ? 790 : 1210,
-          height: { xs: 'auto', lg: 'min(660px, calc(100dvh - 20px))' },
+          width: { xs: '100%', lg: isCompact ? 'min(790px, calc(100vw - 36px))' : 'min(1480px, calc(100vw - 40px))' },
+          maxWidth: '100%',
+          height: { xs: 'auto', lg: 'min(720px, calc(100dvh - 14px))' },
           minHeight: { xs: 'auto', lg: 0 },
-          maxHeight: { lg: 'calc(100dvh - 20px)' },
-          borderRadius: { xs: '18px', md: '22px' },
-          border: `1px solid ${alpha(authPalette.navy, 0.14)}`,
+          maxHeight: { lg: 'calc(100dvh - 14px)' },
+          borderRadius: 0,
+          border: 'none',
           overflow: 'hidden',
-          bgcolor: '#FFFFFF',
-          boxShadow: {
-            xs: '0 16px 38px rgba(13, 27, 77, 0.1)',
-            md: '0 28px 76px rgba(13, 27, 77, 0.13)',
-          },
+          bgcolor: 'transparent',
+          boxShadow: 'none',
         }}
       >
         <Box
           sx={{
             position: 'absolute',
             zIndex: 0,
-            inset: { xs: '18px -44% 18px -30%', lg: '0 4% 0 6%' },
+            inset: { xs: '18px -44% 18px -30%', lg: '0 6% 0 7%' },
             bgcolor: authPalette.blob,
             background: `linear-gradient(145deg, ${authPalette.blob} 0%, #F4FBFF 48%, ${authPalette.blobEdge} 100%)`,
             borderRadius: {
@@ -102,13 +99,13 @@ export default function AuthShell({
             width: '100%',
             height: { xs: 'auto', lg: '100%' },
             boxSizing: 'border-box',
-            px: { xs: 1.6, sm: 2.2, md: 3, lg: 3.2 },
-            py: { xs: 2, sm: 2.4, md: 2.8, lg: 2.4 },
+            px: { xs: 1.4, sm: 2, md: 2.6, lg: 2.2 },
+            py: { xs: 2, sm: 2.4, md: 2.8, lg: 2 },
           }}
         >
           {!isCompact && (
             <Grid
-              size={{ xs: 12, lg: 6.3 }}
+              size={{ xs: 12, lg: 6.6 }}
               sx={{
                 display: 'flex',
                 alignItems: { xs: 'center', lg: 'center' },
@@ -143,15 +140,15 @@ export default function AuthShell({
                       px: { xs: 1, sm: 1.18 },
                       py: 0.55,
                       borderRadius: 999,
-                      border: `1px solid ${alpha(authPalette.orange, 0.22)}`,
-                      bgcolor: alpha('#FFFFFF', 0.82),
+                      border: 'none',
+                      bgcolor: alpha('#FFFFFF', 0.84),
                       color: authPalette.navy,
                       fontSize: { xs: '0.66rem', sm: '0.72rem' },
                       fontWeight: 800,
                       lineHeight: 1,
                       textTransform: 'uppercase',
                       letterSpacing: 0,
-                      boxShadow: `0 12px 24px ${alpha(authPalette.navy, 0.07)}`,
+                      boxShadow: 'none',
                     }}
                   >
                     <Box
@@ -235,7 +232,7 @@ export default function AuthShell({
           )}
 
           <Grid
-            size={{ xs: 12, lg: isCompact ? 12 : 5.7 }}
+            size={{ xs: 12, lg: isCompact ? 12 : 5.4 }}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -248,7 +245,7 @@ export default function AuthShell({
             <Box
               sx={{
                 width: '100%',
-                maxWidth: { xs: 'calc(100vw - 36px)', sm: isCompact ? 430 : 385, md: isCompact ? 440 : 395 },
+                maxWidth: { xs: 'calc(100vw - 36px)', sm: isCompact ? 430 : 430, md: isCompact ? 440 : 460 },
                 mx: { xs: 'auto', lg: 0 },
                 pt: { xs: 0, lg: isCompact ? 0.6 : 0 },
                 pb: { xs: 1, lg: 0 },
@@ -305,7 +302,7 @@ export default function AuthShell({
                 sx={{
                   p: { xs: 0, sm: 0.2 },
                   borderRadius: '8px',
-                  bgcolor: alpha('#FFFFFF', 0.58),
+                  bgcolor: 'transparent',
                 }}
               >
                 {children}

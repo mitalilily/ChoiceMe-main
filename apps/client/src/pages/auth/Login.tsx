@@ -32,12 +32,12 @@ export default function Login() {
         <Box
           sx={{
             borderRadius: '7px',
-            border: `1px solid ${alpha(AUTH_NAVY, 0.18)}`,
-            backgroundColor: alpha('#FFFFFF', 0.7),
+            border: 'none',
+            backgroundColor: alpha('#FFFFFF', 0.42),
             overflow: 'hidden',
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            boxShadow: `0 8px 20px ${alpha(AUTH_NAVY, 0.05)}`,
+            boxShadow: 'none',
           }}
         >
           {[
@@ -53,17 +53,14 @@ export default function Login() {
                 py: { xs: 0.75, sm: 0.82 },
                 px: { xs: 0.5, sm: 1 },
                 minHeight: 40,
-                background: mode === item.value ? '#FFFFFF' : 'rgba(247,248,252,0.72)',
+                background: mode === item.value ? '#FFFFFF' : 'rgba(247,248,252,0.54)',
                 color: mode === item.value ? AUTH_ORANGE : alpha(AUTH_NAVY, 0.72),
                 fontWeight: 800,
                 fontSize: { xs: '0.68rem', sm: '0.86rem' },
                 textTransform: 'none',
                 whiteSpace: 'nowrap',
                 borderBottom: `3px solid ${mode === item.value ? AUTH_ORANGE : 'transparent'}`,
-                borderRight:
-                  item.value === 'otp'
-                    ? `1px solid ${alpha(AUTH_NAVY, 0.14)}`
-                    : '1px solid transparent',
+                borderRight: 'none',
                 '&:hover': {
                   background: '#FFFFFF',
                   color: mode === item.value ? AUTH_ORANGE : AUTH_NAVY,
