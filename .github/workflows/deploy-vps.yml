@@ -1,0 +1,89 @@
+name: Deploy ChoiceMee VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: choicemee-vps-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      BACKEND_ENV_B64: ${{ secrets.BACKEND_ENV_B64 }}
+      PGADMIN_PASSWORD: ${{ secrets.PGADMIN_PASSWORD }}
+      PGADMIN_EMAIL: ${{ secrets.PGADMIN_EMAIL }}
+      REMOTE_SOURCE: /opt/choicemee/source
+      REMOTE_ENV: /opt/choicemee/shared/backend.env
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SSH helpers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rsync sshpass
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          if [ -n "$VPS_SSH_KEY" ]; then
+            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/choicemee_vps
+            chmod 600 ~/.ssh/choicemee_vps
+          fi
+
+      - name: Prepare remote directories
+        run: |
+          if [ -n "$VPS_SSH_KEY" ]; then
+            ssh -i ~/.ssh/choicemee_vps "$VPS_USER@$VPS_HOST" "mkdir -p /opt/choicemee/shared '$REMOTE_SOURCE'"
+          else
+            SSHPASS="$VPS_PASSWORD" sshpass -e ssh "$VPS_USER@$VPS_HOST" "mkdir -p /opt/choicemee/shared '$REMOTE_SOURCE'"
+          fi
+
+      - name: Upload backend env
+        if: ${{ env.BACKEND_ENV_B64 != '' }}
+        run: |
+          if [ -n "$VPS_SSH_KEY" ]; then
+            printf '%s' "$BACKEND_ENV_B64" | base64 -d | ssh -i ~/.ssh/choicemee_vps "$VPS_USER@$VPS_HOST" "cat > '$REMOTE_ENV' && chmod 600 '$REMOTE_ENV'"
+          else
+            printf '%s' "$BACKEND_ENV_B64" | base64 -d | SSHPASS="$VPS_PASSWORD" sshpass -e ssh "$VPS_USER@$VPS_HOST" "cat > '$REMOTE_ENV' && chmod 600 '$REMOTE_ENV'"
+          fi
+
+      - name: Sync repository
+        run: |
+          RSYNC_EXCLUDES=(
+            --exclude '.git'
+            --exclude '.github'
+            --exclude '**/node_modules'
+            --exclude '**/dist'
+            --exclude '**/build'
+            --exclude '**/.env'
+            --exclude '**/.env.*'
+            --exclude '*.log'
+          )
+
+          if [ -n "$VPS_SSH_KEY" ]; then
+            rsync -az --delete "${RSYNC_EXCLUDES[@]}" -e "ssh -i ~/.ssh/choicemee_vps" ./ "$VPS_USER@$VPS_HOST:$REMOTE_SOURCE/"
+          else
+            SSHPASS="$VPS_PASSWORD" rsync -az --delete "${RSYNC_EXCLUDES[@]}" -e "sshpass -e ssh" ./ "$VPS_USER@$VPS_HOST:$REMOTE_SOURCE/"
+          fi
+
+      - name: Deploy on VPS
+        run: |
+          REMOTE_COMMAND="cd '$REMOTE_SOURCE' && PGADMIN_PASSWORD='$PGADMIN_PASSWORD' PGADMIN_EMAIL='$PGADMIN_EMAIL' bash scripts/deploy/vps-deploy.sh"
+          if [ -n "$VPS_SSH_KEY" ]; then
+            ssh -i ~/.ssh/choicemee_vps "$VPS_USER@$VPS_HOST" "$REMOTE_COMMAND"
+          else
+            SSHPASS="$VPS_PASSWORD" sshpass -e ssh "$VPS_USER@$VPS_HOST" "$REMOTE_COMMAND"
+          fi

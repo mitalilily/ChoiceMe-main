@@ -40,7 +40,7 @@ async function startServer() {
   server.listen(PORT, '0.0.0.0', () => {
     const url =
       env === 'production'
-        ? process.env.API_URL || 'https://choiceme-backend-production.up.railway.app'
+        ? process.env.API_URL || 'https://api.choicemee.in'
         : `http://localhost:${PORT}`
     console.log(`🚀 Server running on port ${PORT} in ${env} mode at ${url}`)
   })

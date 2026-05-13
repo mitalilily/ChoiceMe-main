@@ -3,7 +3,7 @@ import axios from 'axios'
 import { clearAuthTokens, getAuthTokens, setAuthTokens } from './tokenVault'
 
 const RAW_API_BASE_URL = import.meta.env.VITE_API_URL
-const DEFAULT_API_BASE_URL = 'https://choiceme-backend-production.up.railway.app/api'
+const DEFAULT_API_BASE_URL = 'https://api.choicemee.in/api'
 
 const getApiBaseUrl = () => {
   const fallback = DEFAULT_API_BASE_URL.replace(/\/+$/, '')

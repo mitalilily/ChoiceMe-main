@@ -45,8 +45,8 @@ echo "Running build with production environment variables..."
 
 # Set production API URL
 # React apps need REACT_APP_ prefix for environment variables
-export REACT_APP_API_BASE_URL="https://choiceme-backend-production.up.railway.app/api"
-export REACT_APP_SOCKET_URL="https://choiceme-backend-production.up.railway.app"
+export REACT_APP_API_BASE_URL="https://api.choicemee.in/api"
+export REACT_APP_SOCKET_URL="https://api.choicemee.in"
 
 echo "Using production API URL: ${REACT_APP_API_BASE_URL}"
 echo "Using production Socket URL: ${REACT_APP_SOCKET_URL}"
@@ -102,4 +102,3 @@ else
   exit 1
 fi
 echo ""
-

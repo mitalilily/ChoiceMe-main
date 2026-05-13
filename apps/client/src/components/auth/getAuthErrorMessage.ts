@@ -42,6 +42,6 @@ export const getAuthErrorMessage = (err: unknown, fallback: string) => {
   if (!isNetwork) return message
 
   const base =
-    import.meta.env.VITE_API_URL || 'https://choiceme-backend-production.up.railway.app/api'
+    import.meta.env.VITE_API_URL || 'https://api.choicemee.in/api'
   return `Cannot reach the ChoiceMe API (${base}). Please try again in a minute.`
 }

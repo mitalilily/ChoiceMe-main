@@ -1,6 +1,6 @@
 import { io, type Socket } from 'socket.io-client'
 
-const DEFAULT_SOCKET_URL = 'https://choiceme-backend-production.up.railway.app'
+const DEFAULT_SOCKET_URL = 'https://api.choicemee.in'
 
 const getSocketUrl = () => {
   const rawSocketUrl = import.meta.env.VITE_APP_SOCKET_URL
