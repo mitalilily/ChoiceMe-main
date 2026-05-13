@@ -5,13 +5,29 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_ssh_deploy:
+        description: Run the optional SSH deploy from GitHub Actions
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: choicemee-vps-deploy
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  pull-deploy-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: VPS pull deploy status
+        run: |
+          echo "ChoiceMee VPS is configured with a pull-based systemd timer."
+          echo "It checks origin/main every 5 minutes and deploys new commits from /opt/choicemee/source."
+          echo "Use workflow_dispatch with run_ssh_deploy=true only if VPS SSH is reachable from GitHub-hosted runners and secrets are configured."
+
+  ssh-deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_ssh_deploy == true }}
     runs-on: ubuntu-latest
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
