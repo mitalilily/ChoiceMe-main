@@ -100,11 +100,11 @@ const testimonials = [
 
 const sectionIntro = {
   eyebrowSx: {
-    fontSize: '0.72rem',
+    fontSize: { xs: '0.68rem', sm: '0.72rem' },
     fontWeight: 800,
     color: brand.accent,
     textTransform: 'uppercase',
-    letterSpacing: '0.16em',
+    letterSpacing: { xs: '0.12em', sm: '0.16em' },
   },
   titleSx: {
     mt: 1,
@@ -130,23 +130,14 @@ const fadeUp = {
 }
 
 export default function LandingPage() {
-  const {
-    data: landingStats,
-    isLoading: landingStatsLoading,
-    error: landingStatsError,
-  } = usePublicLandingStats()
+  const { data: landingStats } = usePublicLandingStats()
 
   const liveValue = (value?: number, suffix = '') => {
-    if (landingStatsLoading) return 'Syncing'
-    if (landingStatsError) return 'Unavailable'
-    return `${new Intl.NumberFormat('en-IN').format(value ?? 0)}${suffix}`
+    const safeValue = Number.isFinite(value) ? (value ?? 0) : 0
+    return `${new Intl.NumberFormat('en-IN').format(safeValue)}${suffix}`
   }
 
-  const livePickupsLabel = landingStatsError
-    ? 'Live data unavailable'
-    : landingStatsLoading
-      ? 'Syncing pickups'
-      : `${liveValue(landingStats?.livePickups)} live pickups`
+  const livePickupsLabel = `${liveValue(landingStats?.livePickups)} live pickups`
 
   const proofPoints = [
     { value: liveValue(landingStats?.enabledCouriers), label: 'Enabled courier networks' },
@@ -170,19 +161,19 @@ export default function LandingPage() {
     <Box className="site-shell">
       <PublicNavbar />
 
-      <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3 }, pb: 8 }}>
-        <Stack spacing={{ xs: 5, md: 7 }}>
+      <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 6, md: 8 } }}>
+        <Stack spacing={{ xs: 4.2, md: 7 }}>
           <Box
             component={motion.section}
             {...fadeUp}
             sx={{
-              pt: { xs: 1.5, md: 3 },
+              pt: { xs: 1.1, md: 3 },
             }}
           >
-            <Grid container spacing={{ xs: 3, lg: 4 }} alignItems="center">
+            <Grid container spacing={{ xs: 2.2, lg: 4 }} alignItems="center">
               <Grid size={{ xs: 12, lg: 6 }}>
                 <Stack spacing={2.4}>
-                    <Chip
+                  <Chip
                     icon={<TbBolt size={16} />}
                     label={`${brandIdentity.shortName} Logistics for modern shipping teams`}
                     sx={{
@@ -191,7 +182,13 @@ export default function LandingPage() {
                       color: brand.ink,
                       border: `1px solid ${alpha(brand.ink, 0.08)}`,
                       fontWeight: 700,
-                      px: 0.6,
+                      maxWidth: '100%',
+                      px: { xs: 0.1, sm: 0.6 },
+                      fontSize: { xs: '0.66rem', sm: '0.78rem' },
+                      '& .MuiChip-label': {
+                        px: { xs: 0.8, sm: 1.2 },
+                        whiteSpace: 'normal',
+                      },
                     }}
                   />
 
@@ -223,16 +220,22 @@ export default function LandingPage() {
                     and backend business logic intact.
                   </Typography>
 
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.4}>
+                  <Stack direction="row" spacing={{ xs: 1, sm: 1.4 }}>
                     <Button
                       component={RouterLink}
                       to="/login"
                       variant="contained"
                       endIcon={<FiArrowRight size={18} />}
+                      sx={{ flex: 1, minHeight: { xs: 44, sm: 48 } }}
                     >
                       Start Shipping
                     </Button>
-                    <Button component={RouterLink} to="/tracking" variant="outlined">
+                    <Button
+                      component={RouterLink}
+                      to="/tracking"
+                      variant="outlined"
+                      sx={{ flex: 1, minHeight: { xs: 44, sm: 48 } }}
+                    >
                       Track Order
                     </Button>
                   </Stack>
@@ -240,17 +243,21 @@ export default function LandingPage() {
                   <Box
                     sx={{
                       display: 'grid',
-                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
-                      gap: 1.2,
-                      maxWidth: 620,
+                      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                      gap: { xs: 0.8, sm: 1.2 },
+                      maxWidth: '100%',
                     }}
                   >
                     {proofPoints.slice(0, 3).map((item) => (
-                      <BrandSurface key={item.label} variant="glass" sx={{ p: 1.7, borderRadius: '24px' }}>
-                        <Typography sx={{ color: brand.ink, fontWeight: 900, fontSize: '1.35rem' }}>
+                      <BrandSurface
+                        key={item.label}
+                        variant="glass"
+                        sx={{ p: { xs: 1.05, sm: 1.7 }, borderRadius: { xs: '18px', sm: '24px' } }}
+                      >
+                        <Typography sx={{ color: brand.ink, fontWeight: 900, fontSize: { xs: '1rem', sm: '1.35rem' } }}>
                           {item.value}
                         </Typography>
-                        <Typography sx={{ color: brand.inkSoft, fontSize: '0.82rem', lineHeight: 1.6 }}>
+                        <Typography sx={{ color: brand.inkSoft, fontSize: { xs: '0.66rem', sm: '0.82rem' }, lineHeight: 1.45 }}>
                           {item.label}
                         </Typography>
                       </BrandSurface>
@@ -263,7 +270,7 @@ export default function LandingPage() {
                 <BrandSurface
                   variant="hero"
                   sx={{
-                    p: { xs: 2.4, md: 3 },
+                    p: { xs: 1.7, md: 3 },
                     minHeight: { lg: 520 },
                     justifyContent: 'space-between',
                     background: `
@@ -273,22 +280,25 @@ export default function LandingPage() {
                     `,
                   }}
                 >
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                      <Typography sx={{ color: brand.inkSoft, fontSize: '0.74rem', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1.2}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography sx={{ color: brand.inkSoft, fontSize: { xs: '0.64rem', sm: '0.74rem' }, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
                         Dispatch Overview
                       </Typography>
-                      <Typography sx={{ color: brand.ink, fontSize: '1.65rem', fontWeight: 800, mt: 0.8 }}>
+                      <Typography sx={{ color: brand.ink, fontSize: { xs: '1rem', sm: '1.65rem' }, fontWeight: 800, mt: 0.5, lineHeight: 1.1 }}>
                         Today&apos;s network pulse
                       </Typography>
                     </Box>
-                      <Chip
+                    <Chip
                       icon={<TbTruckDelivery size={16} />}
                       label={livePickupsLabel}
                       sx={{
                         bgcolor: alpha('#FFFFFF', 0.84),
                         color: brand.ink,
                         fontWeight: 800,
+                        flexShrink: 0,
+                        fontSize: { xs: '0.64rem', sm: '0.78rem' },
+                        '& .MuiChip-label': { px: { xs: 0.8, sm: 1.2 } },
                       }}
                     />
                   </Stack>
@@ -296,24 +306,28 @@ export default function LandingPage() {
                   <Box
                     sx={{
                       display: 'grid',
-                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-                      gap: 1.2,
+                      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                      gap: { xs: 0.8, sm: 1.2 },
                     }}
                   >
                     {dashboardPreviewMetrics.map((item) => (
-                      <BrandSurface key={item.label} variant="glass" sx={{ p: 1.8, borderRadius: '24px' }}>
-                        <Typography sx={{ color: brand.inkSoft, fontSize: '0.82rem', lineHeight: 1.6 }}>
+                      <BrandSurface
+                        key={item.label}
+                        variant="glass"
+                        sx={{ p: { xs: 1.1, sm: 1.8 }, borderRadius: { xs: '18px', sm: '24px' } }}
+                      >
+                        <Typography sx={{ color: brand.inkSoft, fontSize: { xs: '0.62rem', sm: '0.82rem' }, lineHeight: 1.45 }}>
                           {item.label}
                         </Typography>
-                        <Typography sx={{ color: brand.ink, fontWeight: 900, fontSize: '1.75rem', mt: 0.6 }}>
+                        <Typography sx={{ color: brand.ink, fontWeight: 900, fontSize: { xs: '1rem', sm: '1.75rem' }, mt: 0.45 }}>
                           {item.value}
                         </Typography>
                       </BrandSurface>
                     ))}
                   </Box>
 
-                  <BrandSurface variant="soft" sx={{ p: 2.2, borderRadius: '28px' }}>
-                    <Stack spacing={1.2}>
+                  <BrandSurface variant="soft" sx={{ p: { xs: 1.2, sm: 2.2 }, borderRadius: { xs: '18px', sm: '28px' } }}>
+                    <Stack spacing={{ xs: 0.9, sm: 1.2 }}>
                       {[
                         'See live shipments and what is happening across your network.',
                         'Different teams see the operational slices they need without workflow clutter.',
@@ -326,11 +340,13 @@ export default function LandingPage() {
                               height: 10,
                               borderRadius: 999,
                               bgcolor: brand.accent,
-                              mt: 0.7,
+                              mt: 0.55,
                               flexShrink: 0,
                             }}
                           />
-                          <Typography sx={{ color: brand.inkSoft, lineHeight: 1.72 }}>{item}</Typography>
+                          <Typography sx={{ color: brand.inkSoft, lineHeight: 1.6, fontSize: { xs: '0.78rem', sm: '1rem' } }}>
+                            {item}
+                          </Typography>
                         </Stack>
                       ))}
                     </Stack>
@@ -342,25 +358,35 @@ export default function LandingPage() {
 
           <Box component={motion.section} {...fadeUp}>
             <BrandSurface variant="glass" sx={{ p: { xs: 2.2, md: 3 }, borderRadius: '36px' }}>
-              <Grid container spacing={{ xs: 2.2, md: 3 }} alignItems="center">
-                <Grid size={{ xs: 12, md: 4 }}>
+              <Grid container spacing={{ xs: 1.4, md: 3 }} alignItems="center">
+                <Grid size={{ xs: 5, md: 4 }}>
                   <Typography sx={sectionIntro.eyebrowSx}>Brand integration</Typography>
-                  <Box component="img" src="/brand/choiceme-logo.png" alt={brandIdentity.name} sx={{ mt: 1.6, width: { xs: 180, md: 210 }, height: 'auto' }} />
-                  <Typography sx={{ ...sectionIntro.copySx, mt: 1.8 }}>
+                  <Box component="img" src="/brand/choiceme-logo.png" alt={brandIdentity.name} sx={{ mt: 1.3, width: { xs: 104, md: 210 }, height: 'auto' }} />
+                  <Typography sx={{ ...sectionIntro.copySx, mt: 1.2, fontSize: { xs: '0.74rem', md: '1rem' }, lineHeight: { xs: 1.5, md: 1.82 } }}>
                     {brandIdentity.tagline} Connected with leading courier brands in one trusted shipping workflow.
                   </Typography>
                 </Grid>
-                <Grid size={{ xs: 12, md: 8 }}>
+                <Grid size={{ xs: 7, md: 8 }}>
                   <Box
                     sx={{
                       display: 'grid',
-                      gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' },
-                      gap: 1.2,
+                      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                      gap: { xs: 0.7, sm: 1.2 },
                     }}
                   >
                     {partnerLogos.map((item) => (
-                      <BrandSurface key={item.alt} variant="soft" sx={{ p: 2, borderRadius: '24px', alignItems: 'center', justifyContent: 'center', minHeight: 110 }}>
-                        <Box component="img" src={item.src} alt={item.alt} sx={{ width: '100%', maxWidth: 116, objectFit: 'contain', filter: 'grayscale(0.08)' }} />
+                      <BrandSurface
+                        key={item.alt}
+                        variant="soft"
+                        sx={{
+                          p: { xs: 1.05, sm: 2 },
+                          borderRadius: { xs: '18px', sm: '24px' },
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: { xs: 72, sm: 110 },
+                        }}
+                      >
+                        <Box component="img" src={item.src} alt={item.alt} sx={{ width: '100%', maxWidth: { xs: 58, sm: 116 }, objectFit: 'contain', filter: 'grayscale(0.08)' }} />
                       </BrandSurface>
                     ))}
                   </Box>
@@ -376,29 +402,29 @@ export default function LandingPage() {
               Each step is built to feel fast, polished, and operationally reliable for logistics teams.
             </Typography>
 
-            <Grid container spacing={1.6} sx={{ mt: 1 }}>
+            <Grid container spacing={{ xs: 1.2, sm: 1.6 }} sx={{ mt: 1 }}>
               {processSteps.map((step, index) => (
-                <Grid key={step.title} size={{ xs: 12, sm: 6, lg: 3 }}>
-                  <BrandSurface variant="card" sx={{ p: 2.2, borderRadius: '28px' }}>
+                <Grid key={step.title} size={{ xs: 6, lg: 3 }}>
+                  <BrandSurface variant="card" sx={{ p: { xs: 1.35, sm: 2.2 }, borderRadius: { xs: '18px', sm: '28px' } }}>
                     <Box
                       sx={{
-                        width: 56,
-                        height: 56,
+                        width: { xs: 38, sm: 56 },
+                        height: { xs: 38, sm: 56 },
                         borderRadius: 999,
                         display: 'grid',
                         placeItems: 'center',
                         bgcolor: index < 3 ? brand.accent : alpha(brand.ink, 0.08),
                         color: index < 3 ? '#FFFFFF' : brand.inkSoft,
-                        fontSize: '1rem',
+                        fontSize: { xs: '0.74rem', sm: '1rem' },
                         fontWeight: 900,
                       }}
                     >
                       {String(index + 1).padStart(2, '0')}
                     </Box>
-                    <Typography sx={{ mt: 2, color: brand.ink, fontWeight: 800, fontSize: '1.05rem' }}>
+                    <Typography sx={{ mt: { xs: 1.2, sm: 2 }, color: brand.ink, fontWeight: 800, fontSize: { xs: '0.94rem', sm: '1.05rem' }, lineHeight: 1.15 }}>
                       {step.title}
                     </Typography>
-                    <Typography sx={{ mt: 1, color: brand.inkSoft, lineHeight: 1.75 }}>
+                    <Typography sx={{ mt: 0.75, color: brand.inkSoft, lineHeight: 1.55, fontSize: { xs: '0.78rem', sm: '1rem' } }}>
                       {step.text}
                     </Typography>
                   </BrandSurface>

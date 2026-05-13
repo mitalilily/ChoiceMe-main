@@ -32,23 +32,24 @@ export default function PublicNavbar({
 
   return (
     <BrandTopBar
-      sx={{ px: { xs: 1.4, sm: 2.4, lg: 3.2 }, py: { xs: 1, sm: 1.35 } }}
+      sx={{ px: { xs: 0.8, sm: 2.4, lg: 3.2 }, py: { xs: 0.85, sm: 1.35 } }}
       innerSx={{
         background: alpha('#FFFFFF', 0.92),
         border: brandEffects.border,
         boxShadow: '0 18px 48px rgba(68, 92, 138, 0.18)',
       }}
     >
-      <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+      <Stack direction="row" spacing={{ xs: 0.75, sm: 2 }} alignItems="center" justifyContent="space-between">
         <RouterLink to="/" aria-label={`${brandIdentity.name} home`}>
-          <BrandLogo sx={{ width: { xs: 108, sm: 118, md: 128 } }} />
+          <BrandLogo sx={{ width: { xs: 70, sm: 118, md: 128 } }} />
         </RouterLink>
 
         <Stack
           direction="row"
-          spacing={{ sm: 0.2, lg: 0.8 }}
+          spacing={{ xs: 0.05, sm: 0.35, lg: 0.8 }}
           alignItems="center"
-          sx={{ display: { xs: 'none', md: 'flex' } }}
+          justifyContent="center"
+          sx={{ flex: 1, minWidth: 0 }}
         >
           {links.map((item) => {
             const active = location.pathname === item.to
@@ -59,13 +60,15 @@ export default function PublicNavbar({
                 component={RouterLink}
                 to={item.to}
                 sx={{
-                  px: { sm: 1.2, lg: 1.65 },
-                  py: 1,
+                  px: { xs: 0.18, sm: 0.85, lg: 1.65 },
+                  py: { xs: 0.3, sm: 0.8, lg: 1 },
                   borderRadius: 999,
                   color: active ? brand.accent : brand.inkSoft,
                   bgcolor: active ? alpha(brand.accent, 0.12) : 'transparent',
-                  fontSize: '0.92rem',
+                  fontSize: { xs: '0.5rem', sm: '0.72rem', md: '0.92rem' },
                   fontWeight: active ? 800 : 700,
+                  lineHeight: 1.1,
+                  whiteSpace: 'nowrap',
                   transition: 'all 0.2s ease',
                   '&:hover': {
                     color: brand.ink,
@@ -85,7 +88,7 @@ export default function PublicNavbar({
             to="/login"
             variant="text"
             sx={{
-              display: { xs: 'none', lg: 'inline-flex' },
+              display: { xs: 'none', xl: 'inline-flex' },
               color: brand.ink,
               fontWeight: 700,
               '&:hover': {
@@ -101,14 +104,16 @@ export default function PublicNavbar({
             variant="contained"
             endIcon={<FiArrowUpRight size={18} />}
             sx={{
-              minWidth: { xs: 0, sm: 186 },
-              px: { xs: 2.2, sm: 2.8 },
-              py: 1.15,
+              minWidth: { xs: 92, sm: 186 },
+              px: { xs: 1.05, sm: 2.8 },
+              py: { xs: 0.75, sm: 1.15 },
               borderRadius: 999,
               fontWeight: 800,
+              fontSize: { xs: '0.66rem', sm: '0.92rem' },
               letterSpacing: '-0.01em',
+              whiteSpace: 'nowrap',
               color: '#FFFFFF',
-              boxShadow: '0 18px 36px rgba(255, 122, 21, 0.28)',
+              boxShadow: { xs: '0 12px 24px rgba(255, 122, 21, 0.22)', sm: '0 18px 36px rgba(255, 122, 21, 0.28)' },
             }}
           >
             {primaryLabel}
