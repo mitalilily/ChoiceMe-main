@@ -76,17 +76,26 @@ EOF
   fi
 }
 
+npm_clean_install() {
+  local extra_args=("$@")
+  if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+    npm ci "${extra_args[@]}"
+  else
+    npm install "${extra_args[@]}"
+  fi
+}
+
 build_backend() {
   log "Building backend"
   cd "$SOURCE_DIR/apps/backend"
-  npm ci
+  npm_clean_install
   npm run build
 }
 
 build_landing() {
   log "Building landing page"
   cd "$SOURCE_DIR/apps/landing-page"
-  npm ci
+  npm_clean_install
   VITE_API_BASE_URL="$API_URL" \
     VITE_CLIENT_AUTH_URL="$APP_URL/login" \
     npm run build
@@ -97,7 +106,7 @@ build_landing() {
 build_client() {
   log "Building client app"
   cd "$SOURCE_DIR/apps/client"
-  npm ci
+  npm_clean_install
   VITE_API_URL="$API_URL/api" \
     VITE_APP_SOCKET_URL="$API_URL" \
     npm run build
@@ -108,7 +117,7 @@ build_client() {
 build_admin() {
   log "Building admin app"
   cd "$SOURCE_DIR/apps/admin"
-  npm ci --legacy-peer-deps
+  npm_clean_install --legacy-peer-deps
   REACT_APP_API_BASE_URL="$API_URL/api" \
     REACT_APP_SOCKET_URL="$API_URL" \
     npm run build
