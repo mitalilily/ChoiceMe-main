@@ -448,14 +448,14 @@ export const sendVerificationEmail = async (to: string, token: string) => {
       ">
         <div style="
           padding: 26px 28px 18px;
-          background: linear-gradient(135deg, #171310 0%, #2a211d 100%);
+          background: linear-gradient(135deg, #0D1B4D 0%, #18346F 58%, #FF8A28 100%);
           color: #ffffff;
         ">
           <div style="
             display:inline-block;
             padding:6px 12px;
             border-radius:999px;
-            background:rgba(255,255,255,0.12);
+            background:rgba(255,138,40,0.24);
             font-size:12px;
             font-weight:700;
             letter-spacing:0.08em;
