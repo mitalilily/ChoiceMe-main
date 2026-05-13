@@ -66,14 +66,20 @@ const inputPlaceholders: Partial<Record<keyof AdditionalKYCForm, string>> = {
   cin: "Enter your 21-character CIN",
 };
 
+const pdfAccept = ".pdf,application/pdf,application/x-pdf";
+const imagePdfAccept =
+  ".jpg,.jpeg,.png,image/jpeg,image/png,.pdf,application/pdf,application/x-pdf";
+
 const allowedMimeTypes: Partial<Record<keyof AdditionalKYCForm, string>> = {
-  aadhaarUrl: "image/jpeg,image/png,application/pdf",
-  panCardUrl: "image/jpeg,image/png,application/pdf",
-  cancelledChequeUrl: "image/jpeg,image/png,application/pdf",
-  partnershipDeedUrl: "application/pdf",
-  boardResolutionUrl: "application/pdf",
-  companyAddressProofUrl: "application/pdf,image/jpeg,image/png",
-  businessPanUrl: "image/jpeg,image/png,application/pdf",
+  aadhaarUrl: imagePdfAccept,
+  panCardUrl: imagePdfAccept,
+  cancelledChequeUrl: imagePdfAccept,
+  partnershipDeedUrl: pdfAccept,
+  boardResolutionUrl: pdfAccept,
+  llpAgreementUrl: pdfAccept,
+  companyAddressProofUrl: imagePdfAccept,
+  businessPanUrl: imagePdfAccept,
+  gstCertificateUrl: imagePdfAccept,
 };
 
 const isFileField = (f: keyof AdditionalKYCForm) =>
@@ -110,7 +116,9 @@ const scanLabels: Partial<Record<keyof AdditionalKYCForm, string>> = {
 };
 
 const isScanSupported = (mime?: string) =>
-  !mime || mime.startsWith("image/") || mime === "application/pdf";
+  !mime ||
+  mime.startsWith("image/") ||
+  ["application/pdf", "application/x-pdf", "application/octet-stream"].includes(mime);
 
 const mimeFieldByUploadField: Partial<
   Record<keyof AdditionalKYCForm, keyof AdditionalKYCForm>
@@ -317,6 +325,7 @@ export default function AdditionalDetailsStep({
                         fullWidth
                         showAccept={Boolean(filePlaceholder(field)) === false}
                         accept={allowedMimeTypes[field]}
+                        maxSizeMb={20}
                         variant="button"
                         label={getFieldLabel(field)}
                         placeholder={filePlaceholder(field) as string}

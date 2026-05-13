@@ -57,6 +57,17 @@ interface FileUploaderProps {
   required?: boolean
 }
 
+const getUploadErrorMessage = (err: unknown) => {
+  const responseMessage = (err as { response?: { data?: { message?: unknown } } })?.response
+    ?.data?.message
+
+  if (typeof responseMessage === 'string' && responseMessage.trim()) {
+    return responseMessage
+  }
+
+  return 'Upload failed. Please try again.'
+}
+
 /* ---------------------------------------------------------------- style */
 const cleanBox = (error?: boolean) => ({
   background: '#FFFFFF',
@@ -187,11 +198,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     setPreviewFiles([])
   }
 
-  const resetUploadState = () => {
+  const resetUploadState = useCallback(() => {
     setProgress(0)
     setUploading(false)
     if (inputRef.current) inputRef.current.value = ''
-  }
+  }, [])
 
   const renderPlaceholder = () =>
     typeof placeholder === 'string' ? (
@@ -206,7 +217,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       const arr = Array.from(files)
       for (const file of arr) {
         if (file.size / 1024 / 1024 > maxSizeMb) {
-          alert(`${file.name} exceeds ${maxSizeMb} MB limit`)
+          toast.open({
+            message: `${file.name} exceeds ${maxSizeMb} MB limit`,
+            severity: 'error',
+          })
+          resetUploadState()
           return
         }
       }
@@ -248,14 +263,14 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       } catch (err) {
         console.error(err)
         toast.open({
-          message: 'Upload failed. Please try again.',
+          message: getUploadErrorMessage(err),
           severity: 'error',
         })
       } finally {
         resetUploadState()
       }
     },
-    [maxSizeMb, folderKey, multiple, onUploaded],
+    [maxSizeMb, folderKey, multiple, onUploaded, resetUploadState],
   )
   const removeFile = (index: number) => {
     setPreviewFiles((prev) => {
