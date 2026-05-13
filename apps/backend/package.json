@@ -15,6 +15,7 @@
     "seed:holidays:year": "ts-node src/scripts/seedHolidays.ts",
     "seed:delhivery-b2c": "ts-node src/scripts/seedDelhiveryB2CRatecard.ts",
     "seed:delivery-one-b2c": "tsx src/scripts/seedDeliveryOneB2CRatecard.ts",
+    "verify:smtp": "tsx src/scripts/verifySmtp.ts",
     "verify:delivery-one-api-calls": "tsx src/scripts/verifyDeliveryOneApiCalls.ts",
     "smoke:delivery-one": "tsx src/scripts/smokeDeliveryOneApis.ts",
     "sync:xpressbees-couriers": "ts-node src/scripts/syncXpressbeesCouriers.ts"

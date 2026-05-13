@@ -10,14 +10,69 @@ const backendRoot = path.resolve(__dirname, '../..')
 dotenv.config({ path: path.resolve(backendRoot, `.env.${env}`) })
 dotenv.config({ path: path.resolve(backendRoot, '.env') })
 
-const EMAIL_FROM = process.env.EMAIL_FROM || process.env.GOOGLE_SMTP_USER || ''
-const GOOGLE_SMTP_USER = process.env.GOOGLE_SMTP_USER || EMAIL_FROM
-const GOOGLE_SMTP_PASSWORD = process.env.GOOGLE_SMTP_PASSWORD!
-const SMTP_HOST = process.env.SMTP_HOST
-const SMTP_PORT = Number(process.env.SMTP_PORT || 587)
-const SMTP_SECURE = process.env.SMTP_SECURE === 'true'
 const AUTH_CODE_LOGGING_ENABLED =
   process.env.EXPOSE_AUTH_CODES === 'true' || process.env.ALLOW_INLINE_OTP === 'true'
+
+type EmailConfig = {
+  emailFrom: string
+  smtpUser: string
+  smtpPassword: string
+  smtpHost: string
+  smtpPort: number
+  smtpSecure: boolean
+  isGmail: boolean
+  connectionTimeout: number
+  greetingTimeout: number
+  socketTimeout: number
+}
+
+type TransportCandidate = {
+  name: string
+  host: string
+  port: number
+  secure: boolean
+  options: any
+}
+
+const trimEnv = (value?: string) => (value ?? '').trim()
+
+const parseBooleanEnv = (value: string | undefined, fallback = false) => {
+  const normalized = trimEnv(value).toLowerCase()
+  if (!normalized) return fallback
+
+  return ['true', '1', 'yes', 'on'].includes(normalized)
+}
+
+const parsePositiveIntEnv = (value: string | undefined, fallback: number) => {
+  const parsed = Number(trimEnv(value))
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const readEmailConfig = (): EmailConfig => {
+  const configuredFrom = trimEnv(process.env.EMAIL_FROM)
+  const configuredUser = trimEnv(process.env.GOOGLE_SMTP_USER)
+  const emailFrom = configuredFrom || configuredUser
+  const smtpUser = configuredUser || emailFrom
+  const smtpPassword = trimEnv(process.env.GOOGLE_SMTP_PASSWORD)
+  const smtpHost = trimEnv(process.env.SMTP_HOST)
+  const smtpPort = parsePositiveIntEnv(process.env.SMTP_PORT, 587)
+  const smtpSecure = parseBooleanEnv(process.env.SMTP_SECURE, smtpPort === 465)
+  const isGmail =
+    /(^|\.)gmail\.com$/i.test(smtpHost) || /@gmail\.com$/i.test(smtpUser)
+
+  return {
+    emailFrom,
+    smtpUser,
+    smtpPassword,
+    smtpHost,
+    smtpPort,
+    smtpSecure,
+    isGmail,
+    connectionTimeout: parsePositiveIntEnv(process.env.SMTP_CONNECTION_TIMEOUT_MS, 10000),
+    greetingTimeout: parsePositiveIntEnv(process.env.SMTP_GREETING_TIMEOUT_MS, 10000),
+    socketTimeout: parsePositiveIntEnv(process.env.SMTP_SOCKET_TIMEOUT_MS, 30000),
+  }
+}
 
 const maskEmailForLog = (email: string) => {
   const [localPart = '', domain = ''] = email.split('@')
@@ -38,7 +93,7 @@ type AttachmentInput = {
 }
 
 export const isEmailDeliveryConfigured = () =>
-  Boolean(EMAIL_FROM && GOOGLE_SMTP_USER && GOOGLE_SMTP_PASSWORD)
+  Boolean(readEmailConfig().emailFrom && readEmailConfig().smtpUser && readEmailConfig().smtpPassword)
 
 export const logAuthCode = ({
   purpose,
@@ -64,43 +119,164 @@ export const logAuthCode = ({
   })
 }
 
-// Create SMTP transporter (Hostinger/custom SMTP if provided, else Gmail service)
-const createTransporter = () => {
-  if (!EMAIL_FROM || !GOOGLE_SMTP_USER) {
+const assertEmailConfig = (config: EmailConfig) => {
+  if (!config.emailFrom || !config.smtpUser) {
     throw new Error('Email service is not configured. Missing EMAIL_FROM or GOOGLE_SMTP_USER.')
   }
 
-  if (!GOOGLE_SMTP_PASSWORD) {
+  if (!config.smtpPassword) {
     throw new Error('Email service is not configured. Missing GOOGLE_SMTP_PASSWORD.')
   }
+}
 
-  console.log('[Email] Creating transporter', {
-    provider: SMTP_HOST ? 'smtp' : 'gmail',
-    host: SMTP_HOST || 'gmail',
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
-    from: EMAIL_FROM,
-  })
+const makeTransportCandidate = (
+  config: EmailConfig,
+  name: string,
+  host: string,
+  port: number,
+  secure: boolean,
+): TransportCandidate => ({
+  name,
+  host,
+  port,
+  secure,
+  options: {
+    host,
+    port,
+    secure,
+    requireTLS: !secure,
+    auth: {
+      user: config.smtpUser,
+      pass: config.smtpPassword,
+    },
+    connectionTimeout: config.connectionTimeout,
+    greetingTimeout: config.greetingTimeout,
+    socketTimeout: config.socketTimeout,
+    tls: {
+      servername: host,
+      minVersion: 'TLSv1.2',
+    },
+  },
+})
 
-  if (SMTP_HOST) {
-    return nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_SECURE,
-      auth: {
-        user: GOOGLE_SMTP_USER,
-        pass: GOOGLE_SMTP_PASSWORD,
-      },
-    })
+const addTransportCandidate = (
+  candidates: TransportCandidate[],
+  candidate: TransportCandidate,
+) => {
+  const alreadyAdded = candidates.some(
+    (item) => item.host === candidate.host && item.port === candidate.port && item.secure === candidate.secure,
+  )
+
+  if (!alreadyAdded) candidates.push(candidate)
+}
+
+const buildTransportCandidates = (config: EmailConfig) => {
+  assertEmailConfig(config)
+
+  const candidates: TransportCandidate[] = []
+  const configuredHost = config.smtpHost || 'smtp.gmail.com'
+
+  if (config.isGmail && !parseBooleanEnv(process.env.SMTP_PREFER_CONFIGURED, false)) {
+    addTransportCandidate(
+      candidates,
+      makeTransportCandidate(config, 'gmail-smtps', 'smtp.gmail.com', 465, true),
+    )
   }
 
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: GOOGLE_SMTP_USER,
-      pass: GOOGLE_SMTP_PASSWORD, // Use App Password for Gmail
-    },
-  })
+  addTransportCandidate(
+    candidates,
+    makeTransportCandidate(
+      config,
+      config.smtpHost ? 'configured-smtp' : 'gmail-smtps',
+      configuredHost,
+      config.smtpPort,
+      config.smtpSecure,
+    ),
+  )
+
+  if (config.isGmail) {
+    addTransportCandidate(
+      candidates,
+      makeTransportCandidate(config, 'gmail-smtps-fallback', 'smtp.gmail.com', 465, true),
+    )
+    addTransportCandidate(
+      candidates,
+      makeTransportCandidate(config, 'gmail-starttls-fallback', 'smtp.gmail.com', 587, false),
+    )
+  }
+
+  return candidates
+}
+
+const isRetryableSmtpConnectionError = (error: unknown) => {
+  const smtpError = error as { code?: string; command?: string }
+  const retryableCodes = new Set([
+    'ETIMEDOUT',
+    'ECONNECTION',
+    'ESOCKET',
+    'ECONNRESET',
+    'ECONNREFUSED',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+  ])
+
+  return retryableCodes.has(smtpError.code || '') || smtpError.command === 'CONN'
+}
+
+export const verifyEmailTransport = async () => {
+  const config = readEmailConfig()
+  const candidates = buildTransportCandidates(config)
+  let lastError: unknown
+
+  for (const [index, candidate] of candidates.entries()) {
+    const transporter = nodemailer.createTransport(candidate.options)
+
+    try {
+      console.log('[Email] Verifying transporter', {
+        transport: candidate.name,
+        host: candidate.host,
+        port: candidate.port,
+        secure: candidate.secure,
+        from: config.emailFrom,
+      })
+      await transporter.verify()
+      console.log('[Email] Transporter verified', {
+        transport: candidate.name,
+        host: candidate.host,
+        port: candidate.port,
+        secure: candidate.secure,
+      })
+      return {
+        transport: candidate.name,
+        host: candidate.host,
+        port: candidate.port,
+        secure: candidate.secure,
+      }
+    } catch (error) {
+      lastError = error
+      console.error('[Email] Transporter verification failed', {
+        transport: candidate.name,
+        host: candidate.host,
+        port: candidate.port,
+        secure: candidate.secure,
+        error,
+      })
+
+      if (index < candidates.length - 1 && isRetryableSmtpConnectionError(error)) {
+        console.warn('[Email] Trying fallback SMTP transporter after connection failure', {
+          failedTransport: candidate.name,
+          nextTransport: candidates[index + 1].name,
+        })
+        continue
+      }
+
+      throw error
+    } finally {
+      transporter.close()
+    }
+  }
+
+  throw lastError
 }
 
 /**
@@ -112,11 +288,12 @@ const sendEmail = async (
   htmlContent: string,
   attachments?: AttachmentInput[],
 ) => {
-  const transporter = createTransporter()
+  const config = readEmailConfig()
+  const candidates = buildTransportCandidates(config)
   const maskedRecipient = maskEmailForLog(to)
 
   const mailOptions: any = {
-    from: `"ChoiceMe Logistics" <${EMAIL_FROM}>`,
+    from: `"ChoiceMe Logistics" <${config.emailFrom}>`,
     to,
     subject,
     html: htmlContent,
@@ -139,28 +316,74 @@ const sendEmail = async (
     )
   }
 
-  try {
-    console.log('[Email] Sending email', {
-      to: maskedRecipient,
-      subject,
-      attachments: attachments?.length ?? 0,
-    })
-    const info = await transporter.sendMail(mailOptions)
-    console.log('[Email] Email sent successfully', {
-      to: maskedRecipient,
-      messageId: info.messageId,
-      accepted: info.accepted,
-      rejected: info.rejected,
-      response: info.response,
-    })
-  } catch (error) {
-    console.error('[Email] Error sending email', {
-      to: maskedRecipient,
-      subject,
-      error,
-    })
-    throw error
+  let lastError: unknown
+
+  for (const [index, candidate] of candidates.entries()) {
+    const transporter = nodemailer.createTransport(candidate.options)
+
+    try {
+      console.log('[Email] Sending email', {
+        transport: candidate.name,
+        host: candidate.host,
+        port: candidate.port,
+        secure: candidate.secure,
+        to: maskedRecipient,
+        subject,
+        attachments: attachments?.length ?? 0,
+      })
+      const info = await transporter.sendMail(mailOptions)
+      console.log('[Email] Email sent successfully', {
+        transport: candidate.name,
+        to: maskedRecipient,
+        messageId: info.messageId,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
+      })
+      return info
+    } catch (error) {
+      lastError = error
+      console.error('[Email] Error sending email', {
+        transport: candidate.name,
+        host: candidate.host,
+        port: candidate.port,
+        secure: candidate.secure,
+        to: maskedRecipient,
+        subject,
+        error,
+      })
+
+      if (index < candidates.length - 1 && isRetryableSmtpConnectionError(error)) {
+        console.warn('[Email] Retrying email with fallback SMTP transporter', {
+          failedTransport: candidate.name,
+          nextTransport: candidates[index + 1].name,
+        })
+        continue
+      }
+
+      throw error
+    } finally {
+      transporter.close()
+    }
   }
+
+  throw lastError
+}
+
+export const sendSmtpTestEmail = async (to?: string) => {
+  const config = readEmailConfig()
+  const recipient = to || config.emailFrom
+
+  await sendEmail(
+    recipient,
+    'ChoiceMe Logistics SMTP test',
+    `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+        <h2 style="margin:0 0 12px;color:#0D1B4D">SMTP delivery is working</h2>
+        <p>This is a production mailer test from ChoiceMe Logistics.</p>
+      </div>
+    `,
+  )
 }
 
 // Login / verification Email for OTP-based auth
