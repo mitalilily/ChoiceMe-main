@@ -13,10 +13,10 @@ ADMIN_DOMAIN="${ADMIN_DOMAIN:-admin.choicemee.in}"
 API_DOMAIN="${API_DOMAIN:-api.choicemee.in}"
 PGADMIN_DOMAIN="${PGADMIN_DOMAIN:-pgadmin.choicemee.in}"
 
-LANDING_URL="https://${ROOT_DOMAIN}"
-APP_URL="https://${APP_DOMAIN}"
-ADMIN_URL="https://${ADMIN_DOMAIN}"
-API_URL="https://${API_DOMAIN}"
+PUBLIC_LANDING_URL="https://${ROOT_DOMAIN}"
+PUBLIC_APP_URL="https://${APP_DOMAIN}"
+PUBLIC_ADMIN_URL="https://${ADMIN_DOMAIN}"
+PUBLIC_API_URL="https://${API_DOMAIN}"
 BACKEND_PORT="${BACKEND_PORT:-5012}"
 PGADMIN_PORT="${PGADMIN_PORT:-5051}"
 
@@ -96,8 +96,8 @@ build_landing() {
   log "Building landing page"
   cd "$SOURCE_DIR/apps/landing-page"
   npm_clean_install
-  VITE_API_BASE_URL="$API_URL" \
-    VITE_CLIENT_AUTH_URL="$APP_URL/login" \
+  VITE_API_BASE_URL="$PUBLIC_API_URL" \
+    VITE_CLIENT_AUTH_URL="$PUBLIC_APP_URL/login" \
     npm run build
   $SUDO mkdir -p "$WEB_ROOT/landing"
   $SUDO rsync -a --delete dist/ "$WEB_ROOT/landing/"
@@ -107,8 +107,8 @@ build_client() {
   log "Building client app"
   cd "$SOURCE_DIR/apps/client"
   npm_clean_install
-  VITE_API_URL="$API_URL/api" \
-    VITE_APP_SOCKET_URL="$API_URL" \
+  VITE_API_URL="$PUBLIC_API_URL/api" \
+    VITE_APP_SOCKET_URL="$PUBLIC_API_URL" \
     npm run build
   $SUDO mkdir -p "$WEB_ROOT/app"
   $SUDO rsync -a --delete dist/ "$WEB_ROOT/app/"
@@ -118,8 +118,8 @@ build_admin() {
   log "Building admin app"
   cd "$SOURCE_DIR/apps/admin"
   npm_clean_install --legacy-peer-deps
-  REACT_APP_API_BASE_URL="$API_URL/api" \
-    REACT_APP_SOCKET_URL="$API_URL" \
+  REACT_APP_API_BASE_URL="$PUBLIC_API_URL/api" \
+    REACT_APP_SOCKET_URL="$PUBLIC_API_URL" \
     npm run build
   $SUDO mkdir -p "$WEB_ROOT/admin"
   $SUDO rsync -a --delete build/ "$WEB_ROOT/admin/"
@@ -134,10 +134,10 @@ start_backend() {
 
   export NODE_ENV="${DEPLOY_NODE_ENV:-production}"
   export PORT="$BACKEND_PORT"
-  export API_URL="$API_URL"
-  export FRONTEND_URL="$APP_URL"
-  export ADMIN_URL="$ADMIN_URL"
-  export CORS_ORIGINS="$APP_URL,$ADMIN_URL,$LANDING_URL,https://www.$ROOT_DOMAIN"
+  export API_URL="$PUBLIC_API_URL"
+  export FRONTEND_URL="$PUBLIC_APP_URL"
+  export ADMIN_URL="$PUBLIC_ADMIN_URL"
+  export CORS_ORIGINS="$PUBLIC_APP_URL,$PUBLIC_ADMIN_URL,$PUBLIC_LANDING_URL,https://www.$ROOT_DOMAIN"
   export CORS_ALLOWED_ORIGINS="$CORS_ORIGINS"
   export SMTP_PORT="${SMTP_PORT:-465}"
   export SMTP_SECURE="${SMTP_SECURE:-true}"
@@ -365,7 +365,7 @@ main() {
 
   log "Deployment complete"
   printf 'Landing: %s\nApp: %s\nAdmin: %s\nAPI: %s\npgAdmin: https://%s\n' \
-    "$LANDING_URL" "$APP_URL" "$ADMIN_URL" "$API_URL" "$PGADMIN_DOMAIN"
+    "$PUBLIC_LANDING_URL" "$PUBLIC_APP_URL" "$PUBLIC_ADMIN_URL" "$PUBLIC_API_URL" "$PGADMIN_DOMAIN"
 }
 
 main "$@"
