@@ -42,6 +42,8 @@ const maskEmailForLog = (email: string) => {
 const exposeAuthCodes = parseBooleanEnv(process.env.EXPOSE_AUTH_CODES, false)
 const shouldExposeAuthCodes = () => exposeAuthCodes
 
+type AuthFlow = 'login' | 'signup'
+
 // Define User and NewUser types for convenience
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -391,6 +393,7 @@ export const handleEmailVerificationRequest = async (
   email: string,
   password: string | null,
   googleId: string | null,
+  flow: AuthFlow = 'login',
 ): Promise<{ status: number; data: any }> => {
   return await db.transaction(async (tx) => {
     const normalizedEmail = email.trim().toLowerCase()
@@ -400,6 +403,24 @@ export const handleEmailVerificationRequest = async (
     const exposeCode = shouldExposeAuthCodes()
 
     const user = await findUserByEmail(normalizedEmail, tx)
+
+    if (flow === 'signup' && user) {
+      return {
+        status: 409,
+        data: {
+          error: 'This email already has an account. Please log in instead.',
+        },
+      }
+    }
+
+    if (flow === 'login' && !user) {
+      return {
+        status: 404,
+        data: {
+          error: 'No account found for this email. Please create an account first.',
+        },
+      }
+    }
 
     if (user) {
       if (user.emailVerified) {
@@ -509,6 +530,14 @@ export const handleEmailVerificationRequest = async (
     }
 
     // BRAND NEW USER
+    if (flow !== 'signup') {
+      return {
+        status: 404,
+        data: {
+          error: 'No account found for this email. Please create an account first.',
+        },
+      }
+    }
 
     if (googleId) {
       await createUserWithWallet({

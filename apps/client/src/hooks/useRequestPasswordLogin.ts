@@ -1,12 +1,19 @@
 // src/hooks/useRequestPasswordLogin.ts
 
 import { useMutation } from "@tanstack/react-query";
-import { requestPasswordLoginApi, verifyEmailOtpApi } from "../api/auth";
+import { requestPasswordLoginApi, verifyEmailOtpApi, type AuthFlow } from "../api/auth";
 
 export const useRequestPasswordLogin = () => {
   return useMutation({
-    mutationFn: ({ email, password }: { email: string; password?: string }) =>
-      requestPasswordLoginApi(email, password),
+    mutationFn: ({
+      email,
+      password,
+      flow = "login",
+    }: {
+      email: string;
+      password?: string;
+      flow?: AuthFlow;
+    }) => requestPasswordLoginApi(email, password, flow),
   });
 };
 

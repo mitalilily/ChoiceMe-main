@@ -244,6 +244,18 @@ export default function PasswordLoginForm({ setStep, step, setOpenTerms }: IPass
         textColor="#fff"
       />
 
+      <Typography
+        sx={{
+          color: '#6A616A',
+          textAlign: 'center',
+          fontSize: '0.8rem',
+          lineHeight: 1.5,
+          mt: 0.35,
+        }}
+      >
+        Only existing users can sign in here.
+      </Typography>
+
       <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
         <FiShield size={13} color={DE_AMBER} />
         <Typography variant="caption" sx={{ color: '#6A616A', fontWeight: 600 }}>

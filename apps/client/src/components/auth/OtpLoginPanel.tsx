@@ -203,6 +203,18 @@ export default function OtpLoginPanel({
             textColor={compactLogin ? '#FFFFFF' : undefined}
             endIconNode={compactLogin ? <FiArrowRight size={22} /> : undefined}
           />
+
+          <Typography
+            sx={{
+              color: brand.inkSoft,
+              textAlign: 'center',
+              fontSize: '0.8rem',
+              lineHeight: 1.5,
+              mt: 0.35,
+            }}
+          >
+            Only existing users can sign in here.
+          </Typography>
         </Box>
       ) : (
         <Stack component="form" onSubmit={handleVerify} spacing={2}>

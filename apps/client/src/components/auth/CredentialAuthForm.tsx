@@ -67,6 +67,7 @@ export default function CredentialAuthForm({
 
   const { mutate: requestPasswordAccess, isPending: requesting } = useRequestPasswordLogin()
   const { mutate: verifyEmailOtp, isPending: verifying } = useVerifyEmailOtp()
+  const authFlow = mode === 'signup' ? 'signup' : 'login'
 
   const emailError = useMemo(() => {
     if (!email) return 'Email is required.'
@@ -111,6 +112,7 @@ export default function CredentialAuthForm({
       {
         email: email.trim().toLowerCase(),
         password,
+        flow: authFlow,
       },
       {
         onSuccess: (response: any) => {
@@ -301,6 +303,20 @@ export default function CredentialAuthForm({
             textColor={compactLogin ? '#FFFFFF' : undefined}
             endIconNode={compactLogin ? <FiArrowRight size={22} /> : undefined}
           />
+
+          <Typography
+            sx={{
+              color: brand.inkSoft,
+              textAlign: 'center',
+              fontSize: '0.8rem',
+              lineHeight: 1.5,
+              mt: 0.35,
+            }}
+          >
+            {mode === 'signup'
+              ? 'New users create an account here and continue to onboarding.'
+              : 'Only existing users can sign in here.'}
+          </Typography>
         </Stack>
       ) : (
         <Stack component="form" spacing={2} onSubmit={handleVerify}>

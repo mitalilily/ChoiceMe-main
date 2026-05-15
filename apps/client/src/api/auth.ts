@@ -1,6 +1,8 @@
 import axiosInstance from "./axiosInstance";
 import { getAuthTokens } from "./tokenVault";
 
+export type AuthFlow = "login" | "signup";
+
 export const requestOtpApi = async (email: string) => {
   const { data } = await axiosInstance.post("/auth/request-otp", {
     email: email.trim().toLowerCase(),
@@ -18,11 +20,13 @@ export const verifyOtpApi = async (email: string, otp: string) => {
 
 export const requestPasswordLoginApi = async (
   email: string,
-  password?: string
+  password?: string,
+  flow: AuthFlow = "login"
 ) => {
   const { data } = await axiosInstance.post("/auth/request-password-login", {
     email: email.trim().toLowerCase(),
     password,
+    flow,
   });
   return data;
 };
