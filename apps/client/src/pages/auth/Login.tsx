@@ -1,12 +1,13 @@
 ﻿import { Box, Button, Stack } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link as RouterLink, Navigate } from 'react-router-dom'
 import AuthShell from '../../components/auth/AuthShell'
 import CredentialAuthForm from '../../components/auth/CredentialAuthForm'
 import OtpLoginPanel from '../../components/auth/OtpLoginPanel'
 import FullScreenLoader from '../../components/UI/loader/FullScreenLoader'
 import { useAuth } from '../../context/auth/AuthContext'
+import { brand } from '../../theme/brand'
 
 const AUTH_NAVY = '#0D1B4D'
 const AUTH_ORANGE = '#E86F00'
@@ -82,6 +83,23 @@ export default function Login() {
         ) : (
           <CredentialAuthForm mode="login" showIntro={false} compactLogin />
         )}
+
+        <Box component="p" sx={{ color: brand.inkSoft, textAlign: 'center', fontSize: '0.88rem', m: 0 }}>
+          New user,{' '}
+          <Box
+            component={RouterLink}
+            to="/signup"
+            sx={{
+              color: AUTH_ORANGE,
+              fontWeight: 800,
+              textDecoration: 'none',
+              '&:hover': { textDecoration: 'underline' },
+            }}
+          >
+            create your account
+          </Box>{' '}
+          here
+        </Box>
       </Stack>
     </AuthShell>
   )
