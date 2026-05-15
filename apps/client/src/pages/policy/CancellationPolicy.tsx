@@ -35,7 +35,7 @@ const CancellationPolicy = () => {
         </ListItem>
 
         <ListItem sx={{ display: 'list-item' }}>
-          <ListItemText primary="Approved refunds will be credited to your bank account within 7 business days." />
+          <ListItemText primary="Refund policy: Once the refund is approved, it will take 7 business days to credit to your bank account." />
         </ListItem>
       </List>
     </Box>

@@ -44,7 +44,7 @@ const PolicyPages = () => {
           with the Platform.
         </Typography>
         <Typography paragraph>
-          â€¢ Approved refunds will be credited to your bank account within 7 business days.
+          â€¢ Refund policy: Once the refund is approved, it will take 7 business days to credit to your bank account.
         </Typography>
       </Box>
 

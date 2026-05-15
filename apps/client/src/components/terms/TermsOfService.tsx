@@ -4,7 +4,7 @@ const TermsOfService = () => {
   return (
     <Container maxWidth="lg">
       <Typography paragraph sx={{ mt: 2 }}>
-        This website is operated by ChoiceMee - Syed Muddasir.
+        This website is operated by choice me - Syed Muddasir.
       </Typography>
 
       {/* Account Terms */}
@@ -116,7 +116,10 @@ const TermsOfService = () => {
           the online store.
         </li>
         <li>All fees are exclusive of applicable taxes, fees, or charges.</li>
-        <li>Approved refunds will be credited to your bank account within 7 business days.</li>
+        <li>
+          Refund policy: Once the refund is approved, it will take 7 business days to credit to
+          your bank account.
+        </li>
       </ul>
 
       {/* Cancellation and Termination */}
