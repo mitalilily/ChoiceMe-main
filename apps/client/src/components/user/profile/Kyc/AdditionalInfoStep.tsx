@@ -18,6 +18,10 @@ export interface AdditionalKYCForm {
   cin?: string;
   aadhaarUrl?: string;
   aadhaarMime?: string;
+  aadhaarFrontUrl?: string;
+  aadhaarFrontMime?: string;
+  aadhaarBackUrl?: string;
+  aadhaarBackMime?: string;
   businessPanUrl?: string;
   businessPanMime?: string;
   companyAddressProofUrl?: string;
@@ -50,6 +54,8 @@ const fieldLabels: Partial<Record<keyof AdditionalKYCForm, string>> = {
   cin: "CIN (Corporate Identification Number)",
   gstCertificateUrl: "Upload GST Certificate",
   aadhaarUrl: "Upload Your Aadhaar Card",
+  aadhaarFrontUrl: "Upload Aadhaar Front Side",
+  aadhaarBackUrl: "Upload Aadhaar Back Side",
   partnershipDeedUrl: "Upload Partnership Deed",
   businessPanUrl: "Upload Business PAN",
   companyAddressProofUrl: "Upload Company Address Proof",
@@ -69,6 +75,8 @@ const imagePdfAccept =
 
 const allowedMimeTypes: Partial<Record<keyof AdditionalKYCForm, string>> = {
   aadhaarUrl: imagePdfAccept,
+  aadhaarFrontUrl: imagePdfAccept,
+  aadhaarBackUrl: imagePdfAccept,
   panCardUrl: imagePdfAccept,
   cancelledChequeUrl: imagePdfAccept,
   partnershipDeedUrl: pdfAccept,
@@ -82,6 +90,8 @@ const allowedMimeTypes: Partial<Record<keyof AdditionalKYCForm, string>> = {
 const isFileField = (f: keyof AdditionalKYCForm) =>
   [
     "aadhaarUrl",
+    "aadhaarFrontUrl",
+    "aadhaarBackUrl",
     "panCardUrl",
     "partnershipDeedUrl",
     "boardResolutionUrl",
@@ -98,6 +108,8 @@ const mimeFieldByUploadField: Partial<
   Record<keyof AdditionalKYCForm, keyof AdditionalKYCForm>
 > = {
   aadhaarUrl: "aadhaarMime",
+  aadhaarFrontUrl: "aadhaarFrontMime",
+  aadhaarBackUrl: "aadhaarBackMime",
   panCardUrl: "panCardMime",
   cancelledChequeUrl: "cancelledChequeMime",
   partnershipDeedUrl: "partnershipDeedMime",
