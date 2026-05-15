@@ -8,7 +8,7 @@ import { useAuth } from '../../context/auth/AuthContext'
 import { useRequestPasswordLogin, useVerifyEmailOtp } from '../../hooks/useRequestPasswordLogin'
 import { getPostAuthRedirect } from '../../utils/authRedirect'
 import { TERMS_AND_CONDITIONS } from '../../utils/constants'
-import { setOnboardingPrefill } from '../../utils/onboardingPrefill'
+import { clearOnboardingPrefill, setOnboardingPrefill } from '../../utils/onboardingPrefill'
 import CustomIconLoadingButton from '../UI/button/CustomLoadingButton'
 import CustomCheckbox from '../UI/inputs/CustomCheckbox'
 import CustomInput from '../UI/inputs/CustomInput'
@@ -121,10 +121,6 @@ export default function CredentialAuthForm({
     }
 
     setError('')
-    if (mode === 'signup') {
-      setOnboardingPrefill(name)
-    }
-
     requestPasswordAccess(
       {
         email: email.trim().toLowerCase(),
@@ -138,6 +134,7 @@ export default function CredentialAuthForm({
           setInlineCode(verificationCode)
 
           if (response?.token && response?.refreshToken) {
+            if (mode === 'signup') setOnboardingPrefill(name)
             sessionStorage.setItem('activeEmail', email.trim().toLowerCase())
             setUserId(response?.user?.id ?? '')
             setTokens(response.token, response.refreshToken)
@@ -146,6 +143,7 @@ export default function CredentialAuthForm({
           }
 
           if (verificationCode || response?.message?.includes('Verification')) {
+            if (mode === 'signup') setOnboardingPrefill(name)
             setStep('verify')
             setCode('')
             toast.open({
@@ -165,6 +163,7 @@ export default function CredentialAuthForm({
           }
         },
         onError: (err: unknown) => {
+          if (mode === 'signup') clearOnboardingPrefill()
           setError(getAuthErrorMessage(err, 'Authentication failed'))
         },
       },

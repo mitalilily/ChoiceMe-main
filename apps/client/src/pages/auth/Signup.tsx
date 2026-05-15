@@ -5,12 +5,13 @@ import CredentialAuthForm from '../../components/auth/CredentialAuthForm'
 import FullScreenLoader from '../../components/UI/loader/FullScreenLoader'
 import { useAuth } from '../../context/auth/AuthContext'
 import { brand } from '../../theme/brand'
+import { getPostAuthRedirect } from '../../utils/authRedirect'
 
 export default function Signup() {
-  const { loading, isAuthenticated } = useAuth()
+  const { loading, isAuthenticated, user } = useAuth()
 
   if (loading) return <FullScreenLoader />
-  if (isAuthenticated) return <Navigate to="/app" replace />
+  if (isAuthenticated) return <Navigate to={getPostAuthRedirect(user)} replace />
 
   return (
     <AuthShell

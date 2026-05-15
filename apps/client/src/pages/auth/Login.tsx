@@ -7,16 +7,17 @@ import CredentialAuthForm from '../../components/auth/CredentialAuthForm'
 import OtpLoginPanel from '../../components/auth/OtpLoginPanel'
 import FullScreenLoader from '../../components/UI/loader/FullScreenLoader'
 import { useAuth } from '../../context/auth/AuthContext'
+import { getPostAuthRedirect } from '../../utils/authRedirect'
 
 const AUTH_NAVY = '#0D1B4D'
 const AUTH_ORANGE = '#E86F00'
 
 export default function Login() {
-  const { loading, isAuthenticated } = useAuth()
+  const { loading, isAuthenticated, user } = useAuth()
   const [mode, setMode] = useState<'otp' | 'password'>('otp')
 
   if (loading) return <FullScreenLoader />
-  if (isAuthenticated) return <Navigate to="/app" replace />
+  if (isAuthenticated) return <Navigate to={getPostAuthRedirect(user)} replace />
 
   return (
     <AuthShell

@@ -449,13 +449,11 @@ export const handleEmailVerificationRequest = async (
         }
 
         if (!user.passwordHash) {
-          const hashed = await bcrypt.hash(password, 10)
-          await updateUserByEmail(normalizedEmail, { passwordHash: hashed }, tx)
           return {
-            status: 200,
+            status: 400,
             data: {
-              message: 'Password set successfully. You can now log in.',
-              user,
+              error:
+                'Password login is not enabled for this account. Please use Email OTP, then set a password from profile settings.',
             },
           }
         }
@@ -494,8 +492,13 @@ export const handleEmailVerificationRequest = async (
       }
 
       if (!user.passwordHash) {
-        const hashed = await bcrypt.hash(password, 10)
-        await updateUserByEmail(normalizedEmail, { passwordHash: hashed }, tx)
+        return {
+          status: 400,
+          data: {
+            error:
+              'Password login is not enabled for this account. Please use Email OTP, then set a password from profile settings.',
+          },
+        }
       } else {
         const valid = await bcrypt.compare(password, user.passwordHash)
         if (!valid) {
