@@ -1,13 +1,12 @@
 ﻿import { Box, Button, Stack } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import AuthShell from '../../components/auth/AuthShell'
 import CredentialAuthForm from '../../components/auth/CredentialAuthForm'
 import OtpLoginPanel from '../../components/auth/OtpLoginPanel'
 import FullScreenLoader from '../../components/UI/loader/FullScreenLoader'
 import { useAuth } from '../../context/auth/AuthContext'
-import { brand } from '../../theme/brand'
 
 const AUTH_NAVY = '#0D1B4D'
 const AUTH_ORANGE = '#E86F00'
@@ -15,7 +14,6 @@ const AUTH_ORANGE = '#E86F00'
 export default function Login() {
   const { loading, isAuthenticated } = useAuth()
   const [mode, setMode] = useState<'otp' | 'password'>('otp')
-  const navigate = useNavigate()
 
   if (loading) return <FullScreenLoader />
   if (isAuthenticated) return <Navigate to="/app" replace />
@@ -85,29 +83,6 @@ export default function Login() {
           <CredentialAuthForm mode="login" showIntro={false} compactLogin />
         )}
 
-        <Box component="p" sx={{ color: brand.inkSoft, textAlign: 'center', fontSize: '0.88rem', m: 0 }}>
-          New user,{' '}
-          <Box
-            component="a"
-            href="/signup"
-            onClick={(event) => {
-              event.preventDefault()
-              navigate('/signup')
-            }}
-            sx={{
-              color: AUTH_ORANGE,
-              fontWeight: 800,
-              textDecoration: 'none',
-              cursor: 'pointer',
-              position: 'relative',
-              zIndex: 2,
-              '&:hover': { textDecoration: 'underline' },
-            }}
-          >
-            create your account
-          </Box>{' '}
-          here
-        </Box>
       </Stack>
     </AuthShell>
   )

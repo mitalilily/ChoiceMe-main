@@ -23,6 +23,17 @@ interface OtpLoginPanelProps {
   compactLogin?: boolean
 }
 
+type AuthUser = {
+  id?: string
+  onboardingComplete?: boolean | null
+}
+
+type AuthResponse = Record<string, unknown> & {
+  token?: string
+  refreshToken?: string
+  user?: AuthUser
+}
+
 const AUTH_NAVY = '#0D1B4D'
 const AUTH_ORANGE = '#E86F00'
 
@@ -62,6 +73,11 @@ export default function OtpLoginPanel({
   const { mutate: requestOtp, isPending: requesting } = useRequestOtp()
   const { mutate: verifyOtp, isPending: verifying } = useVerifyOtp()
 
+  const handleSignupRedirect = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    navigate('/signup')
+  }
+
   const emailError = useMemo(() => {
     if (!email) return 'Email is required.'
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Enter a valid email address.'
@@ -86,7 +102,7 @@ export default function OtpLoginPanel({
 
     setError('')
     requestOtp(email.trim().toLowerCase(), {
-      onSuccess: (response: any) => {
+      onSuccess: (response: AuthResponse) => {
         const inlineCode = extractInlineCode(response)
         setInlineOtp(inlineCode)
         setStep('verify')
@@ -98,7 +114,7 @@ export default function OtpLoginPanel({
           severity: 'success',
         })
       },
-      onError: (err: any) => {
+      onError: (err: unknown) => {
         setError(getAuthErrorMessage(err, 'OTP request failed'))
       },
     })
@@ -116,13 +132,21 @@ export default function OtpLoginPanel({
     verifyOtp(
       { email, otp: code },
       {
-        onSuccess: ({ token, refreshToken, user }) => {
+        onSuccess: ({
+          token,
+          refreshToken,
+          user,
+        }: {
+          token: string
+          refreshToken: string
+          user?: AuthUser
+        }) => {
           sessionStorage.setItem('activeEmail', email.trim().toLowerCase())
-          setUserId(user?.id)
+          setUserId(user?.id ?? '')
           setTokens(token, refreshToken)
           navigate(getPostAuthRedirect(user), { replace: true })
         },
-        onError: (err: any) => {
+        onError: (err: unknown) => {
           setError(getAuthErrorMessage(err, 'OTP verification failed'))
         },
       },
@@ -213,7 +237,16 @@ export default function OtpLoginPanel({
               mt: 0.35,
             }}
           >
-            Only existing users can sign in here.
+            New user,{' '}
+            <Link
+              href="/signup"
+              underline="hover"
+              onClick={handleSignupRedirect}
+              sx={{ color: AUTH_ORANGE, fontWeight: 800 }}
+            >
+              create your account
+            </Link>{' '}
+            here
           </Typography>
         </Box>
       ) : (

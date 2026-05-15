@@ -26,6 +26,18 @@ interface CredentialAuthFormProps {
   compactLogin?: boolean
 }
 
+type AuthUser = {
+  id?: string
+  onboardingComplete?: boolean | null
+}
+
+type AuthResponse = Record<string, unknown> & {
+  token?: string
+  refreshToken?: string
+  user?: AuthUser
+  message?: string
+}
+
 const AUTH_NAVY = '#0D1B4D'
 const AUTH_ORANGE = '#E86F00'
 
@@ -68,6 +80,11 @@ export default function CredentialAuthForm({
   const { mutate: requestPasswordAccess, isPending: requesting } = useRequestPasswordLogin()
   const { mutate: verifyEmailOtp, isPending: verifying } = useVerifyEmailOtp()
   const authFlow = mode === 'signup' ? 'signup' : 'login'
+
+  const handleSignupRedirect = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    navigate('/signup')
+  }
 
   const emailError = useMemo(() => {
     if (!email) return 'Email is required.'
@@ -115,13 +132,13 @@ export default function CredentialAuthForm({
         flow: authFlow,
       },
       {
-        onSuccess: (response: any) => {
+        onSuccess: (response: AuthResponse) => {
           const verificationCode = extractInlineCode(response)
           setInlineCode(verificationCode)
 
           if (response?.token && response?.refreshToken) {
             sessionStorage.setItem('activeEmail', email.trim().toLowerCase())
-            setUserId(response?.user?.id)
+            setUserId(response?.user?.id ?? '')
             setTokens(response.token, response.refreshToken)
             navigate(getPostAuthRedirect(response?.user), { replace: true })
             return
@@ -146,7 +163,7 @@ export default function CredentialAuthForm({
             })
           }
         },
-        onError: (err: any) => {
+        onError: (err: unknown) => {
           setError(getAuthErrorMessage(err, 'Authentication failed'))
         },
       },
@@ -169,13 +186,21 @@ export default function CredentialAuthForm({
         password,
       },
       {
-        onSuccess: ({ token, refreshToken, user }) => {
+        onSuccess: ({
+          token,
+          refreshToken,
+          user,
+        }: {
+          token: string
+          refreshToken: string
+          user?: AuthUser
+        }) => {
           sessionStorage.setItem('activeEmail', email.trim().toLowerCase())
-          setUserId(user?.id)
+          setUserId(user?.id ?? '')
           setTokens(token, refreshToken)
           navigate(getPostAuthRedirect(user), { replace: true })
         },
-        onError: (err: any) => {
+        onError: (err: unknown) => {
           setError(getAuthErrorMessage(err, 'Verification failed'))
         },
       },
@@ -313,9 +338,22 @@ export default function CredentialAuthForm({
               mt: 0.35,
             }}
           >
-            {mode === 'signup'
-              ? 'New users create an account here and continue to onboarding.'
-              : 'Only existing users can sign in here.'}
+            {mode === 'signup' ? (
+              'New users create an account here and continue to onboarding.'
+            ) : (
+              <>
+                New user,{' '}
+                <Link
+                  href="/signup"
+                  underline="hover"
+                  onClick={handleSignupRedirect}
+                  sx={{ color: AUTH_ORANGE, fontWeight: 800 }}
+                >
+                  create your account
+                </Link>{' '}
+                here
+              </>
+            )}
           </Typography>
         </Stack>
       ) : (
