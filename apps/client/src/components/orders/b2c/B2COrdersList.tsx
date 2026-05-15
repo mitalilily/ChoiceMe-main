@@ -642,7 +642,7 @@ const B2COrdersList = () => {
     const status = (row.order_status || '').toLowerCase()
     const cancellableStatuses = new Set(['pending', 'booked', 'pickup_initiated'])
     const provider = (row.integration_type || '').toLowerCase()
-    const providerSupports = ['delhivery', 'ekart', 'xpressbees'].includes(provider)
+    const providerSupports = ['delhivery', 'deliveryone', 'ekart', 'xpressbees'].includes(provider)
     return providerSupports && cancellableStatuses.has(status)
   }
 

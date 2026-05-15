@@ -42,6 +42,7 @@ type ApiLikeError = {
 export const BULK_MANIFEST_LIMIT = 5
 
 const B2C_MANIFESTABLE_STATUSES = new Set([
+  'pending',
   'booked',
   'shipment_created',
   'manifest_failed',

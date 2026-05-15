@@ -93,9 +93,10 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
         isCalculator: params.isCalculator === true || params.context === 'rate_calculator',
         breadth,
         height,
-      }),
+    }),
     enabled: enabled && !!pickupPincode && !!deliveryPincode && (!!weight || !!cod),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    refetchOnMount: 'always',
     retry: 1,
   })
 }
@@ -128,7 +129,8 @@ export const useShippingRates = (filters = {}) => {
   return useQuery({
     queryKey: ['getShippingRates', filters],
     queryFn: () => fetchShippingRates(filters),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 

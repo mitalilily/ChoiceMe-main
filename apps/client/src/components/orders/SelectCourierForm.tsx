@@ -159,13 +159,18 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
         ? courier.rate
         : courier?.localRates?.forward?.rate,
     )
-  const getCourierProviderCost = (courier: (typeof availableCouriers)[number]) =>
-    toChargeNumber(
-      courier?.provider_rate?.total ??
-        courier?.courier_cost_estimate ??
-        courier?.rateEstimate ??
-        0,
+  const getCourierProviderCost = (courier: (typeof availableCouriers)[number]) => {
+    const providerTotal = toChargeNumber(courier?.provider_rate?.total)
+    const providerFreight = toChargeNumber(courier?.provider_rate?.freight)
+    const providerCod = toChargeNumber(courier?.provider_rate?.cod)
+    const providerParts = providerFreight + providerCod
+
+    return (
+      providerTotal ||
+      providerParts ||
+      toChargeNumber(courier?.courier_cost_estimate ?? courier?.rateEstimate ?? 0)
     )
+  }
   const getCourierFinalCharge = (courier: (typeof availableCouriers)[number]) =>
     getCourierPlatformCharge(courier) + getCourierProviderCost(courier)
 

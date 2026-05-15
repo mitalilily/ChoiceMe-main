@@ -164,7 +164,8 @@ export const useShippingRates = (filters = {}) => {
   return useQuery({
     queryKey: ['shippingRates', filters],
     queryFn: () => fetchShippingRates(filters),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 
@@ -197,7 +198,14 @@ export const useUpdateShippingRate = () => {
 }
 
 export const useImportShippingRates = () => {
-  return useMutation({ mutationFn: uploadShippingRates })
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: uploadShippingRates,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shippingRates'] })
+    },
+  })
 }
 
 export const useDeleteB2CZone = (planId) => {

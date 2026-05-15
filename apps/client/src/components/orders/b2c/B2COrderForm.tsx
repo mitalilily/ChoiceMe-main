@@ -629,7 +629,7 @@ export default function B2COrderFormSteps({ onClose }: { onClose?: () => void })
                     background: ACCENT,
                   }}
                 >
-                  Create & Book Order
+                  Create Order
                 </Button>
               )}
             </Stack>

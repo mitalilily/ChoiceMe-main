@@ -42,6 +42,7 @@ export interface Courier {
     freight?: number | null
     cod?: number | null
     chargeable_weight?: number | null
+    raw?: unknown
   } | null
 }
 

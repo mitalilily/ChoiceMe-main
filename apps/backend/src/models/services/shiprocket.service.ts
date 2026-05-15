@@ -270,7 +270,7 @@ const refundManifestFailureChargeOnce = async ({
   })
 }
 
-const debitManifestSuccessChargeIfNeeded = async ({
+const getManifestWalletDebitContext = async ({
   tx,
   order,
 }: {
@@ -284,7 +284,11 @@ const debitManifestSuccessChargeIfNeeded = async ({
 
   const expectedDebit = getExpectedWalletDebitFromOrder(order)
   if (expectedDebit <= 0) {
-    return
+    return {
+      wallet,
+      amountToDebit: 0,
+      totalManifestRefund: 0,
+    }
   }
 
   const transactions = await tx
@@ -313,6 +317,63 @@ const debitManifestSuccessChargeIfNeeded = async ({
 
   const netCharged = totalOriginalDebit - totalManifestRefund
   const amountToDebit = Math.max(0, expectedDebit - netCharged)
+
+  return {
+    wallet,
+    amountToDebit,
+    totalManifestRefund,
+  }
+}
+
+const assertManifestWalletBalance = async ({
+  tx,
+  orders,
+}: {
+  tx: any
+  orders: any[]
+}) => {
+  const totalsByWallet = new Map<
+    string,
+    { balance: number; amountToDebit: number; orderNumbers: string[] }
+  >()
+
+  for (const order of orders) {
+    const { wallet, amountToDebit } = await getManifestWalletDebitContext({ tx, order })
+    if (amountToDebit <= 0) continue
+
+    const current =
+      totalsByWallet.get(wallet.id) || {
+        balance: Number(wallet.balance ?? 0),
+        amountToDebit: 0,
+        orderNumbers: [],
+      }
+
+    current.amountToDebit += amountToDebit
+    current.orderNumbers.push(String(order.order_number || order.id))
+    totalsByWallet.set(wallet.id, current)
+  }
+
+  for (const total of totalsByWallet.values()) {
+    if (total.balance < total.amountToDebit) {
+      throw new HttpError(
+        400,
+        `Insufficient wallet balance to manifest selected order(s). Required INR ${total.amountToDebit.toFixed(
+          2,
+        )}, available INR ${total.balance.toFixed(2)}.`,
+      )
+    }
+  }
+}
+
+const debitManifestSuccessChargeIfNeeded = async ({
+  tx,
+  order,
+}: {
+  tx: any
+  order: any
+}) => {
+  const { wallet, amountToDebit, totalManifestRefund } =
+    await getManifestWalletDebitContext({ tx, order })
 
   if (amountToDebit <= 0) {
     return
@@ -920,6 +981,112 @@ const numberOrNull = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const numberFromRecord = (record: any, keys: string[]) => {
+  if (record === undefined || record === null || record === '') return null
+  const directNumber = numberOrNull(
+    typeof record === 'string' ? record.replace(/,/g, '') : record,
+  )
+  if (directNumber !== null) return directNumber
+  if (typeof record !== 'object') return null
+
+  for (const key of keys) {
+    const value = record?.[key]
+    if (value === undefined || value === null || value === '') continue
+    const parsed = numberOrNull(typeof value === 'string' ? value.replace(/,/g, '') : value)
+    if (parsed !== null) return parsed
+  }
+  return null
+}
+
+const buildProviderRate = (
+  provider: string,
+  values: {
+    total?: unknown
+    freight?: unknown
+    cod?: unknown
+    chargeable_weight?: unknown
+    raw?: unknown
+  },
+) => {
+  const total = numberFromRecord(values.total, [
+    'total_amount',
+    'total_charge',
+    'total_charges',
+    'totalCharges',
+    'forwardDeliveredCharges',
+    'forward_delivered_charges',
+    'rtoDeliveredCharges',
+    'rto_delivered_charges',
+    'reverseDeliveredCharges',
+    'reverse_delivered_charges',
+    'amount',
+    'charge',
+    'charges',
+    'rate',
+  ])
+  const freight = numberFromRecord(values.freight, [
+    'freight_charge',
+    'freight_charges',
+    'freightCharges',
+    'shipping_charge',
+    'shipping_charges',
+    'shippingCharges',
+    'forward_charge',
+    'forward_charges',
+    'forwardDeliveredCharges',
+    'forward_delivered_charges',
+    'amount',
+    'charge',
+    'charges',
+    'rate',
+  ])
+  const cod = numberFromRecord(values.cod, [
+    'cod_charge',
+    'cod_charges',
+    'codCharges',
+    'cod_amount',
+    'codAmount',
+    'amount',
+    'charge',
+    'charges',
+    'rate',
+  ])
+  const chargeableWeight = numberFromRecord(values.chargeable_weight, [
+    'chargeable_weight',
+    'chargeableWeight',
+    'billable_weight',
+    'billing_weight',
+    'weight',
+    'cgm',
+  ])
+  const computedTotal =
+    total ??
+    (freight !== null && cod !== null ? freight + cod : null) ??
+    freight ??
+    cod
+
+  if (computedTotal === null && freight === null && cod === null) return null
+
+  return {
+    provider,
+    total: computedTotal,
+    freight,
+    cod,
+    chargeable_weight: chargeableWeight,
+    raw: values.raw ?? null,
+  }
+}
+
+const getProviderRateAmount = (providerRate?: { total?: unknown; freight?: unknown; cod?: unknown } | null) => {
+  if (!providerRate) return null
+  const total = numberOrNull(providerRate.total)
+  if (total !== null) return total
+  const freight = numberOrNull(providerRate.freight)
+  const cod = numberOrNull(providerRate.cod)
+  if (freight !== null && cod !== null) return freight + cod
+  return freight ?? cod
+}
+
 const getDeliveryOneQuoteAmount = (quote?: DeliveryOneShippingCostResponse | null) => {
   const total = numberOrNull(quote?.charges?.total)
   if (total !== null) return total
@@ -984,6 +1151,64 @@ const fetchDeliveryOneShippingCostEstimate = async (params: {
 
   return {
     amount: getDeliveryOneQuoteAmount(quote),
+    quote,
+  }
+}
+
+const fetchDelhiveryShippingCostEstimate = async (params: {
+  delhivery?: DelhiveryService
+  courierId?: unknown
+  mode?: unknown
+  originPincode: string
+  destinationPincode: string
+  paymentType?: string
+  weightG: number
+  chargeableWeightG?: number | null
+  lengthCm?: number | null
+  breadthCm?: number | null
+  heightCm?: number | null
+}) => {
+  const billingMode = resolveDeliveryOneBillingMode(params.courierId, params.mode)
+  if (!billingMode) {
+    console.warn('[Delhivery] Skipping shipping cost estimate: billing mode not resolved', {
+      courierId: params.courierId,
+      mode: params.mode,
+    })
+    return null
+  }
+
+  const chargeableWeight = Math.max(
+    1,
+    Math.round(Number(params.chargeableWeightG || params.weightG || 0)),
+  )
+  if (!Number.isFinite(chargeableWeight) || chargeableWeight <= 0) {
+    console.warn('[Delhivery] Skipping shipping cost estimate: chargeable weight missing', {
+      courierId: params.courierId,
+      weightG: params.weightG,
+      chargeableWeightG: params.chargeableWeightG,
+    })
+    return null
+  }
+
+  const delhivery = params.delhivery ?? new DelhiveryService()
+  const optionalDimension = (value?: number | null) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+  }
+  const quote = await delhivery.calculateShippingCost({
+    md: billingMode,
+    cgm: chargeableWeight,
+    o_pin: params.originPincode,
+    d_pin: params.destinationPincode,
+    ss: 'Delivered',
+    pt: String(params.paymentType || 'prepaid').toLowerCase() === 'cod' ? 'COD' : 'Pre-paid',
+    l: optionalDimension(params.lengthCm),
+    b: optionalDimension(params.breadthCm),
+    h: optionalDimension(params.heightCm),
+  })
+
+  return {
+    amount: getProviderRateAmount(quote.charges) ?? null,
     quote,
   }
 }
@@ -1554,6 +1779,35 @@ export const fetchAvailableCouriersWithRates = async (
       })
     }
 
+    const ekartProviderRate =
+      ekartAvailable && ekartResp
+        ? buildProviderRate('ekart', {
+            total:
+              ekartResp?.availability?.forwardDeliveredCharges ??
+              ekartResp?.availability?.forward_delivered_charges ??
+              ekartResp?.raw?.forwardDeliveredCharges ??
+              ekartResp?.raw?.forward_delivered_charges ??
+              ekartResp?.availability?.charges ??
+              ekartResp?.raw?.charges,
+            freight:
+              ekartResp?.availability?.forwardDeliveredCharges ??
+              ekartResp?.availability?.forward_delivered_charges ??
+              ekartResp?.raw?.forwardDeliveredCharges ??
+              ekartResp?.raw?.forward_delivered_charges,
+            cod:
+              ekartResp?.availability?.codCharges ??
+              ekartResp?.availability?.cod_charges ??
+              ekartResp?.raw?.codCharges ??
+              ekartResp?.raw?.cod_charges,
+            chargeable_weight:
+              ekartResp?.availability?.chargeableWeight ??
+              ekartResp?.availability?.chargeable_weight ??
+              ekartResp?.raw?.chargeableWeight ??
+              ekartResp?.raw?.chargeable_weight,
+            raw: ekartResp?.availability ?? ekartResp?.raw ?? null,
+          })
+        : null
+
     for (const [providerKey, bucket] of providerCourierBuckets.entries()) {
       const providerMeta = serviceableProviders.get(providerKey)
       if (!providerMeta) continue
@@ -1565,6 +1819,17 @@ export const fetchAvailableCouriersWithRates = async (
                 (record: any) => String(record?.id || '').trim() === String(courier.id).trim(),
               )
             : null
+        const xpressbeesProviderRate = xpressbeesRecord
+          ? buildProviderRate('xpressbees', {
+              total: xpressbeesRecord?.total_charges ?? xpressbeesRecord?.totalCharges,
+              freight: xpressbeesRecord?.freight_charges ?? xpressbeesRecord?.freightCharges,
+              cod: xpressbeesRecord?.cod_charges ?? xpressbeesRecord?.codCharges,
+              chargeable_weight:
+                xpressbeesRecord?.chargeable_weight ?? xpressbeesRecord?.chargeableWeight,
+              raw: xpressbeesRecord,
+            })
+          : null
+        const providerRate = providerKey === 'ekart' ? ekartProviderRate : xpressbeesProviderRate
         providerMeta.matchedCourierIds.add(Number(courier.id))
         combinedCouriers.push({
           id: courier.id,
@@ -1577,9 +1842,11 @@ export const fetchAvailableCouriersWithRates = async (
           approxZone: null,
           createdAt: courier.createdAt,
           courier_cost_estimate:
+            getProviderRateAmount(providerRate) ??
             xpressbeesRecord?.total_charges ??
             xpressbeesRecord?.freight_charges ??
             null,
+          provider_rate: providerRate,
           freight_charges: xpressbeesRecord?.freight_charges ?? null,
           cod_charges: xpressbeesRecord?.cod_charges ?? null,
           total_charges: xpressbeesRecord?.total_charges ?? null,
@@ -1905,24 +2172,30 @@ export const fetchAvailableCouriersWithRates = async (
     // ✅ Final filter: Ensure all couriers have correct business_type
     combined = await filterCouriersByBusinessType(combined, 'b2c')
 
-    // Fetch Delivery One's live provider cost after local rate-card filtering so
-    // order creation can persist the courier-company estimate selected by the user.
-    if (combined.some((c: any) => normalizeProviderKey(c.integration_type) === 'deliveryone')) {
+    // Fetch live provider costs after local rate-card filtering so order creation
+    // can persist the courier-company estimate selected by the user.
+    const quoteBackedProviders = new Set(['delhivery', 'deliveryone'])
+    if (
+      combined.some((c: any) =>
+        quoteBackedProviders.has(normalizeProviderKey(c.integration_type)),
+      )
+    ) {
       const originPincode = params.origin?.toString()
       const destinationPincode = params.destination?.toString()
       const deliveryOne = new DeliveryOneService()
+      const delhivery = new DelhiveryService()
 
       if (originPincode && destinationPincode) {
         combined = await Promise.all(
           combined.map(async (courier: any) => {
-            if (normalizeProviderKey(courier.integration_type) !== 'deliveryone') return courier
+            const providerKey = normalizeProviderKey(courier.integration_type)
+            if (!quoteBackedProviders.has(providerKey)) return courier
 
             const rateType = isReverseShipment ? 'rto' : 'forward'
             const localRate = courier.localRates?.[rateType] ?? null
 
             try {
-              const estimate = await fetchDeliveryOneShippingCostEstimate({
-                deliveryOne,
+              const quoteParams = {
                 courierId: courier.id,
                 mode: courier.shipping_mode ?? courier.mode ?? localRate?.mode,
                 originPincode,
@@ -1933,23 +2206,35 @@ export const fetchAvailableCouriersWithRates = async (
                 lengthCm: Number(params.length ?? 0),
                 breadthCm: Number(params.breadth ?? 0),
                 heightCm: Number(params.height ?? 0),
-              })
+              }
+              const estimate =
+                providerKey === 'deliveryone'
+                  ? await fetchDeliveryOneShippingCostEstimate({
+                      deliveryOne,
+                      ...quoteParams,
+                    })
+                  : await fetchDelhiveryShippingCostEstimate({
+                      delhivery,
+                      ...quoteParams,
+                    })
 
               if (!estimate?.quote) return courier
 
               return {
                 ...courier,
                 courier_cost_estimate: estimate.amount ?? courier.courier_cost_estimate ?? null,
-                provider_rate: {
-                  provider: 'deliveryone',
-                  total: estimate.quote.charges.total,
-                  freight: estimate.quote.charges.freight,
-                  cod: estimate.quote.charges.cod,
-                  chargeable_weight: estimate.quote.charges.chargeableWeight,
-                },
+                provider_rate:
+                  buildProviderRate(providerKey, {
+                    total: estimate.quote.charges.total,
+                    freight: estimate.quote.charges.freight,
+                    cod: estimate.quote.charges.cod,
+                    chargeable_weight: estimate.quote.charges.chargeableWeight,
+                    raw: estimate.quote.raw,
+                  }) ?? courier.provider_rate ?? null,
               }
             } catch (err: any) {
-              console.error('[Serviceability] Delivery One shipping cost estimate failed', {
+              console.error('[Serviceability] Courier shipping cost estimate failed', {
+                provider: providerKey,
                 courierId: courier.id,
                 mode: courier.shipping_mode ?? courier.mode ?? localRate?.mode,
                 origin: originPincode,
@@ -1961,7 +2246,7 @@ export const fetchAvailableCouriersWithRates = async (
           }),
         )
       } else {
-        console.warn('[Serviceability] Delivery One shipping cost skipped: missing pincode', {
+        console.warn('[Serviceability] Courier shipping cost skipped: missing pincode', {
           origin: originPincode,
           destination: destinationPincode,
         })
@@ -3127,7 +3412,7 @@ export const createB2CShipmentService = async (
       `Pickup details incomplete. Missing fields: ${missingPickupFields.join(', ')}. Please select a valid pickup address and retry.`,
     )
   }
-  // 💰 PRE-CHECK: Validate wallet balance BEFORE creating shipments with service providers
+  // Resolve pincodes and rate-card freight now; wallet debit is collected when manifest succeeds.
   const bookingPickupPincode = normalizePincode(
     params.origin ??
       params.pickup?.pincode ??
@@ -3206,50 +3491,6 @@ export const createB2CShipmentService = async (
         400,
         freightErr?.message || 'Unable to compute freight for selected courier/zone',
       )
-    }
-  }
-
-  let estimatedWalletDebit = 0
-  if (!isReverseShipment) {
-    if (params.payment_type === 'prepaid') {
-      estimatedWalletDebit = freightCharges + otherCharges
-    } else if (params.payment_type === 'cod') {
-      estimatedWalletDebit = freightCharges + otherCharges + codCharges
-    }
-
-    if (estimatedWalletDebit > 0) {
-      const [userWallet] = await db
-        .select()
-        .from(wallets)
-        .where(eq(wallets.userId, userId))
-        .limit(1)
-      if (!userWallet) {
-        throw new Error('Wallet not found')
-      }
-      const walletBalance = Number(userWallet?.balance ?? 0)
-
-      console.log('💳 Pre-checking wallet balance before shipment creation:', {
-        order_number: params.order_number,
-        payment_type: params.payment_type,
-        wallet_balance: walletBalance,
-        estimated_wallet_debit: estimatedWalletDebit,
-        freight_charges: freightCharges,
-        other_charges: otherCharges,
-        cod_charges: isCodOrder ? codCharges : 0,
-      })
-
-      if (walletBalance < estimatedWalletDebit) {
-        const errorMessage =
-          params.payment_type === 'prepaid'
-            ? 'Insufficient wallet balance for prepaid order'
-            : 'Insufficient wallet balance for COD service charges'
-        console.error('❌ Wallet balance check failed:', {
-          wallet_balance: walletBalance,
-          required_amount: estimatedWalletDebit,
-          shortfall: estimatedWalletDebit - walletBalance,
-        })
-        throw new Error(errorMessage)
-      }
     }
   }
 
@@ -3803,7 +4044,7 @@ export const createB2CShipmentService = async (
       isReverse: params.isReverse === true || params.payment_type === 'reverse',
     })
 
-    // 2️⃣ INSERT LOCAL ORDER + WALLET TRANSACTION
+    // 2️⃣ INSERT LOCAL ORDER + WALLET DEBIT PREVIEW
     const result = await db.transaction(async (tx) => {
       const userWallet = await walletOfUser(userId, tx)
       const walletBalance = Number(userWallet?.balance ?? 0)
@@ -3869,9 +4110,9 @@ export const createB2CShipmentService = async (
 
       let walletDebit = 0
       if (params.payment_type === 'prepaid') {
-        // Prepaid: Seller wallet debited for freight charges + other charges (all courier costs)
+        // Prepaid: Seller wallet will be debited for freight charges + other charges after manifest.
         // Customer pays: order_amount + shipping + transaction_fee + gift_wrap - discount - prepaid
-        // Seller wallet debited: freight_charges (courier shipping cost) + other_charges (fuel surcharge, handling, etc.)
+        // Seller wallet debit: freight_charges (courier shipping cost) + other_charges (fuel surcharge, handling, etc.)
         walletDebit = freightCharges + otherCharges
 
         // Validate that otherCharges are included
@@ -3883,7 +4124,7 @@ export const createB2CShipmentService = async (
           )
         }
 
-        console.log('💳 Prepaid Wallet Deduction:', {
+        console.log('💳 Prepaid Wallet Debit Preview (charged on manifest):', {
           order_number: params.order_number,
           wallet_balance: walletBalance,
           freight_charges: freightCharges,
@@ -3893,13 +4134,10 @@ export const createB2CShipmentService = async (
           reason: 'B2C Prepaid Order Payment',
         })
 
-        if (walletBalance < walletDebit) {
-          throw new Error('Insufficient wallet balance for prepaid order')
-        }
       } else {
-        // COD: Seller wallet debited for freight charges + other charges + COD charges
+        // COD: Seller wallet will be debited for freight charges + other charges + COD charges after manifest.
         // Customer pays: order_amount + shipping + COD + transaction_fee + gift_wrap - discount
-        // Seller wallet debited: freight_charges (courier shipping) + other_charges (fuel surcharge, handling, etc.) + cod_charges (courier COD fee)
+        // Seller wallet debit: freight_charges (courier shipping) + other_charges (fuel surcharge, handling, etc.) + cod_charges (courier COD fee)
         walletDebit = freightCharges + otherCharges + codCharges
 
         // Validate that otherCharges are included
@@ -3911,7 +4149,7 @@ export const createB2CShipmentService = async (
           )
         }
 
-        console.log('💳 COD Wallet Deduction:', {
+        console.log('💳 COD Wallet Debit Preview (charged on manifest):', {
           order_number: params.order_number,
           wallet_balance: walletBalance,
           freight_charges: freightCharges,
@@ -3922,13 +4160,10 @@ export const createB2CShipmentService = async (
           reason: 'B2C COD Service Charges',
         })
 
-        if (walletBalance < walletDebit) {
-          throw new Error('Insufficient wallet balance for COD service charges')
-        }
       }
 
       // 3️⃣ CREATE LOCAL ORDER ENTRY (no seller insurance for B2C – platform liability only)
-      const orderStatus = 'booked'
+      const orderStatus = 'pending'
       const manifestErrorMessage = null
 
       const newOrder = await createB2COrder({
@@ -3964,13 +4199,13 @@ export const createB2CShipmentService = async (
       }
 
       // 4️⃣ WALLET TRANSACTION
-      // Delhivery forward orders use deferred manifest generation, so charge only after manifest succeeds.
-      const shouldDeferWalletDebit =
-        integrationType === 'delhivery' && !isReverseShipment && shipmentData?.deferred_manifest === true
+      // Forward B2C orders are charged only after a successful manifest.
+      const shouldDeferWalletDebit = !isReverseShipment
       const finalWalletDebit = walletDebit ?? 0
       if (shouldDeferWalletDebit) {
-        console.log('ℹ️ Deferring wallet debit until manifest success for Delhivery order', {
+        console.log('ℹ️ Deferring wallet debit until manifest success for B2C order', {
           order_number: params.order_number,
+          integration_type: integrationType,
           deferred_wallet_debit: finalWalletDebit,
         })
       } else if (finalWalletDebit <= 0) {
@@ -4866,6 +5101,8 @@ export const generateManifestService = async (params: {
             throw new Error(`Unable to load ${integrationType} orders for manifest generation`)
           }
 
+          await assertManifestWalletBalance({ tx, orders: fetchedOrders })
+
           const providerName = integrationType === 'ekart' ? 'Ekart' : 'Xpressbees'
           const providerManifestIds =
             integrationType === 'ekart'
@@ -5144,6 +5381,10 @@ export const generateManifestService = async (params: {
           })
 
           await Promise.all(orderUpdatePromises)
+
+          for (const order of fetchedOrders) {
+            await debitManifestSuccessChargeIfNeeded({ tx, order })
+          }
 
           const invoiceResults = await Promise.allSettled(
             fetchedOrders.map((order) => generateInvoiceForOrder(order)),
@@ -5680,6 +5921,8 @@ export const generateManifestService = async (params: {
             throw new Error('Unable to load Delhivery orders for manifest generation')
           }
 
+          await assertManifestWalletBalance({ tx, orders: fetchedOrders })
+
           manifestFailureOrderIds = fetchedOrders.map((order) => order.id)
 
           const delhivery = new DelhiveryService()
@@ -5881,10 +6124,6 @@ export const generateManifestService = async (params: {
               requested_pickup_date: String(pickupDateRaw).slice(0, 10) || null,
               final_pickup_date: pickupDate,
             })
-          }
-
-          for (const order of fetchedOrders) {
-            await debitManifestSuccessChargeIfNeeded({ tx, order })
           }
 
           await delhivery.createPickupRequest({
@@ -6228,6 +6467,10 @@ export const generateManifestService = async (params: {
           // Wait for order updates to complete
           await Promise.all(orderUpdatePromisesDel)
 
+          for (const order of fetchedOrders) {
+            await debitManifestSuccessChargeIfNeeded({ tx, order })
+          }
+
           // Update invoices in background (fire-and-forget, but wait a bit for initial completion)
           Promise.allSettled(invoicePromisesDel).then((results) => {
             results.forEach((result, index) => {
@@ -6297,6 +6540,16 @@ export const generateManifestService = async (params: {
 
         const deliveryOnePickupWarnings: string[] = []
         const localManifestOrdersById = new Map<string, any>()
+
+        if (params.type === 'b2c') {
+          const localOrderIds = orders
+            .map((order) => String((order as any).id ?? '').trim())
+            .filter(Boolean)
+          const walletCheckOrders = localOrderIds.length
+            ? await tx.select().from(b2c_orders).where(inArray(b2c_orders.id, localOrderIds))
+            : []
+          await assertManifestWalletBalance({ tx, orders: walletCheckOrders })
+        }
 
         for (const awb of params.awbs) {
           const ref = String(awb ?? '').trim()
@@ -6763,6 +7016,12 @@ export const generateManifestService = async (params: {
               .where(eq(table.id, order.id)),
           ),
         )
+
+        if (params.type === 'b2c') {
+          for (const order of localManifestOrders) {
+            await debitManifestSuccessChargeIfNeeded({ tx, order })
+          }
+        }
 
         const manifestDownloadUrl = await resolveManifestUrl(manifestKey)
 

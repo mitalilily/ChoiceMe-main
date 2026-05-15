@@ -31,6 +31,12 @@ export async function cancelOrderShipment(orderId: string) {
     currentStatus: order.order_status,
   })
 
+  const cancellableStatuses = new Set(['pending', 'booked', 'confirmed', 'pickup_initiated'])
+  const currentStatus = String(order.order_status || '').toLowerCase()
+  if (!cancellableStatuses.has(currentStatus)) {
+    throw new Error(`Order with status "${order.order_status}" cannot be cancelled`)
+  }
+
   const integration = normalizeServiceProviderKey(order.integration_type)
   if (!INTEGRATED_SERVICE_PROVIDERS.includes(integration as any)) {
     console.error('❌ Unsupported integration type:', { orderId, integration })

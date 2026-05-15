@@ -223,6 +223,8 @@ export const RateCardContainer = ({ forceBusinessType = null, embedded = false }
     setFilters(nextFilters)
   }, [selectedBusinessType, selectedPlanId])
 
+  const activePlanId = selectedPlanId || filters?.planId || plans?.[0]?.id || ''
+
   const openEditModal = (row) => {
     setSelectedRate(row)
     setModalOpen(true)
@@ -373,7 +375,7 @@ export const RateCardContainer = ({ forceBusinessType = null, embedded = false }
                 colorScheme="brand"
                 leftIcon={<AddIcon />}
                 onClick={openAddModal}
-                isDisabled={!selectedPlanId || plans?.length === 0}
+                isDisabled={!activePlanId || plans?.length === 0}
               >
                 Add Rate
               </Button>
@@ -382,7 +384,7 @@ export const RateCardContainer = ({ forceBusinessType = null, embedded = false }
                 colorScheme="pink"
                 leftIcon={<IconUpload />}
                 onClick={handleImportRates}
-                isDisabled={!selectedPlanId || plans?.length === 0}
+                isDisabled={!activePlanId || plans?.length === 0}
               >
                 Import Rate Card
               </Button>
@@ -393,7 +395,7 @@ export const RateCardContainer = ({ forceBusinessType = null, embedded = false }
           <RateCardTable
             data={data || []}
             zones={zones}
-            planId={selectedPlanId || filters?.planId}
+            planId={activePlanId}
             businessType={selectedBusinessType}
             onEdit={openEditModal}
             loading={isLoading}
@@ -406,7 +408,7 @@ export const RateCardContainer = ({ forceBusinessType = null, embedded = false }
             data={selectedRate}
             existingRates={data}
             zones={zones}
-            planId={filters?.planId}
+            planId={activePlanId}
             couriers={courierList || []}
             businessType={selectedBusinessType}
           />
@@ -436,7 +438,7 @@ export const RateCardContainer = ({ forceBusinessType = null, embedded = false }
                 importRates(
                   {
                     file: files[0],
-                    planId: selectedPlanId || filters?.planId,
+                    planId: activePlanId,
                     businessType: filters?.businessType || selectedBusinessType,
                   },
                   {

@@ -138,6 +138,19 @@ export const RateCardEditModal = ({
   }
 
   const handleSave = () => {
+    const resolvedCourierId = form.courier_id || data?.courier_id
+    const resolvedMode = String(form.mode || data?.mode || '').trim()
+
+    if (!resolvedCourierId) {
+      alert('Please select a courier before saving rates.')
+      return
+    }
+
+    if (!resolvedMode) {
+      alert('Please select a shipping mode before saving rates.')
+      return
+    }
+
     // Build rates per zone
     const rates = {}
     zones.forEach((zone) => {
@@ -176,9 +189,9 @@ export const RateCardEditModal = ({
       cod_charges: form.cod_charges,
       cod_percent: form.cod_percent,
       other_charges: form.other_charges,
-      mode: form.mode,
+      mode: resolvedMode,
       previous_mode: data?.mode,
-      courier_id: form.courier_id || data?.courier_id, // from form (create) or existing (edit)
+      courier_id: resolvedCourierId, // from form (create) or existing (edit)
       courier_name: form.courier_name || data?.courier_name,
       service_provider: serviceProviderValue, // Always send the service_provider
       previous_service_provider: data?.service_provider || data?.serviceProvider,
@@ -402,9 +415,16 @@ export const RateCardEditModal = ({
           Courier Info
         </Text>
         <SimpleGrid columns={2} spacing={4}>
-          <FormControl>
+          <FormControl isRequired>
             <FormLabel>Mode</FormLabel>
-            <Input value={form.mode} onChange={(e) => handleChange('mode', e.target.value)} />
+            <Select
+              placeholder="Select mode..."
+              value={form.mode}
+              onChange={(e) => handleChange('mode', e.target.value)}
+            >
+              <option value="air">Air</option>
+              <option value="surface">Surface</option>
+            </Select>
           </FormControl>
           {!isB2C && (
             <FormControl>

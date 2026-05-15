@@ -36,8 +36,8 @@ export const useCreateShipment = (onClose?: () => void) => {
 
     // 🔹 Success handling
     onSuccess: (data) => {
-      toast.open({ message: 'Shipment created successfully', severity: 'success' })
-      console.log('Shipment created successfully:', data)
+      toast.open({ message: 'Order created successfully', severity: 'success' })
+      console.log('Order created successfully:', data)
       queryClient.invalidateQueries({ queryKey: ['b2cOrdersByUser'] })
       if (onClose) onClose() // ✅ Close modal/drawer after success
     },
