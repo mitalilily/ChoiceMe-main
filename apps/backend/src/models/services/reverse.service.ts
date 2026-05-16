@@ -53,6 +53,8 @@ const ZONE_KEY_TO_DB_CODE: Record<string, string> = {
   WITHIN_STATE: 'Within State',
 }
 
+const B2C_ZONE_CONDITION = sql`lower(trim(${zones.business_type})) = 'b2c'`
+
 function determineB2CZoneKey(
   origin: LocRow | null,
   destination: LocRow | null,
@@ -111,20 +113,20 @@ async function fetchZoneIdByKey(key: string): Promise<{ id: string; code: string
   const exactTrim = await db
     .select({ id: zones.id, code: zones.code, name: zones.name })
     .from(zones)
-    .where(sql`trim(${zones.code}) = ${dbCode}`)
+    .where(and(B2C_ZONE_CONDITION, sql`trim(${zones.code}) = ${dbCode}`))
     .limit(1)
   if (exactTrim?.[0]?.id)
     return { id: exactTrim[0].id, code: exactTrim[0].code, name: exactTrim[0].name }
   const ci = await db
     .select({ id: zones.id, code: zones.code, name: zones.name })
     .from(zones)
-    .where(sql`lower(trim(${zones.code})) = ${dbCode.toLowerCase()}`)
+    .where(and(B2C_ZONE_CONDITION, sql`lower(trim(${zones.code})) = ${dbCode.toLowerCase()}`))
     .limit(1)
   if (ci?.[0]?.id) return { id: ci[0].id, code: ci[0].code, name: ci[0].name }
   const nameMatch = await db
     .select({ id: zones.id, code: zones.code, name: zones.name })
     .from(zones)
-    .where(sql`lower(trim(${zones.name})) = ${dbCode.toLowerCase()}`)
+    .where(and(B2C_ZONE_CONDITION, sql`lower(trim(${zones.name})) = ${dbCode.toLowerCase()}`))
     .limit(1)
   if (nameMatch?.[0]?.id)
     return { id: nameMatch[0].id, code: nameMatch[0].code, name: nameMatch[0].name }
@@ -133,7 +135,10 @@ async function fetchZoneIdByKey(key: string): Promise<{ id: string; code: string
     .select({ id: zones.id, code: zones.code, name: zones.name })
     .from(zones)
     .where(
-      sql`lower(trim(${zones.code})) = ${roiKeyLower} OR lower(trim(${zones.name})) = ${roiKeyLower}`,
+      and(
+        B2C_ZONE_CONDITION,
+        sql`(lower(trim(${zones.code})) = ${roiKeyLower} OR lower(trim(${zones.name})) = ${roiKeyLower})`,
+      ),
     )
     .limit(1)
   if (fallback?.[0]?.id)

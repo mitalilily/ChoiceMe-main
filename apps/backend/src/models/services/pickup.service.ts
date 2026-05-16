@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../client'
 import { b2c_orders } from '../schema/b2cOrders'
 import { DelhiveryService } from './couriers/delhivery.service'
@@ -12,10 +12,17 @@ import {
   supportedServiceProviderList,
 } from '../../utils/courierProviders'
 
-export async function cancelOrderShipment(orderId: string) {
+export async function cancelOrderShipment(orderId: string, expectedUserId?: string) {
   console.log('🔍 Starting cancellation for orderId:', orderId)
 
-  const [order] = await db.select().from(b2c_orders).where(eq(b2c_orders.id, orderId))
+  const [order] = await db
+    .select()
+    .from(b2c_orders)
+    .where(
+      expectedUserId
+        ? and(eq(b2c_orders.id, orderId), eq(b2c_orders.user_id, expectedUserId))
+        : eq(b2c_orders.id, orderId),
+    )
 
   if (!order) {
     console.error('❌ Order not found:', orderId)

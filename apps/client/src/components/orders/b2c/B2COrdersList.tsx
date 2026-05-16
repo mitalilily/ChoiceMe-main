@@ -52,6 +52,7 @@ import ManifestScheduleDialog, {
 } from '../ManifestScheduleDialog'
 import ReverseModal from '../reverse/ReverseModal'
 import B2COrderFormSteps from './B2COrderForm'
+import { isB2CCancelEligible } from './orderActionRules'
 
 /* ───────────── Types ───────────── */
 interface OrderFilters {
@@ -638,14 +639,6 @@ const B2COrdersList = () => {
   }
 
   /* ───────────── Columns ───────────── */
-  const isCancellable = (row: B2COrder) => {
-    const status = (row.order_status || '').toLowerCase()
-    const cancellableStatuses = new Set(['pending', 'booked', 'pickup_initiated'])
-    const provider = (row.integration_type || '').toLowerCase()
-    const providerSupports = ['delhivery', 'deliveryone', 'ekart', 'xpressbees'].includes(provider)
-    return providerSupports && cancellableStatuses.has(status)
-  }
-
   const hasLabelGenerated = (row: B2COrder) =>
     Boolean(String(row.label_url || row.label_key || row.label || '').trim())
 
@@ -797,7 +790,7 @@ const B2COrdersList = () => {
           )
         }
 
-        if (isCancellable(row)) {
+        if (isB2CCancelEligible(row)) {
           actions.push(
             <Button
               key="cancel"

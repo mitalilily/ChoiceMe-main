@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { db } from '../client'
 import { shippingRates, shippingRateCodSlabs, shippingRateSlabs } from '../schema/shippingRates'
 import { calculateFreight } from './pricing/chargeableFreight'
@@ -76,6 +76,8 @@ export interface ComputedB2CRateCardCharge {
   matched_by: 'slab' | 'last_slab_extra' | 'legacy'
 }
 
+type RateCardRow = typeof shippingRates.$inferSelect
+
 export function normalizeB2CShippingMode(value: unknown): string {
   const raw = String(value ?? '')
     .trim()
@@ -94,6 +96,45 @@ export function normalizeB2CServiceProvider(value: unknown): string {
 function toNumber(value: unknown, fallback = 0) {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function toTimestamp(value: unknown) {
+  if (value instanceof Date) return value.getTime()
+  if (value === undefined || value === null || value === '') return 0
+  const parsed = new Date(String(value)).getTime()
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function getRateCardDedupeKey(row: RateCardRow) {
+  return [
+    row.plan_id,
+    row.zone_id,
+    row.courier_id,
+    normalizeB2CServiceProvider(row.service_provider),
+    normalizeB2CShippingMode(row.mode),
+    String(row.type || '').trim().toLowerCase(),
+  ].join('|')
+}
+
+function pickLatestRateCardRows(rows: RateCardRow[]) {
+  const latestRows = new Map<string, RateCardRow>()
+
+  for (const row of rows) {
+    const key = getRateCardDedupeKey(row)
+    const current = latestRows.get(key)
+    if (!current) {
+      latestRows.set(key, row)
+      continue
+    }
+
+    const rowTime = Math.max(toTimestamp(row.last_updated), toTimestamp(row.created_at))
+    const currentTime = Math.max(toTimestamp(current.last_updated), toTimestamp(current.created_at))
+    if (rowTime >= currentTime) {
+      latestRows.set(key, row)
+    }
+  }
+
+  return Array.from(latestRows.values())
 }
 
 function normaliseSlabInput(slab: RateCardSlabInput): ResolvedRateCardSlab {
@@ -274,7 +315,11 @@ export async function fetchResolvedB2CRateCards(filters: {
 
   const requestedServiceProvider = normalizeB2CServiceProvider(filters.serviceProvider)
   const requestedMode = normalizeB2CShippingMode(filters.mode)
-  const allRateRows = await db.select().from(shippingRates).where(and(...conditions))
+  const allRateRows = await db
+    .select()
+    .from(shippingRates)
+    .where(and(...conditions))
+    .orderBy(desc(shippingRates.last_updated), desc(shippingRates.created_at))
   const providerFilteredRows = requestedServiceProvider
     ? (() => {
         const exactProviderRows = allRateRows.filter(
@@ -284,7 +329,7 @@ export async function fetchResolvedB2CRateCards(filters: {
         return allRateRows.filter((row) => !normalizeB2CServiceProvider(row.service_provider))
       })()
     : allRateRows
-  const rateRows = requestedMode
+  const modeFilteredRows = requestedMode
     ? (() => {
         const exactModeRows = providerFilteredRows.filter(
           (row) => normalizeB2CShippingMode(row.mode) === requestedMode,
@@ -293,6 +338,7 @@ export async function fetchResolvedB2CRateCards(filters: {
         return providerFilteredRows.filter((row) => !normalizeB2CShippingMode(row.mode))
       })()
     : providerFilteredRows
+  const rateRows = pickLatestRateCardRows(modeFilteredRows)
   const rateIds = rateRows.map((row) => row.id)
   const [slabs, codSlabs] = await Promise.all([
     fetchShippingRateSlabs(rateIds),

@@ -76,6 +76,53 @@ export const getSortClause = (sortBy?: GetAllCouriersPaginatedParams['sortBy']) 
   }
 }
 
+type ShippingRateJoinRow = {
+  rate: typeof shippingRates.$inferSelect
+  zone: typeof zones.$inferSelect | null
+}
+
+const toTimestamp = (value: unknown) => {
+  if (value instanceof Date) return value.getTime()
+  if (value === undefined || value === null || value === '') return 0
+  const parsed = new Date(String(value)).getTime()
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const getShippingRateDedupeKey = (rate: typeof shippingRates.$inferSelect) =>
+  [
+    rate.plan_id,
+    rate.business_type,
+    rate.zone_id,
+    rate.type,
+    rate.courier_id,
+    normalizeB2CServiceProvider(rate.service_provider),
+    normalizeB2CShippingMode(rate.mode),
+  ].join('|')
+
+const pickLatestShippingRateRows = (rows: ShippingRateJoinRow[]) => {
+  const latestRows = new Map<string, ShippingRateJoinRow>()
+
+  for (const row of rows) {
+    const key = getShippingRateDedupeKey(row.rate)
+    const current = latestRows.get(key)
+    if (!current) {
+      latestRows.set(key, row)
+      continue
+    }
+
+    const rowTime = Math.max(toTimestamp(row.rate.last_updated), toTimestamp(row.rate.created_at))
+    const currentTime = Math.max(
+      toTimestamp(current.rate.last_updated),
+      toTimestamp(current.rate.created_at),
+    )
+    if (rowTime >= currentTime) {
+      latestRows.set(key, row)
+    }
+  }
+
+  return Array.from(latestRows.values())
+}
+
 // =========================
 // 📦 Get Paginated Couriers
 // =========================
@@ -170,10 +217,11 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
     .from(shippingRates)
     .leftJoin(zones, eq(zones.id, shippingRates.zone_id))
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(asc(shippingRates.last_updated))
-  const filteredResults = normalizedModeFilter
+    .orderBy(desc(shippingRates.last_updated), desc(shippingRates.created_at))
+  const modeFilteredResults = normalizedModeFilter
     ? rawResults.filter((row) => normalizeB2CShippingMode(row.rate.mode) === normalizedModeFilter)
     : rawResults
+  const filteredResults = pickLatestShippingRateRows(modeFilteredResults)
 
   const filteredRateIds = filteredResults.map((row) => row.rate.id)
   const [slabs, codSlabs] = await Promise.all([
@@ -209,8 +257,19 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
 
   const grouped: Record<string, any> = {}
 
-  // Fetch all zones (for B2C)
-  const allZones = await db.select().from(zones)
+  // Fetch only zones for the requested business type so B2C rate cards do not show B2B zones.
+  const allZones =
+    filters.business_type === 'b2c'
+      ? await db
+          .select()
+          .from(zones)
+          .where(sql`lower(trim(${zones.business_type})) = 'b2c'`)
+      : filters.business_type === 'b2b'
+        ? await db
+            .select()
+            .from(zones)
+            .where(sql`lower(trim(${zones.business_type})) = 'b2b'`)
+        : await db.select().from(zones)
 
   for (const row of filteredResults) {
     const businessType = row.rate.business_type
@@ -399,7 +458,12 @@ export const updateShippingRate = async (
     const zoneRows = await db
       .select({ id: zones.id, name: zones.name })
       .from(zones)
-      .where(inArray(zones.name, zoneNames))
+      .where(
+        and(
+          inArray(zones.name, zoneNames),
+          sql`lower(trim(${zones.business_type})) = ${normalizedBusinessType}`,
+        ),
+      )
 
     for (const zn of zoneRows) {
       const zoneRate = rates[zn.name] || {}

@@ -27,6 +27,13 @@ export type DocumentEntry = {
   fileName: string
 }
 
+export {
+  BULK_MANIFEST_LIMIT,
+  getB2CManifestIdentifier,
+  getB2CManifestProvider,
+  isB2CManifestEligible,
+} from './b2c/orderActionRules'
+
 type ApiLikeError = {
   code?: string
   request?: unknown
@@ -39,41 +46,7 @@ type ApiLikeError = {
   message?: string
 }
 
-export const BULK_MANIFEST_LIMIT = 5
-
-const B2C_MANIFESTABLE_STATUSES = new Set([
-  'pending',
-  'booked',
-  'shipment_created',
-  'manifest_failed',
-  'pickup_initiated',
-  'manifest_generated',
-])
-
 export const isHttpUrl = (value?: string | null) => typeof value === 'string' && /^https?:\/\//i.test(value)
-
-export const getB2CManifestIdentifier = (order: BulkOrderDocumentShape) =>
-  order.order_number || order.awb_number || null
-
-export const getB2CManifestProvider = (order: BulkOrderDocumentShape) => {
-  const integrationType = String(order.integration_type || '').trim().toLowerCase()
-  const courierPartner = String(order.courier_partner || '').trim().toLowerCase()
-
-  if (integrationType.includes('xpressbees') || courierPartner.includes('xpressbees')) {
-    return 'xpressbees'
-  }
-
-  if (integrationType.includes('ekart') || courierPartner.includes('ekart')) {
-    return 'ekart'
-  }
-
-  return 'delhivery'
-}
-
-export const isB2CManifestEligible = (order: BulkOrderDocumentShape) => {
-  const status = String(order.order_status || '').toLowerCase()
-  return Boolean(getB2CManifestIdentifier(order)) && B2C_MANIFESTABLE_STATUSES.has(status)
-}
 
 const sanitizeFileNameSegment = (value: string) =>
   value
