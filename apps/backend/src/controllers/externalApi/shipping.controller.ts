@@ -1,6 +1,6 @@
 import { Response } from 'express'
 import { fetchAvailableCouriersWithRates } from '../../models/services/shiprocket.service'
-import { extractOrderAmountFromBody } from '../../utils/orderAmount'
+import { extractCodChargeBasisFromBody, extractOrderAmountFromBody } from '../../utils/orderAmount'
 
 /**
  * Get shipping rates for a shipment
@@ -53,6 +53,14 @@ export const getShippingRatesController = async (req: any, res: Response) => {
         message: 'order_amount must be numeric and non-negative',
       })
     }
+    const codChargeBasisResult = extractCodChargeBasisFromBody(req.body, orderAmountResult.value)
+    if (codChargeBasisResult.invalid) {
+      return res.status(400).json({
+        success: false,
+        error: 'cod_charge_basis must be a non-negative number',
+        message: 'cod_charge_basis must be numeric and non-negative',
+      })
+    }
 
     // Build serviceability options (no preferred carriers - return all)
     const serviceabilityOptions: any = {}
@@ -66,6 +74,7 @@ export const getShippingRatesController = async (req: any, res: Response) => {
         destination: Number(destination),
         payment_type: payment_type as 'cod' | 'prepaid' | 'reverse',
         order_amount: orderAmountResult.value,
+        cod_charge_basis: codChargeBasisResult.value,
         shipment_type:
           shipment_type && ['b2b', 'b2c'].includes(shipment_type)
             ? (shipment_type as 'b2b' | 'b2c')

@@ -197,6 +197,7 @@ export default function B2COrderFormSteps({ onClose }: { onClose?: () => void })
         order_number: normalizedOrderId,
         payment_type: data.orderType,
         order_amount: subtotal,
+        cod_charge_basis: Math.max(totalCollectable, 0),
         order_date: data?.orderDate,
         package_weight: data.weight,
         package_length: data.length,

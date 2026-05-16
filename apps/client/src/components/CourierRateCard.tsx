@@ -21,6 +21,8 @@ type ForwardRate = {
   rate?: number | null
   cod_charges?: number | null
   cod_percent?: number | null
+  cod_charge_basis?: number | null
+  cod_charge_source?: string | null
   is_prepaid?: boolean
   is_cod?: boolean
 }

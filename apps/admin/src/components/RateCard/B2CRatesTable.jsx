@@ -15,6 +15,19 @@ export const B2CTable = ({ data, zones, onEdit, planId, loading }) => {
     return `${slabs.length} slabs (${first.weight_from}-${last.weight_to ?? 'open'} kg)`
   }
 
+  const renderCodSlabSummary = (slabs = []) => {
+    if (!slabs.length) return 'Legacy fallback'
+    return slabs
+      .map((slab) => {
+        const value =
+          slab.charge_type === 'percent'
+            ? `${slab.charge_value}%`
+            : `Rs ${slab.charge_value}`
+        return `${slab.amount_from}-${slab.amount_to ?? 'open'}: ${value}`
+      })
+      .join(', ')
+  }
+
   const columns = useMemo(() => {
     const zoneColumns =
       zones?.map((zone) => ({
@@ -55,9 +68,9 @@ export const B2CTable = ({ data, zones, onEdit, planId, loading }) => {
     const postColumns = [
       {
         key: 'cod',
-        label: 'COD (Charges | %)',
-        width: '200px',
-        renderer: (_, row) => `₹${row.cod_charges ?? '0'} | ${row.cod_percent ?? '0'}%`,
+        label: 'COD Slabs',
+        width: '260px',
+        renderer: (_, row) => renderCodSlabSummary(row.cod_slabs || []),
       },
       {
         key: 'other',

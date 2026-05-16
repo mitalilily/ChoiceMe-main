@@ -35,3 +35,16 @@ export const shippingRateSlabs = pgTable('shipping_rate_slabs', {
   created_at: timestamp('created_at').defaultNow(),
   updated_at: timestamp('updated_at').defaultNow(),
 })
+
+export const shippingRateCodSlabs = pgTable('shipping_rate_cod_slabs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  shipping_rate_id: uuid('shipping_rate_id')
+    .references(() => shippingRates.id, { onDelete: 'cascade' })
+    .notNull(),
+  amount_from: decimal('amount_from', { precision: 12, scale: 2 }).notNull(),
+  amount_to: decimal('amount_to', { precision: 12, scale: 2 }),
+  charge_type: varchar('charge_type', { length: 20 }).notNull(), // flat / percent
+  charge_value: decimal('charge_value', { precision: 10, scale: 2 }).notNull(),
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+})

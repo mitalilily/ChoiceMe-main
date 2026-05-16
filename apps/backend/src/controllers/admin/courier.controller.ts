@@ -26,6 +26,7 @@ import {
   INTEGRATED_SERVICE_PROVIDERS,
   normalizeServiceProviderKey,
 } from '../../utils/courierProviders'
+import { extractCodChargeBasisFromBody, extractOrderAmountFromBody } from '../../utils/orderAmount'
 
 export interface ShippingRateFilters {
   courier_name?: string[]
@@ -43,6 +44,8 @@ export const fetchAvailableCouriersForAdmin = async (req: Request, res: Response
       destination,
       payment_type,
       order_amount,
+      cod_charge_basis,
+      codChargeBasis,
       weight,
       length,
       breadth,
@@ -59,12 +62,24 @@ export const fetchAvailableCouriersForAdmin = async (req: Request, res: Response
       })
     }
 
+    const orderAmountResult = extractOrderAmountFromBody(req.body)
+    const codChargeBasisResult = extractCodChargeBasisFromBody(req.body, orderAmountResult.value)
+    if (orderAmountResult.invalid || codChargeBasisResult.invalid) {
+      return res.status(400).json({
+        success: false,
+        error: orderAmountResult.invalid
+          ? 'order_amount must be a non-negative number'
+          : 'cod_charge_basis must be a non-negative number',
+      })
+    }
+
     const couriers = await fetchAvailableCouriersWithRatesAdmin(
       {
         origin: Number(origin),
         destination: Number(destination),
         payment_type: payment_type,
-        order_amount: order_amount,
+        order_amount: orderAmountResult.value ?? order_amount,
+        cod_charge_basis: codChargeBasisResult.value ?? cod_charge_basis ?? codChargeBasis,
         shipment_type: shipment_type,
         weight: Number(weight),
         length: Number(length),
@@ -1144,8 +1159,12 @@ const parseSlabJsonCell = (value?: string) => {
   }
 }
 
+const parseCodSlabJsonCell = (value?: string) => parseSlabJsonCell(value)
+
 const isSlabValidationError = (err: unknown) =>
-  /slab|overlap|extra_rate|extra_weight_unit/i.test(String((err as any)?.message || err || ''))
+  /slab|overlap|extra_rate|extra_weight_unit|charge_type|charge_value/i.test(
+    String((err as any)?.message || err || ''),
+  )
 
 const isRateUpdateValidationError = (err: unknown) =>
   isSlabValidationError(err) ||
@@ -1272,6 +1291,8 @@ export const importShippingRatesController = async (req: any, res: Response) => 
 
       const codCharges = row['COD Charges'] ? Number(row['COD Charges']) : null
       const codPercent = row['COD Percent'] ? Number(row['COD Percent']) : null
+      const codSlabs =
+        normalizedBusinessType === 'b2c' ? parseCodSlabJsonCell(row['COD Slabs']) : undefined
       const otherCharges = row['Other Charges'] ? Number(row['Other Charges']) : null
 
       // ✅ skip rows without mode, courier info, or any charges/rates
@@ -1281,7 +1302,8 @@ export const importShippingRatesController = async (req: any, res: Response) => 
         codPercent !== null ||
         otherCharges !== null ||
         rates.length > 0 ||
-        Object.keys(zoneSlabs).length > 0
+        Object.keys(zoneSlabs).length > 0 ||
+        Boolean(codSlabs?.length)
 
       if (!hasData) continue
 
@@ -1298,6 +1320,7 @@ export const importShippingRatesController = async (req: any, res: Response) => 
         other_charges: otherCharges,
         rates,
         zone_slabs: normalizedBusinessType === 'b2c' ? zoneSlabs : undefined,
+        cod_slabs: codSlabs,
       })
     }
 

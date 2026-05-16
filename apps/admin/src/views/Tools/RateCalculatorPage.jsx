@@ -279,9 +279,7 @@ export default function RateCalculatorPage() {
           ? Number(courier.rate)
           : Number(forward.rate ?? 0)
       const codCharge = Number(forward.cod_charges ?? 0)
-      const codPercent = Number(forward.cod_percent ?? 0)
-      const total =
-        formData.paymentType === 'cod' ? slabbedRate + codCharge + codPercent : slabbedRate
+      const total = formData.paymentType === 'cod' ? slabbedRate + codCharge : slabbedRate
       return {
         ...courier,
         displayName: getCourierDisplayName(courier),
@@ -377,6 +375,7 @@ export default function RateCalculatorPage() {
         paymentType: formData.paymentType,
         pickupId: formData.pickupLocationId || undefined,
         orderAmount: Number(formData.orderAmount || 0),
+        codChargeBasis: Number(formData.orderAmount || 0),
         context: 'rate_calculator',
         planId: formData.planId || undefined,
       }
@@ -497,8 +496,7 @@ export default function RateCalculatorPage() {
             const baseRate =
               c?.rate !== undefined && c?.rate !== null ? Number(c.rate) : Number(forward?.rate ?? 0)
             const codCharge = Number(forward?.cod_charges ?? 0)
-            const codPercent = Number(forward?.cod_percent ?? 0)
-            const codTotal = formData.paymentType === 'cod' ? codCharge + codPercent : 0
+            const codTotal = formData.paymentType === 'cod' ? codCharge : 0
             return {
               sno: idx + 1,
               name: getCourierDisplayName(c),

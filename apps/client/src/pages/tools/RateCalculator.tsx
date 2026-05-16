@@ -148,6 +148,7 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
         breadth,
         height,
         orderAmount: orderAmountValue > 0 ? orderAmountValue : undefined,
+        codChargeBasis: Math.max(orderAmountValue, 0),
         shipmentType,
         payment_type: formData.paymentType,
         context: 'rate_calculator',

@@ -37,6 +37,12 @@ interface ShippingRate {
   min_weight: number
   cod_charges?: number | string
   cod_percent?: number | string
+  cod_slabs?: Array<{
+    amount_from: number | string
+    amount_to?: number | string | null
+    charge_type: 'flat' | 'percent' | string
+    charge_value: number | string
+  }>
   other_charges?: number | string
   rates: {
     [zone: string]: {
@@ -53,6 +59,19 @@ interface ShippingRate {
 // --- B2C Table ---
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const B2CClientTable = ({ data, zones }: { data: ShippingRate[]; zones: any[] }) => {
+  const renderCodSlabSummary = (slabs: ShippingRate['cod_slabs'] = []) => {
+    if (!slabs?.length) return 'Legacy fallback'
+    return slabs
+      .map((slab) => {
+        const value =
+          slab.charge_type === 'percent'
+            ? `${slab.charge_value}%`
+            : `Rs ${slab.charge_value}`
+        return `${slab.amount_from}-${slab.amount_to ?? 'open'}: ${value}`
+      })
+      .join(', ')
+  }
+
   const columns: Column<ShippingRate>[] = [
     {
       id: 'courier_name',
@@ -105,8 +124,8 @@ const B2CClientTable = ({ data, zones }: { data: ShippingRate[]; zones: any[] })
 
     {
       id: 'cod',
-      label: 'COD (Charges | %)',
-      render: (_, row) => `₹${row.cod_charges ?? '0'} | ${row.cod_percent ?? '0'}%`,
+      label: 'COD Slabs',
+      render: (_, row) => renderCodSlabSummary(row.cod_slabs),
     },
     {
       id: 'other',
@@ -236,6 +255,9 @@ const RateCard = () => {
 
       base['COD Charges'] = r.cod_charges ?? 'N/A'
       base['COD %'] = r.cod_percent ?? 'N/A'
+      if (businessType === 'b2c') {
+        base['COD Slabs'] = r.cod_slabs?.length ? JSON.stringify(r.cod_slabs) : ''
+      }
       base['Other Charges'] = r.other_charges ?? 'N/A'
 
       return base

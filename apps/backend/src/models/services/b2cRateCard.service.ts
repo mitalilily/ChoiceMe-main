@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '../client'
-import { shippingRates, shippingRateSlabs } from '../schema/shippingRates'
+import { shippingRates, shippingRateCodSlabs, shippingRateSlabs } from '../schema/shippingRates'
 import { calculateFreight } from './pricing/chargeableFreight'
 import { normalizeServiceProviderKey } from '../../utils/courierProviders'
 
@@ -12,6 +12,17 @@ export interface RateCardSlabInput {
   extra_weight_unit?: number | null
 }
 
+export interface CodSlabInput {
+  amount_from?: number | string
+  amount_to?: number | string | null
+  charge_type?: 'flat' | 'percent' | string
+  charge_value?: number | string
+  from?: number | string
+  to?: number | string | null
+  type?: 'flat' | 'percent' | string
+  value?: number | string
+}
+
 export interface ResolvedRateCardSlab {
   id?: string
   weight_from: number
@@ -19,6 +30,14 @@ export interface ResolvedRateCardSlab {
   rate: number
   extra_rate: number | null
   extra_weight_unit: number | null
+}
+
+export interface ResolvedCodSlab {
+  id?: string
+  amount_from: number
+  amount_to: number | null
+  charge_type: 'flat' | 'percent'
+  charge_value: number
 }
 
 export interface ResolvedB2CRateCard {
@@ -34,6 +53,14 @@ export interface ResolvedB2CRateCard {
   min_weight: number
   base_rate: number
   slabs: ResolvedRateCardSlab[]
+  cod_slabs: ResolvedCodSlab[]
+}
+
+export interface ComputedCodCharge {
+  cod_charges: number
+  cod_charge_basis: number
+  cod_charge_source: 'slab' | 'legacy' | 'prepaid'
+  selected_cod_slab: ResolvedCodSlab | null
 }
 
 export interface ComputedB2CRateCardCharge {
@@ -127,6 +154,74 @@ export function validateRateCardSlabs(slabs: ResolvedRateCardSlab[]) {
   }
 }
 
+export const DEFAULT_B2C_COD_SLABS: ResolvedCodSlab[] = [
+  { amount_from: 0, amount_to: 2000, charge_type: 'flat', charge_value: 40 },
+  { amount_from: 2000, amount_to: null, charge_type: 'percent', charge_value: 2 },
+]
+
+function normalizeCodChargeType(value: unknown): 'flat' | 'percent' {
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized === 'percent' || normalized === 'percentage' ? 'percent' : 'flat'
+}
+
+function normaliseCodSlabInput(slab: CodSlabInput): ResolvedCodSlab {
+  const rawAmountFrom = slab.amount_from ?? slab.from ?? 0
+  const rawAmountTo = slab.amount_to ?? slab.to ?? null
+  const amountFrom = Math.max(0, toNumber(rawAmountFrom))
+  const amountTo =
+    rawAmountTo === undefined || rawAmountTo === null || rawAmountTo === ''
+      ? null
+      : Math.max(amountFrom, toNumber(rawAmountTo))
+  const chargeValue = Math.max(0, toNumber(slab.charge_value ?? slab.value))
+
+  return {
+    amount_from: amountFrom,
+    amount_to: amountTo,
+    charge_type: normalizeCodChargeType(slab.charge_type ?? slab.type),
+    charge_value: chargeValue,
+  }
+}
+
+export function normaliseCodSlabs(slabs: CodSlabInput[] = []): ResolvedCodSlab[] {
+  return slabs
+    .filter((slab) =>
+      [slab.amount_from ?? slab.from, slab.amount_to ?? slab.to, slab.charge_value ?? slab.value].some(
+        (value) => value !== undefined && value !== null && value !== '',
+      ),
+    )
+    .map(normaliseCodSlabInput)
+    .filter((slab) => slab.charge_value > 0)
+    .sort((a, b) => a.amount_from - b.amount_from || (a.amount_to ?? Infinity) - (b.amount_to ?? Infinity))
+}
+
+export function validateCodSlabs(slabs: ResolvedCodSlab[]) {
+  for (let index = 0; index < slabs.length; index += 1) {
+    const slab = slabs[index]
+    if (slab.amount_to !== null && slab.amount_to < slab.amount_from) {
+      throw new Error(`Invalid COD slab range at row ${index + 1}: amount_to cannot be less than amount_from`)
+    }
+    if (slab.charge_type !== 'flat' && slab.charge_type !== 'percent') {
+      throw new Error(`Invalid COD slab at row ${index + 1}: charge_type must be flat or percent`)
+    }
+    if (!Number.isFinite(slab.charge_value) || slab.charge_value < 0) {
+      throw new Error(`Invalid COD slab at row ${index + 1}: charge_value must be zero or greater`)
+    }
+  }
+
+  for (let index = 1; index < slabs.length; index += 1) {
+    const previous = slabs[index - 1]
+    const current = slabs[index]
+    if (previous.amount_to === null) {
+      throw new Error(`Invalid COD slab configuration: open-ended slab at row ${index} must be the last slab`)
+    }
+    if (current.amount_from < previous.amount_to) {
+      throw new Error(
+        `Overlapping COD slab ranges are not allowed: ${previous.amount_from}-${previous.amount_to} overlaps ${current.amount_from}-${current.amount_to ?? 'open'}`,
+      )
+    }
+  }
+}
+
 export async function fetchShippingRateSlabs(rateIds: string[]) {
   if (!rateIds.length) return []
 
@@ -138,6 +233,20 @@ export async function fetchShippingRateSlabs(rateIds: string[]) {
       asc(shippingRateSlabs.shipping_rate_id),
       asc(shippingRateSlabs.weight_from),
       asc(shippingRateSlabs.weight_to),
+    )
+}
+
+export async function fetchShippingRateCodSlabs(rateIds: string[]) {
+  if (!rateIds.length) return []
+
+  return db
+    .select()
+    .from(shippingRateCodSlabs)
+    .where(inArray(shippingRateCodSlabs.shipping_rate_id, rateIds))
+    .orderBy(
+      asc(shippingRateCodSlabs.shipping_rate_id),
+      asc(shippingRateCodSlabs.amount_from),
+      asc(shippingRateCodSlabs.amount_to),
     )
 }
 
@@ -184,8 +293,13 @@ export async function fetchResolvedB2CRateCards(filters: {
         return providerFilteredRows.filter((row) => !normalizeB2CShippingMode(row.mode))
       })()
     : providerFilteredRows
-  const slabs = await fetchShippingRateSlabs(rateRows.map((row) => row.id))
+  const rateIds = rateRows.map((row) => row.id)
+  const [slabs, codSlabs] = await Promise.all([
+    fetchShippingRateSlabs(rateIds),
+    fetchShippingRateCodSlabs(rateIds),
+  ])
   const slabMap = new Map<string, ResolvedRateCardSlab[]>()
+  const codSlabMap = new Map<string, ResolvedCodSlab[]>()
 
   for (const slab of slabs) {
     const list = slabMap.get(slab.shipping_rate_id) || []
@@ -199,6 +313,18 @@ export async function fetchResolvedB2CRateCards(filters: {
         slab.extra_weight_unit === null ? null : toNumber(slab.extra_weight_unit),
     })
     slabMap.set(slab.shipping_rate_id, list)
+  }
+
+  for (const slab of codSlabs) {
+    const list = codSlabMap.get(slab.shipping_rate_id) || []
+    list.push({
+      id: slab.id,
+      amount_from: toNumber(slab.amount_from),
+      amount_to: slab.amount_to === null ? null : toNumber(slab.amount_to),
+      charge_type: normalizeCodChargeType(slab.charge_type),
+      charge_value: toNumber(slab.charge_value),
+    })
+    codSlabMap.set(slab.shipping_rate_id, list)
   }
 
   return rateRows.map(
@@ -215,6 +341,7 @@ export async function fetchResolvedB2CRateCards(filters: {
       min_weight: toNumber(row.min_weight),
       base_rate: toNumber(row.rate),
       slabs: slabMap.get(row.id) || [],
+      cod_slabs: codSlabMap.get(row.id) || [],
     }),
   )
 }
@@ -423,6 +550,65 @@ export function computeB2CRateCardCharge(params: {
   }
 }
 
+function codSlabContainsAmount(amount: number, slab: ResolvedCodSlab, slabIndex: number) {
+  const start = slab.amount_from
+  const end = slab.amount_to ?? Infinity
+  const lowerBoundMatches = slabIndex === 0 ? amount >= start : amount > start
+  return lowerBoundMatches && amount <= end
+}
+
+function calculateCodValueFromSlab(amount: number, slab: ResolvedCodSlab) {
+  if (slab.charge_type === 'percent') {
+    return (amount * slab.charge_value) / 100
+  }
+  return slab.charge_value
+}
+
+function roundMoney(value: number) {
+  return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100
+}
+
+export function computeB2CCodCharge(params: {
+  payment_type?: string | null
+  cod_charge_basis?: number | string | null
+  rateCard?: Pick<ResolvedB2CRateCard, 'cod_charges' | 'cod_percent' | 'cod_slabs'> | null
+}): ComputedCodCharge {
+  const isCod = String(params.payment_type || '').trim().toLowerCase() === 'cod'
+  const codChargeBasis = Math.max(0, toNumber(params.cod_charge_basis))
+
+  if (!isCod) {
+    return {
+      cod_charges: 0,
+      cod_charge_basis: codChargeBasis,
+      cod_charge_source: 'prepaid',
+      selected_cod_slab: null,
+    }
+  }
+
+  const codSlabs = params.rateCard?.cod_slabs || []
+  const selectedSlab =
+    codSlabs.find((slab, index) => codSlabContainsAmount(codChargeBasis, slab, index)) || null
+
+  if (selectedSlab) {
+    return {
+      cod_charges: roundMoney(calculateCodValueFromSlab(codChargeBasis, selectedSlab)),
+      cod_charge_basis: codChargeBasis,
+      cod_charge_source: 'slab',
+      selected_cod_slab: selectedSlab,
+    }
+  }
+
+  const legacyFlatCharge = Math.max(0, toNumber(params.rateCard?.cod_charges))
+  const legacyPercentCharge = (codChargeBasis * Math.max(0, toNumber(params.rateCard?.cod_percent))) / 100
+
+  return {
+    cod_charges: roundMoney(Math.max(legacyFlatCharge, legacyPercentCharge)),
+    cod_charge_basis: codChargeBasis,
+    cod_charge_source: 'legacy',
+    selected_cod_slab: null,
+  }
+}
+
 export async function replaceShippingRateSlabs(shippingRateId: string, slabs: RateCardSlabInput[]) {
   const normalised = normaliseRateCardSlabs(slabs)
   validateRateCardSlabs(normalised)
@@ -439,6 +625,25 @@ export async function replaceShippingRateSlabs(shippingRateId: string, slabs: Ra
       extra_rate: slab.extra_rate === null ? null : slab.extra_rate.toFixed(2),
       extra_weight_unit:
         slab.extra_weight_unit === null ? null : slab.extra_weight_unit.toFixed(3),
+      updated_at: new Date(),
+    })),
+  )
+}
+
+export async function replaceShippingRateCodSlabs(shippingRateId: string, slabs: CodSlabInput[]) {
+  const normalised = normaliseCodSlabs(slabs)
+  validateCodSlabs(normalised)
+
+  await db.delete(shippingRateCodSlabs).where(eq(shippingRateCodSlabs.shipping_rate_id, shippingRateId))
+  if (!normalised.length) return
+
+  await db.insert(shippingRateCodSlabs).values(
+    normalised.map((slab) => ({
+      shipping_rate_id: shippingRateId,
+      amount_from: slab.amount_from.toFixed(2),
+      amount_to: slab.amount_to === null ? null : slab.amount_to.toFixed(2),
+      charge_type: slab.charge_type,
+      charge_value: slab.charge_value.toFixed(2),
       updated_at: new Date(),
     })),
   )

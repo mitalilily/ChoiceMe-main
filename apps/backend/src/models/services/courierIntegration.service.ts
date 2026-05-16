@@ -13,12 +13,17 @@ import {
   supportedServiceProviderList,
 } from '../../utils/courierProviders'
 import {
+  fetchShippingRateCodSlabs,
   fetchShippingRateSlabs,
   normalizeB2CShippingMode,
   normalizeB2CServiceProvider,
+  normaliseCodSlabs,
   normaliseRateCardSlabs,
+  replaceShippingRateCodSlabs,
   replaceShippingRateSlabs,
+  validateCodSlabs,
   validateRateCardSlabs,
+  type CodSlabInput,
   type RateCardSlabInput,
 } from './b2cRateCard.service'
 
@@ -170,8 +175,13 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
     ? rawResults.filter((row) => normalizeB2CShippingMode(row.rate.mode) === normalizedModeFilter)
     : rawResults
 
-  const slabs = await fetchShippingRateSlabs(filteredResults.map((row) => row.rate.id))
+  const filteredRateIds = filteredResults.map((row) => row.rate.id)
+  const [slabs, codSlabs] = await Promise.all([
+    fetchShippingRateSlabs(filteredRateIds),
+    fetchShippingRateCodSlabs(filteredRateIds),
+  ])
   const slabMap = new Map<string, any[]>()
+  const codSlabMap = new Map<string, any[]>()
   for (const slab of slabs) {
     const list = slabMap.get(slab.shipping_rate_id) || []
     list.push({
@@ -184,6 +194,17 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
         slab.extra_weight_unit === null ? null : Number(slab.extra_weight_unit),
     })
     slabMap.set(slab.shipping_rate_id, list)
+  }
+  for (const slab of codSlabs) {
+    const list = codSlabMap.get(slab.shipping_rate_id) || []
+    list.push({
+      id: slab.id,
+      amount_from: Number(slab.amount_from),
+      amount_to: slab.amount_to === null ? null : Number(slab.amount_to),
+      charge_type: slab.charge_type,
+      charge_value: Number(slab.charge_value),
+    })
+    codSlabMap.set(slab.shipping_rate_id, list)
   }
 
   const grouped: Record<string, any> = {}
@@ -221,6 +242,7 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
         service_provider: serviceProvider, // Always include service_provider
         rates,
         zone_slabs: {},
+        cod_slabs: businessType === 'b2c' ? codSlabMap.get(row.rate.id) || [] : [],
       }
 
       // Debug log for first item
@@ -239,6 +261,9 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
       if (businessType === 'b2c') {
         grouped[key].zone_slabs[row.zone.name] = grouped[key].zone_slabs[row.zone.name] || {}
         grouped[key].zone_slabs[row.zone.name][row.rate.type] = slabMap.get(row.rate.id) || []
+        if (!grouped[key].cod_slabs?.length && codSlabMap.get(row.rate.id)?.length) {
+          grouped[key].cod_slabs = codSlabMap.get(row.rate.id)
+        }
       }
     }
   }
@@ -289,6 +314,7 @@ export interface ShippingRateUpdatePayload {
   businessType?: 'b2b' | 'b2c'
   rates?: any
   zone_slabs?: Record<string, { forward?: RateCardSlabInput[]; rto?: RateCardSlabInput[] }>
+  cod_slabs?: CodSlabInput[]
 }
 
 const toMoney = (v: any): string => {
@@ -326,6 +352,7 @@ export const updateShippingRate = async (
     businessType,
     rates,
     zone_slabs,
+    cod_slabs,
     previous_mode,
   } = updates
 
@@ -362,6 +389,11 @@ export const updateShippingRate = async (
       ...Object.keys(zone_slabs || {}),
     ]),
   )
+  const shouldReplaceCodSlabs = normalizedBusinessType === 'b2c' && Array.isArray(cod_slabs)
+  const explicitCodSlabs = shouldReplaceCodSlabs ? normaliseCodSlabs(cod_slabs || []) : []
+  if (shouldReplaceCodSlabs) {
+    validateCodSlabs(explicitCodSlabs)
+  }
 
   if (zoneNames.length > 0) {
     const zoneRows = await db
@@ -427,6 +459,9 @@ export const updateShippingRate = async (
           await db.update(shippingRates).set(updateData).where(eq(shippingRates.id, existing.id))
           if (normalizedBusinessType === 'b2c') {
             await replaceShippingRateSlabs(existing.id, explicitSlabs)
+            if (shouldReplaceCodSlabs) {
+              await replaceShippingRateCodSlabs(existing.id, explicitCodSlabs)
+            }
           }
           console.log(`[updateShippingRate] ✅ Updated rate ${existing.id} successfully`)
         } else {
@@ -456,6 +491,9 @@ export const updateShippingRate = async (
           await db.insert(shippingRates).values(insertData)
           if (normalizedBusinessType === 'b2c') {
             await replaceShippingRateSlabs(insertData.id, explicitSlabs)
+            if (shouldReplaceCodSlabs) {
+              await replaceShippingRateCodSlabs(insertData.id, explicitCodSlabs)
+            }
           }
           console.log(`[updateShippingRate] ✅ Inserted new rate successfully`)
         }
@@ -478,6 +516,7 @@ interface RateInput {
   other_charges?: number | null
   rates: { zone_id: string; type: 'forward' | 'rto'; rate: number }[]
   zone_slabs?: Record<string, { forward?: RateCardSlabInput[]; rto?: RateCardSlabInput[] }>
+  cod_slabs?: CodSlabInput[]
 }
 
 export const upsertShippingRate = async (input: RateInput) => {
@@ -542,6 +581,12 @@ export const upsertShippingRate = async (input: RateInput) => {
     finalServiceProvider = providedServiceProvider
   }
 
+  const shouldReplaceCodSlabs = input.business_type === 'b2c' && Array.isArray(input.cod_slabs)
+  const explicitCodSlabs = shouldReplaceCodSlabs ? normaliseCodSlabs(input.cod_slabs || []) : []
+  if (shouldReplaceCodSlabs) {
+    validateCodSlabs(explicitCodSlabs)
+  }
+
   for (const r of input.rates) {
     const explicitSlabs = normaliseRateCardSlabs(input.zone_slabs?.[r.zone_id]?.[r.type] || [])
     validateRateCardSlabs(explicitSlabs)
@@ -587,13 +632,17 @@ export const upsertShippingRate = async (input: RateInput) => {
       await db.update(shippingRates).set(updateData).where(eq(shippingRates.id, existing[0].id))
       if (input.business_type === 'b2c') {
         await replaceShippingRateSlabs(existing[0].id, explicitSlabs)
+        if (shouldReplaceCodSlabs) {
+          await replaceShippingRateCodSlabs(existing[0].id, explicitCodSlabs)
+        }
       }
     } else {
       console.log(
         `[upsertShippingRate] Inserting new rate with service_provider: ${finalServiceProvider}`,
       )
+      const insertedRateId = randomUUID()
       await db.insert(shippingRates).values({
-        id: randomUUID(),
+        id: insertedRateId,
         courier_id: input.courier_id,
         mode: normalizedMode,
         courier_name: input.courier_name,
@@ -611,26 +660,9 @@ export const upsertShippingRate = async (input: RateInput) => {
         last_updated: new Date(),
       } as any)
       if (input.business_type === 'b2c') {
-        const [inserted] = await db
-          .select({ id: shippingRates.id })
-          .from(shippingRates)
-          .where(
-            and(
-              eq(shippingRates.courier_id, Number(input.courier_id)),
-              eq(shippingRates.plan_id, input.plan_id),
-              eq(shippingRates.business_type, input.business_type),
-              eq(shippingRates.zone_id, r.zone_id),
-              eq(shippingRates.type, r.type),
-              eq(sql`LOWER(${shippingRates.mode})`, normalizedMode),
-              finalServiceProvider
-                ? eq(sql`LOWER(${shippingRates.service_provider})`, finalServiceProvider)
-                : sql`1=1`,
-            ),
-          )
-          .orderBy(desc(shippingRates.created_at))
-          .limit(1)
-        if (inserted) {
-          await replaceShippingRateSlabs(inserted.id, explicitSlabs)
+        await replaceShippingRateSlabs(insertedRateId, explicitSlabs)
+        if (shouldReplaceCodSlabs) {
+          await replaceShippingRateCodSlabs(insertedRateId, explicitCodSlabs)
         }
       }
     }

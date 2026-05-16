@@ -74,6 +74,7 @@ import { XpressbeesService } from './couriers/xpressbees.service'
 import { calculateOrderWeights } from './courierWeightCalculation.service'
 import { generateLabelForOrder } from './generateCustomLabelService'
 import {
+  computeB2CCodCharge,
   computeB2CRateCardCharge,
   fetchResolvedB2CRateCards,
   findMatchingSlabIndex,
@@ -608,6 +609,8 @@ interface NimbusServiceabilityParams {
   payment_type?: 'cod' | 'prepaid' | 'reverse'
   order_amount?: number
   orderAmount?: number
+  cod_charge_basis?: number
+  codChargeBasis?: number
   weight?: number
   length?: number
   shipment_type?: 'b2b' | 'b2c'
@@ -859,6 +862,8 @@ export const computeB2CFreightForOrder = async (params: {
   serviceProvider?: string | null
   mode?: string | null
   selectedMaxSlabWeight?: number | null
+  paymentType?: string | null
+  codChargeBasis?: number | string | null
   zoneIdOverride?: string | null
   destinationPincode: string
   originPincode: string
@@ -938,9 +943,15 @@ export const computeB2CFreightForOrder = async (params: {
   if (rateCard.slabs.length && freightCalc.freight <= 0) {
     throw new HttpError(400, 'No slab configured for selected courier/zone/weight')
   }
+  const codCalc = computeB2CCodCharge({
+    payment_type: params.paymentType,
+    cod_charge_basis: params.codChargeBasis,
+    rateCard,
+  })
 
   return {
     ...freightCalc,
+    ...codCalc,
     slab_weight: freightCalc.slab_weight,
     base_price: freightCalc.base_price,
     zone_id: resolvedZoneRow.id,
@@ -1959,6 +1970,9 @@ export const fetchAvailableCouriersWithRates = async (
     // Match couriers with local rates by courier_id
     // Include ALL couriers (even if they don't have local rates) - they have service provider response data
     const isReverseShipment = params.isReverse === true || params.payment_type === 'reverse'
+    const codChargeBasis = Number(
+      params.cod_charge_basis ?? params.codChargeBasis ?? params.order_amount ?? params.orderAmount ?? 0,
+    )
 
     const buildServiceabilityRateOptions = (rateCard: any) => {
       const computed = computeB2CRateCardCharge({
@@ -1968,14 +1982,23 @@ export const fetchAvailableCouriersWithRates = async (
         height_cm: Number(params.height ?? 0),
         rateCard,
       })
+      const codCalc = computeB2CCodCharge({
+        payment_type: isReverseShipment ? 'prepaid' : params.payment_type,
+        cod_charge_basis: codChargeBasis,
+        rateCard,
+      })
 
       if (!rateCard?.slabs?.length) {
         return computed.freight > 0
           ? [
               {
                 rate: computed.freight,
-                cod_charges: rateCard.cod_charges,
+                cod_charges: codCalc.cod_charges,
                 cod_percent: rateCard.cod_percent,
+                cod_charge_basis: codCalc.cod_charge_basis,
+                cod_charge_source: codCalc.cod_charge_source,
+                cod_slabs: rateCard.cod_slabs,
+                selected_cod_slab: codCalc.selected_cod_slab,
                 other_charges: rateCard.other_charges,
                 mode: rateCard.mode,
                 min_weight: rateCard.min_weight,
@@ -1998,8 +2021,12 @@ export const fetchAvailableCouriersWithRates = async (
       if (matchedIndex >= 0) {
         return rateCard.slabs.slice(matchedIndex).map((slab: any) => ({
           rate: Number(slab.rate),
-          cod_charges: rateCard.cod_charges,
+          cod_charges: codCalc.cod_charges,
           cod_percent: rateCard.cod_percent,
+          cod_charge_basis: codCalc.cod_charge_basis,
+          cod_charge_source: codCalc.cod_charge_source,
+          cod_slabs: rateCard.cod_slabs,
+          selected_cod_slab: codCalc.selected_cod_slab,
           other_charges: rateCard.other_charges,
           mode: rateCard.mode,
           min_weight: rateCard.min_weight,
@@ -2027,8 +2054,12 @@ export const fetchAvailableCouriersWithRates = async (
         return [
           {
             rate: Number(lastFiniteSlab.rate) + extraUnits * Number(lastFiniteSlab.extra_rate),
-            cod_charges: rateCard.cod_charges,
+            cod_charges: codCalc.cod_charges,
             cod_percent: rateCard.cod_percent,
+            cod_charge_basis: codCalc.cod_charge_basis,
+            cod_charge_source: codCalc.cod_charge_source,
+            cod_slabs: rateCard.cod_slabs,
+            selected_cod_slab: codCalc.selected_cod_slab,
             other_charges: rateCard.other_charges,
             mode: rateCard.mode,
             min_weight: rateCard.min_weight,
@@ -2658,6 +2689,8 @@ export interface ShipmentParams {
   courier_option_key?: string
 
   cod_charges?: number
+  cod_charge_basis?: number
+  codChargeBasis?: number
   discount?: number
   order_amount?: number
   // Additional optional fields used across flows
@@ -2771,6 +2804,7 @@ export interface InsertB2COrderParams {
   shippingCharges?: number // What seller charges customer (total shipping including other_charges)
   otherCharges?: number // Other charges from courier serviceability API
   freightCharges?: number // What platform charges seller (based on rate card)
+  codCharges?: number
   courierCost?: number | null // What platform pays courier (actual courier cost)
   transactionFee?: number
   giftWrap?: number
@@ -2794,6 +2828,7 @@ export async function createB2COrder({
   shippingCharges = 0,
   otherCharges = 0,
   freightCharges = 0,
+  codCharges,
   courierCost,
   transactionFee = 0,
   status,
@@ -2838,7 +2873,7 @@ export async function createB2COrder({
   const pickupDetails = normalizeJsonValue(params.pickup) ?? {}
   const rtoDetails = normalizeJsonValue(params.rto)
   const isCodOrder = params.payment_type === 'cod'
-  const storedCodCharges = isCodOrder ? Number(params?.cod_charges ?? 0) : 0
+  const storedCodCharges = isCodOrder ? Number(codCharges ?? params?.cod_charges ?? 0) : 0
 
   try {
     const [newOrder] = await tx
@@ -3320,6 +3355,7 @@ export const createB2CShipmentService = async (
   params.payment_type = normalizedPaymentType as ShipmentParams['payment_type']
 
   const orderAmount = Number(params.order_amount ?? 0)
+  const codChargeBasis = Number(params.cod_charge_basis ?? params.codChargeBasis ?? params.order_amount ?? 0)
   if (!orderAmount || Number.isNaN(orderAmount)) {
     throw new HttpError(
       400,
@@ -3433,7 +3469,7 @@ export const createB2CShipmentService = async (
   const totalShippingCharges = shippingCharges + otherCharges
   let freightCharges = Number(params?.freight_charges ?? totalShippingCharges)
   const isCodOrder = params.payment_type === 'cod'
-  const codCharges = isCodOrder ? Number(params?.cod_charges ?? 0) : 0
+  let codCharges = 0
   const discount = Number(params?.discount ?? 0)
   const giftWrap = Number(params?.gift_wrap ?? 0)
   const transactionFee = Number(params?.transaction_fee ?? 0)
@@ -3445,6 +3481,9 @@ export const createB2CShipmentService = async (
 
   let slabbedFreight: {
     freight: number
+    cod_charges?: number
+    cod_charge_basis?: number
+    cod_charge_source?: string
     volumetric_weight: number | null
     chargeable_weight: number | null
     slabs: number | null
@@ -3471,10 +3510,15 @@ export const createB2CShipmentService = async (
         breadthCm: Number(params.package_breadth ?? params.breadth ?? 0),
         heightCm: Number(params.package_height ?? params.height ?? 0),
         isReverse: isReverseShipment,
+        paymentType: params.payment_type,
+        codChargeBasis,
       })
       if (computedFreight?.freight !== undefined) {
         slabbedFreight = computedFreight
         freightCharges = Number(computedFreight.freight)
+        codCharges = isCodOrder ? Number(computedFreight.cod_charges ?? 0) : 0
+        params.cod_charges = codCharges
+        params.cod_charge_basis = Number(computedFreight.cod_charge_basis ?? codChargeBasis)
       }
     } catch (freightErr: any) {
       console.error('❌ Failed to compute slab-based freight; aborting shipment creation', {
@@ -3514,6 +3558,7 @@ export const createB2CShipmentService = async (
           shippingCharges: totalShippingCharges,
           otherCharges,
           freightCharges,
+          codCharges,
           courierCost: null,
           transactionFee,
           giftWrap,
@@ -4042,9 +4087,15 @@ export const createB2CShipmentService = async (
       breadthCm: Number(params.package_breadth ?? params.breadth ?? 0),
       heightCm: Number(params.package_height ?? params.height ?? 0),
       isReverse: params.isReverse === true || params.payment_type === 'reverse',
+      paymentType: params.payment_type,
+      codChargeBasis,
     })
 
     // 2️⃣ INSERT LOCAL ORDER + WALLET DEBIT PREVIEW
+    codCharges = isCodOrder ? Number(finalSlabbedFreight.cod_charges ?? 0) : 0
+    params.cod_charges = codCharges
+    params.cod_charge_basis = Number(finalSlabbedFreight.cod_charge_basis ?? codChargeBasis)
+
     const result = await db.transaction(async (tx) => {
       const userWallet = await walletOfUser(userId, tx)
       const walletBalance = Number(userWallet?.balance ?? 0)
@@ -4174,6 +4225,7 @@ export const createB2CShipmentService = async (
         shippingCharges: totalShippingCharges, // Total shipping (base + other charges)
         otherCharges, // Store other_charges separately
         freightCharges,
+        codCharges,
         courierCost: courierCost ?? undefined, // Save courier cost (actual from API or estimated from serviceability)
         transactionFee,
         giftWrap,

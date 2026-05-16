@@ -41,3 +41,29 @@ export const extractOrderAmountFromBody = (body: Record<string, any>): OrderAmou
     invalid: false,
   }
 }
+
+export const extractCodChargeBasisFromBody = (
+  body: Record<string, any>,
+  fallback?: number,
+): OrderAmountResult => {
+  if (!body) {
+    return { value: fallback, wasProvided: false, invalid: false }
+  }
+
+  const rawValue = body.cod_charge_basis ?? body.codChargeBasis
+
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return { value: fallback, wasProvided: false, invalid: false }
+  }
+
+  const parsed = normalizeNumber(rawValue)
+  if (parsed === undefined || parsed < 0) {
+    return { wasProvided: true, invalid: true }
+  }
+
+  return {
+    value: parsed,
+    wasProvided: true,
+    invalid: false,
+  }
+}

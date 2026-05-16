@@ -13,7 +13,7 @@ import {
   fetchAvailableCouriersWithRates,
   fetchAvailableCouriersWithRatesB2B,
 } from '../models/services/shiprocket.service'
-import { extractOrderAmountFromBody } from '../utils/orderAmount'
+import { extractCodChargeBasisFromBody, extractOrderAmountFromBody } from '../utils/orderAmount'
 
 const parseOptionalBoolean = (value: unknown): boolean | undefined => {
   if (typeof value === 'boolean') return value
@@ -215,6 +215,13 @@ export const fetchAvailableCouriers = async (req: Request, res: Response) => {
         error: 'order_amount must be a non-negative number',
       })
     }
+    const codChargeBasisResult = extractCodChargeBasisFromBody(req.body, orderAmountResult.value)
+    if (codChargeBasisResult.invalid) {
+      return res.status(400).json({
+        success: false,
+        error: 'cod_charge_basis must be a non-negative number',
+      })
+    }
 
     const serviceabilityOptions = buildServiceabilityOptions(req.body)
 
@@ -224,6 +231,7 @@ export const fetchAvailableCouriers = async (req: Request, res: Response) => {
         destination: Number(destination),
         payment_type: payment_type,
         order_amount: orderAmountResult.value,
+        cod_charge_basis: codChargeBasisResult.value,
         shipment_type: shipment_type,
         weight: Number(weight),
         length: Number(length),
@@ -319,12 +327,20 @@ export const fetchAvailableCouriersForGuestController = async (req: Request, res
         error: 'order_amount must be a non-negative number',
       })
     }
+    const codChargeBasisResult = extractCodChargeBasisFromBody(req.body, orderAmountResult.value)
+    if (codChargeBasisResult.invalid) {
+      return res.status(400).json({
+        success: false,
+        error: 'cod_charge_basis must be a non-negative number',
+      })
+    }
 
     const couriers = await fetchAvailableCouriersForGuest({
       origin: originNum,
       destination: destinationNum,
       payment_type: payment_type,
       order_amount: orderAmountResult.value,
+      cod_charge_basis: codChargeBasisResult.value,
       weight: weightNum,
       length: lengthNum,
       breadth: breadthNum,
@@ -367,6 +383,13 @@ export const fetchAvailableCouriersToUser = async (req: Request, res: Response) 
         error: 'order_amount must be a non-negative number',
       })
     }
+    const codChargeBasisResult = extractCodChargeBasisFromBody(req.body, orderAmountResult.value)
+    if (codChargeBasisResult.invalid) {
+      return res.status(400).json({
+        success: false,
+        error: 'cod_charge_basis must be a non-negative number',
+      })
+    }
 
     // Route to appropriate function based on shipment_type
     const serviceParams = {
@@ -374,6 +397,7 @@ export const fetchAvailableCouriersToUser = async (req: Request, res: Response) 
       destination: Number(destination),
       payment_type: payment_type,
       order_amount: orderAmountResult.value,
+      cod_charge_basis: codChargeBasisResult.value,
       shipment_type: shipment_type,
       weight: Number(weight),
       length: Number(length),

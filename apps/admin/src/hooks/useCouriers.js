@@ -45,6 +45,11 @@ export const useAvailableCouriersMutation = () => {
     mutationFn: (params) => {
       const parsedOrderAmount = Number(params.orderAmount ?? 0)
       const normalizedOrderAmount = parsedOrderAmount > 0 ? parsedOrderAmount : undefined
+      const parsedCodChargeBasis = Number(params.codChargeBasis ?? params.cod_charge_basis ?? params.orderAmount ?? 0)
+      const normalizedCodChargeBasis =
+        parsedCodChargeBasis >= 0 && Number.isFinite(parsedCodChargeBasis)
+          ? parsedCodChargeBasis
+          : normalizedOrderAmount
 
       return fetchAvailableCouriers({
         origin: params.pickupPincode,
@@ -52,6 +57,7 @@ export const useAvailableCouriersMutation = () => {
         pickupId: params.pickupId,
         payment_type: params.paymentType ?? (params.cod && params.cod > 0 ? 'cod' : 'prepaid'),
         order_amount: normalizedOrderAmount,
+        cod_charge_basis: normalizedCodChargeBasis,
         weight: params.weight,
         length: params.length,
         breadth: params.breadth,

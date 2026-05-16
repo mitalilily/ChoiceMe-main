@@ -32,6 +32,7 @@ export interface UseAvailableCouriersParams {
   weight?: number
   cod?: number
   orderAmount?: number
+  codChargeBasis?: number
   length?: number
   breadth?: number
   height?: number
@@ -52,6 +53,7 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
     weight,
     cod,
     orderAmount,
+    codChargeBasis,
     length,
     breadth,
     height,
@@ -62,6 +64,10 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
 
   const normalizedOrderAmount =
     typeof orderAmount === 'number' && orderAmount > 0 ? orderAmount : undefined
+  const normalizedCodChargeBasis =
+    typeof codChargeBasis === 'number' && codChargeBasis >= 0
+      ? codChargeBasis
+      : normalizedOrderAmount
 
   return useQuery({
     queryKey: [
@@ -74,6 +80,7 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
       weight,
       cod,
       orderAmount,
+      codChargeBasis,
       length,
       breadth,
       height,
@@ -87,6 +94,7 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
         pickupId,
         payment_type: payment_type,
         order_amount: normalizedOrderAmount,
+        cod_charge_basis: normalizedCodChargeBasis,
         weight,
         length,
         ...(shipmentType && { shipment_type: shipmentType }),
@@ -108,13 +116,18 @@ export const useAvailableCouriersMutation = () => {
     mutationFn: (params: UseAvailableCouriersParams) => {
       const normalizedOrderAmount =
         typeof params.orderAmount === 'number' && params.orderAmount > 0 ? params.orderAmount : undefined
+      const normalizedCodChargeBasis =
+        typeof params.codChargeBasis === 'number' && params.codChargeBasis >= 0
+          ? params.codChargeBasis
+          : normalizedOrderAmount
 
       return fetchAvailableCouriers({
         origin: params.pickupPincode,
         destination: params.deliveryPincode,
         pickupId: params.pickupId,
-        payment_type: params.cod && params.cod > 0 ? 'cod' : 'prepaid',
+        payment_type: params.payment_type ?? (params.cod && params.cod > 0 ? 'cod' : 'prepaid'),
         order_amount: normalizedOrderAmount,
+        cod_charge_basis: normalizedCodChargeBasis,
         weight: params.weight,
         length: params.length,
         breadth: params.breadth,

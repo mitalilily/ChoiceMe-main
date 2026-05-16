@@ -1,7 +1,7 @@
 import { Response } from 'express'
 import { fetchAvailableCouriersWithRates } from '../../models/services/shiprocket.service'
 import { getOpaqueProviderCode } from '../../utils/externalApiHelpers'
-import { extractOrderAmountFromBody } from '../../utils/orderAmount'
+import { extractCodChargeBasisFromBody, extractOrderAmountFromBody } from '../../utils/orderAmount'
 
 // Helper function to build serviceability options
 const buildServiceabilityOptions = (body: any): Record<string, any> => {
@@ -145,6 +145,14 @@ export const checkServiceabilityController = async (req: any, res: Response) => 
         message: 'order_amount must be numeric and non-negative',
       })
     }
+    const codChargeBasisResult = extractCodChargeBasisFromBody(params, orderAmountResult.value)
+    if (codChargeBasisResult.invalid) {
+      return res.status(400).json({
+        success: false,
+        error: 'cod_charge_basis must be a non-negative number',
+        message: 'cod_charge_basis must be numeric and non-negative',
+      })
+    }
 
     // Build serviceability options using the helper function
     const serviceabilityOptions = buildServiceabilityOptions(params)
@@ -156,6 +164,7 @@ export const checkServiceabilityController = async (req: any, res: Response) => 
         destination: Number(destination),
         payment_type: payment_type as 'cod' | 'prepaid' | 'reverse',
         order_amount: orderAmountResult.value,
+        cod_charge_basis: codChargeBasisResult.value,
         shipment_type:
           shipment_type && ['b2b', 'b2c'].includes(shipment_type)
             ? (shipment_type as 'b2b' | 'b2c')

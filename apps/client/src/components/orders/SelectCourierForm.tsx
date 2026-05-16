@@ -96,6 +96,7 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
   )
   const courierPayloadOrderAmount =
     declaredOrderValue > 0 ? declaredOrderValue : Math.max(totalProductPrice, 0)
+  const codChargeBasis = Math.max(totalOrderValue, 0)
 
   const cod = orderType === 'cod' ? 1 : 0
 
@@ -111,6 +112,7 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
     cod,
     payment_type: orderType,
     orderAmount: courierPayloadOrderAmount,
+    codChargeBasis,
     shipmentType: shipment_type,
   }
 

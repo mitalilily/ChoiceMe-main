@@ -71,6 +71,7 @@ const downloadCSV = (allCouriers = [], allZones = [], existingData = [], filters
       ]),
       'COD Charges',
       'COD Percent',
+      'COD Slabs',
       'Other Charges',
     ]
 
@@ -106,6 +107,7 @@ const downloadCSV = (allCouriers = [], allZones = [], existingData = [], filters
           ...zoneValues,
           row.cod_charges ?? '',
           row.cod_percent ?? '',
+          row.cod_slabs?.length ? JSON.stringify(row.cod_slabs) : '',
           row.other_charges ?? '',
         ]
       })
