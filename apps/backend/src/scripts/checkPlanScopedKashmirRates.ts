@@ -46,20 +46,40 @@ async function createPlanUser(plan: PlanRow) {
   return userId
 }
 
-async function quoteFor(userId: string, originPincode: string, destinationPincode: string) {
+type QuoteParams = {
+  userId: string
+  originPincode: string
+  destinationPincode: string
+  mode: 'air' | 'surface'
+  weightKg: number
+  paymentType?: 'cod' | 'prepaid'
+  codChargeBasis?: number
+}
+
+const weights = [0.5, 1, 2, 3, 4, 5, 6]
+
+async function quoteFor({
+  userId,
+  originPincode,
+  destinationPincode,
+  mode,
+  weightKg,
+  paymentType = 'prepaid',
+  codChargeBasis = 0,
+}: QuoteParams) {
   return computeB2CFreightForOrder({
     userId,
-    courierId: 100,
+    courierId: mode === 'air' ? 99 : 100,
     serviceProvider: 'delhivery',
-    mode: 'surface',
-    paymentType: 'prepaid',
-    codChargeBasis: 0,
+    mode,
+    paymentType,
+    codChargeBasis,
     originPincode,
     destinationPincode,
-    weightG: 500,
-    lengthCm: 10,
-    breadthCm: 10,
-    heightCm: 10,
+    weightG: Math.round(weightKg * 1000),
+    lengthCm: 1,
+    breadthCm: 1,
+    heightCm: 1,
   })
 }
 
@@ -78,26 +98,114 @@ async function main() {
     const premiumUserId = await createPlanUser(premium)
     createdUserIds.push(basicUserId, premiumUserId)
 
-    const [basicKashmir, basicOutside, premiumKashmir, premiumOutside] = await Promise.all([
-      quoteFor(basicUserId, '193123', '110001'),
-      quoteFor(basicUserId, '110001', '110001'),
-      quoteFor(premiumUserId, '193123', '110001'),
-      quoteFor(premiumUserId, '110001', '110001'),
-    ])
+    const groups = [
+      {
+        label: 'Basic within Kashmir surface',
+        userId: basicUserId,
+        originPincode: '193123',
+        destinationPincode: '110001',
+        mode: 'surface' as const,
+        expected: [80, 100, 150, 200, 230, 260, 280],
+      },
+      {
+        label: 'Premium within Kashmir surface',
+        userId: premiumUserId,
+        originPincode: '193123',
+        destinationPincode: '110001',
+        mode: 'surface' as const,
+        expected: [70, 85, 115, 165, 200, 225, 250],
+      },
+      {
+        label: 'Basic outside Kashmir surface',
+        userId: basicUserId,
+        originPincode: '110001',
+        destinationPincode: '400001',
+        mode: 'surface' as const,
+        expected: [95, 140, 195, 260, 320, 380, 430],
+      },
+      {
+        label: 'Premium outside Kashmir surface',
+        userId: premiumUserId,
+        originPincode: '110001',
+        destinationPincode: '400001',
+        mode: 'surface' as const,
+        expected: [85, 115, 180, 250, 300, 360, 400],
+      },
+      {
+        label: 'Basic outside Kashmir express',
+        userId: basicUserId,
+        originPincode: '110001',
+        destinationPincode: '400001',
+        mode: 'air' as const,
+        expected: [110, 150, 230, 300, 400, 500, 550],
+      },
+      {
+        label: 'Premium outside Kashmir express',
+        userId: premiumUserId,
+        originPincode: '110001',
+        destinationPincode: '400001',
+        mode: 'air' as const,
+        expected: [110, 150, 230, 300, 400, 500, 550],
+      },
+    ]
 
-    assertFreight('Basic Kashmir surface forward', basicKashmir.freight, 185)
-    assertFreight('Basic outside-Kashmir surface forward', basicOutside.freight, 155)
-    assertFreight('Premium Kashmir surface forward', premiumKashmir.freight, 165)
-    assertFreight('Premium outside-Kashmir surface forward', premiumOutside.freight, 135)
+    const outputRows: string[] = []
+    for (const group of groups) {
+      const quotes = await Promise.all(
+        weights.map((weightKg) =>
+          quoteFor({
+            userId: group.userId,
+            originPincode: group.originPincode,
+            destinationPincode: group.destinationPincode,
+            mode: group.mode,
+            weightKg,
+          }),
+        ),
+      )
 
-    console.log('Plan-scoped Kashmir rate check')
+      quotes.forEach((quote, index) => {
+        assertFreight(`${group.label} ${weights[index]}kg`, quote.freight, group.expected[index])
+      })
+
+      outputRows.push(
+        `${group.label}: ${quotes
+          .map((quote, index) => `${weights[index]}kg=${money(quote.freight)}`)
+          .join(', ')}`,
+      )
+    }
+
+    const codChecks = await Promise.all(
+      [1999, 2000, 2500].map((basis) =>
+        quoteFor({
+          userId: basicUserId,
+          originPincode: '110001',
+          destinationPincode: '400001',
+          mode: 'surface',
+          weightKg: 0.5,
+          paymentType: 'cod',
+          codChargeBasis: basis,
+        }),
+      ),
+    )
+    const expectedCod = [40, 40, 50]
+    codChecks.forEach((quote, index) => {
+      if (Number(quote.cod_charges) !== expectedCod[index]) {
+        throw new Error(
+          `COD basis ${[1999, 2000, 2500][index]}: expected ${expectedCod[index]}, received ${quote.cod_charges}`,
+        )
+      }
+    })
+
+    console.log('Plan-scoped image rate card check')
     console.log(`Basic plan (${basic.id})`)
-    console.log(`  Kashmir 193123 -> 110001: freight ${money(basicKashmir.freight)}, zone ${basicKashmir.zone_id}`)
-    console.log(`  Outside 110001 -> 110001: freight ${money(basicOutside.freight)}, zone ${basicOutside.zone_id}`)
     console.log(`Premium plan (${premium.id})`)
-    console.log(`  Kashmir 193123 -> 110001: freight ${money(premiumKashmir.freight)}, zone ${premiumKashmir.zone_id}`)
-    console.log(`  Outside 110001 -> 110001: freight ${money(premiumOutside.freight)}, zone ${premiumOutside.zone_id}`)
-    console.log('PASS: assigned users only received their active plan rates.')
+    for (const row of outputRows) {
+      console.log(`  ${row}`)
+    }
+    console.log(
+      `  COD slabs: 1999=${money(codChecks[0].cod_charges)}, 2000=${money(codChecks[1].cod_charges)}, 2500=${money(codChecks[2].cod_charges)}`,
+    )
+    console.log('PASS: image rates were created and assigned users only received their active plan rates.')
   } finally {
     if (createdUserIds.length) {
       await db.delete(users).where(inArray(users.id, createdUserIds))
@@ -110,4 +218,3 @@ main().catch((error) => {
   console.error(error)
   process.exit(1)
 })
-

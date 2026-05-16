@@ -14,16 +14,18 @@ DECLARE
   v_courier record;
   v_rate_id uuid;
   v_is_kashmir boolean;
-  v_forward_rate numeric(10, 2);
-  v_rto_rate numeric(10, 2);
+  v_slab_rates numeric[];
+  v_extra_rate numeric(10, 2);
+  v_extra_weight_unit numeric(10, 3);
+  v_slab_index integer;
+  v_weight_froms numeric[] := ARRAY[0.100, 0.500, 1.000, 2.000, 3.000, 4.000];
+  v_weight_tos numeric[] := ARRAY[0.500, 1.000, 2.000, 3.000, 4.000, 5.000];
+  v_rate_type text;
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM app_data_migrations
-    WHERE key IN (
-      'seed_basic_premium_kashmir_b2c_rates_v1',
-      'seed_basic_premium_kashmir_b2c_rates_v2'
-    )
+    WHERE key = 'seed_basic_premium_kashmir_b2c_rates_v2'
   ) THEN
     RETURN;
   END IF;
@@ -78,7 +80,7 @@ BEGIN
         'Kashmir and other special-service pincodes.',
         'Kashmir',
         'B2C',
-        '{"source":"basic-premium-kashmir-rate-seed"}'::jsonb,
+        '{"source":"basic-premium-kashmir-rate-seed-v2"}'::jsonb,
         '[]'::jsonb,
         now(),
         now()
@@ -101,7 +103,7 @@ BEGIN
         'Outside Kashmir fallback zone.',
         'Outside Kashmir',
         'B2C',
-        '{"source":"basic-premium-kashmir-rate-seed"}'::jsonb,
+        '{"source":"basic-premium-kashmir-rate-seed-v2"}'::jsonb,
         '[]'::jsonb,
         now(),
         now()
@@ -155,120 +157,115 @@ BEGIN
         UNION ALL
         SELECT 100 AS id, 'Delhivery Metro Surface' AS name, 'surface' AS mode
       LOOP
-        IF v_plan.name = 'Basic' THEN
-          IF v_is_kashmir THEN
-            v_forward_rate := CASE WHEN v_courier.mode = 'air' THEN 205.00 ELSE 185.00 END;
-            v_rto_rate := CASE WHEN v_courier.mode = 'air' THEN 120.00 ELSE 115.00 END;
+        IF v_is_kashmir THEN
+          IF v_plan.name = 'Premium' THEN
+            v_slab_rates := ARRAY[70.00, 85.00, 115.00, 165.00, 200.00, 225.00];
+            v_extra_rate := 25.00;
+            v_extra_weight_unit := 2.000;
           ELSE
-            v_forward_rate := CASE WHEN v_courier.mode = 'air' THEN 175.00 ELSE 155.00 END;
-            v_rto_rate := CASE WHEN v_courier.mode = 'air' THEN 100.00 ELSE 95.00 END;
+            v_slab_rates := ARRAY[80.00, 100.00, 150.00, 200.00, 230.00, 260.00];
+            v_extra_rate := 20.00;
+            v_extra_weight_unit := 1.000;
           END IF;
         ELSE
-          IF v_is_kashmir THEN
-            v_forward_rate := CASE WHEN v_courier.mode = 'air' THEN 185.00 ELSE 165.00 END;
-            v_rto_rate := CASE WHEN v_courier.mode = 'air' THEN 110.00 ELSE 100.00 END;
+          IF v_courier.mode = 'air' THEN
+            v_slab_rates := ARRAY[110.00, 150.00, 230.00, 300.00, 400.00, 500.00];
+            v_extra_rate := 50.00;
+            v_extra_weight_unit := 1.000;
+          ELSIF v_plan.name = 'Premium' THEN
+            v_slab_rates := ARRAY[85.00, 115.00, 180.00, 250.00, 300.00, 360.00];
+            v_extra_rate := 40.00;
+            v_extra_weight_unit := 1.000;
           ELSE
-            v_forward_rate := CASE WHEN v_courier.mode = 'air' THEN 155.00 ELSE 135.00 END;
-            v_rto_rate := CASE WHEN v_courier.mode = 'air' THEN 90.00 ELSE 85.00 END;
+            v_slab_rates := ARRAY[95.00, 140.00, 195.00, 260.00, 320.00, 380.00];
+            v_extra_rate := 50.00;
+            v_extra_weight_unit := 1.000;
           END IF;
         END IF;
 
-        v_rate_id := gen_random_uuid();
-        INSERT INTO shipping_rates
-          (
-            id,
-            plan_id,
-            service_provider,
-            cod_charges,
-            cod_percent,
-            other_charges,
-            rate,
-            last_updated,
-            courier_id,
-            courier_name,
-            mode,
-            business_type,
-            min_weight,
-            zone_id,
-            type,
-            created_at
-          )
-        VALUES
-          (
-            v_rate_id,
-            v_plan.id,
-            'delhivery',
-            40.00,
-            2.00,
-            18.00,
-            v_forward_rate,
-            now(),
-            v_courier.id,
-            v_courier.name,
-            v_courier.mode,
-            'b2c',
-            0.50,
-            v_zone.id,
-            'forward',
-            now()
-          );
+        FOR v_rate_type IN SELECT 'forward' UNION ALL SELECT 'rto'
+        LOOP
+          v_rate_id := gen_random_uuid();
 
-        INSERT INTO shipping_rate_cod_slabs
-          (id, shipping_rate_id, amount_from, amount_to, charge_type, charge_value, created_at, updated_at)
-        VALUES
-          (gen_random_uuid(), v_rate_id, 0.00, 2000.00, 'flat', 40.00, now(), now()),
-          (gen_random_uuid(), v_rate_id, 2000.00, NULL, 'percent', 2.00, now(), now());
+          INSERT INTO shipping_rates
+            (
+              id,
+              plan_id,
+              service_provider,
+              cod_charges,
+              cod_percent,
+              other_charges,
+              rate,
+              last_updated,
+              courier_id,
+              courier_name,
+              mode,
+              business_type,
+              min_weight,
+              zone_id,
+              type,
+              created_at
+            )
+          VALUES
+            (
+              v_rate_id,
+              v_plan.id,
+              'delhivery',
+              40.00,
+              2.00,
+              18.00,
+              v_slab_rates[1],
+              now(),
+              v_courier.id,
+              v_courier.name,
+              v_courier.mode,
+              'b2c',
+              0.50,
+              v_zone.id,
+              v_rate_type,
+              now()
+            );
 
-        v_rate_id := gen_random_uuid();
-        INSERT INTO shipping_rates
-          (
-            id,
-            plan_id,
-            service_provider,
-            cod_charges,
-            cod_percent,
-            other_charges,
-            rate,
-            last_updated,
-            courier_id,
-            courier_name,
-            mode,
-            business_type,
-            min_weight,
-            zone_id,
-            type,
-            created_at
-          )
-        VALUES
-          (
-            v_rate_id,
-            v_plan.id,
-            'delhivery',
-            40.00,
-            2.00,
-            18.00,
-            v_rto_rate,
-            now(),
-            v_courier.id,
-            v_courier.name,
-            v_courier.mode,
-            'b2c',
-            0.50,
-            v_zone.id,
-            'rto',
-            now()
-          );
+          FOR v_slab_index IN 1..array_length(v_slab_rates, 1)
+          LOOP
+            INSERT INTO shipping_rate_slabs
+              (
+                id,
+                shipping_rate_id,
+                weight_from,
+                weight_to,
+                rate,
+                extra_rate,
+                extra_weight_unit,
+                created_at,
+                updated_at
+              )
+            VALUES
+              (
+                gen_random_uuid(),
+                v_rate_id,
+                v_weight_froms[v_slab_index],
+                v_weight_tos[v_slab_index],
+                v_slab_rates[v_slab_index],
+                CASE WHEN v_slab_index = array_length(v_slab_rates, 1) THEN v_extra_rate ELSE NULL END,
+                CASE WHEN v_slab_index = array_length(v_slab_rates, 1) THEN v_extra_weight_unit ELSE NULL END,
+                now(),
+                now()
+              );
+          END LOOP;
 
-        INSERT INTO shipping_rate_cod_slabs
-          (id, shipping_rate_id, amount_from, amount_to, charge_type, charge_value, created_at, updated_at)
-        VALUES
-          (gen_random_uuid(), v_rate_id, 0.00, 2000.00, 'flat', 40.00, now(), now()),
-          (gen_random_uuid(), v_rate_id, 2000.00, NULL, 'percent', 2.00, now(), now());
+          INSERT INTO shipping_rate_cod_slabs
+            (id, shipping_rate_id, amount_from, amount_to, charge_type, charge_value, created_at, updated_at)
+          VALUES
+            (gen_random_uuid(), v_rate_id, 0.00, 2000.00, 'flat', 40.00, now(), now()),
+            (gen_random_uuid(), v_rate_id, 2000.00, NULL, 'percent', 2.00, now(), now());
+        END LOOP;
       END LOOP;
     END LOOP;
   END LOOP;
 
   INSERT INTO app_data_migrations (key)
-  VALUES ('seed_basic_premium_kashmir_b2c_rates_v1')
+  VALUES ('seed_basic_premium_kashmir_b2c_rates_v2')
   ON CONFLICT (key) DO NOTHING;
 END $$;
+
