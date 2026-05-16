@@ -25,7 +25,7 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM app_data_migrations
-    WHERE key = 'seed_basic_premium_kashmir_b2c_rates_v2'
+    WHERE key = 'seed_basic_premium_kashmir_b2c_rates_v4'
   ) THEN
     RETURN;
   END IF;
@@ -64,57 +64,34 @@ BEGIN
     business_type = EXCLUDED.business_type,
     updated_at = now();
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM meracourierwala_zones
-    WHERE lower(trim(business_type)) = 'b2c'
-      AND (lower(trim(code)) IN ('special zone', 'special_zone') OR lower(trim(name)) = 'special zone')
-  ) THEN
-    INSERT INTO meracourierwala_zones
-      (id, code, name, description, region, business_type, metadata, states, created_at, updated_at)
-    VALUES
-      (
-        gen_random_uuid(),
-        'SPECIAL ZONE',
-        'Special Zone',
-        'Kashmir and other special-service pincodes.',
-        'Kashmir',
-        'B2C',
-        '{"source":"basic-premium-kashmir-rate-seed-v2"}'::jsonb,
-        '[]'::jsonb,
-        now(),
-        now()
-      );
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1
-    FROM meracourierwala_zones
-    WHERE lower(trim(business_type)) = 'b2c'
-      AND (lower(trim(code)) = 'roi' OR lower(trim(name)) = 'rest of india')
-  ) THEN
-    INSERT INTO meracourierwala_zones
-      (id, code, name, description, region, business_type, metadata, states, created_at, updated_at)
-    VALUES
-      (
-        gen_random_uuid(),
-        'ROI',
-        'Rest of India',
-        'Outside Kashmir fallback zone.',
-        'Outside Kashmir',
-        'B2C',
-        '{"source":"basic-premium-kashmir-rate-seed-v2"}'::jsonb,
-        '[]'::jsonb,
-        now(),
-        now()
-      );
-  END IF;
+  INSERT INTO meracourierwala_zones
+    (id, code, name, description, region, business_type, metadata, states, created_at, updated_at)
+  VALUES
+    (
+      gen_random_uuid(),
+      'KASHMIR',
+      'Kashmir',
+      'Jammu and Kashmir / Ladakh-only B2C pricing zone.',
+      'Kashmir',
+      'B2C',
+      '{"source":"basic-premium-kashmir-rate-seed-v4"}'::jsonb,
+      '["JAMMU AND KASHMIR", "LADAKH"]'::jsonb,
+      now(),
+      now()
+    )
+  ON CONFLICT (code, business_type) DO UPDATE SET
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    region = EXCLUDED.region,
+    metadata = EXCLUDED.metadata,
+    states = EXCLUDED.states,
+    updated_at = now();
 
   DELETE FROM shipping_rate_cod_slabs
   WHERE shipping_rate_id IN (
     SELECT id
     FROM shipping_rates
-    WHERE business_type = 'b2c'
+    WHERE lower(trim(business_type)) = 'b2c'
       AND plan_id IN (v_basic_plan_id, v_premium_plan_id)
       AND courier_id IN (99, 100)
       AND lower(coalesce(service_provider, '')) = 'delhivery'
@@ -124,14 +101,14 @@ BEGIN
   WHERE shipping_rate_id IN (
     SELECT id
     FROM shipping_rates
-    WHERE business_type = 'b2c'
+    WHERE lower(trim(business_type)) = 'b2c'
       AND plan_id IN (v_basic_plan_id, v_premium_plan_id)
       AND courier_id IN (99, 100)
       AND lower(coalesce(service_provider, '')) = 'delhivery'
   );
 
   DELETE FROM shipping_rates
-  WHERE business_type = 'b2c'
+  WHERE lower(trim(business_type)) = 'b2c'
     AND plan_id IN (v_basic_plan_id, v_premium_plan_id)
     AND courier_id IN (99, 100)
     AND lower(coalesce(service_provider, '')) = 'delhivery';
@@ -149,8 +126,8 @@ BEGIN
         AND lower(trim(name)) NOT LIKE '%within sate%'
     LOOP
       v_is_kashmir :=
-        lower(trim(v_zone.code)) IN ('special zone', 'special_zone')
-        OR lower(trim(v_zone.name)) = 'special zone';
+        lower(trim(v_zone.code)) = 'kashmir'
+        OR lower(trim(v_zone.name)) = 'kashmir';
 
       FOR v_courier IN
         SELECT 100 AS id, 'Delhivery Metro Air' AS name, 'air' AS mode
@@ -265,6 +242,7 @@ BEGIN
   END LOOP;
 
   INSERT INTO app_data_migrations (key)
-  VALUES ('seed_basic_premium_kashmir_b2c_rates_v2')
+  VALUES ('seed_basic_premium_kashmir_b2c_rates_v4')
   ON CONFLICT (key) DO NOTHING;
 END $$;
+

@@ -56,8 +56,8 @@ BEGIN
 
   INSERT INTO couriers (id, name, "serviceProvider", "isEnabled", business_type, created_at, updated_at)
   VALUES
-    (99, 'Delhivery Metro Air', 'delhivery', true, '["b2c"]'::jsonb, now(), now()),
-    (100, 'Delhivery Metro Surface', 'delhivery', true, '["b2c"]'::jsonb, now(), now())
+    (100, 'Delhivery Metro Air', 'delhivery', true, '["b2c"]'::jsonb, now(), now()),
+    (99, 'Delhivery Metro Surface', 'delhivery', true, '["b2c"]'::jsonb, now(), now())
   ON CONFLICT (id, "serviceProvider") DO UPDATE SET
     name = EXCLUDED.name,
     "isEnabled" = true,
@@ -148,9 +148,9 @@ BEGIN
         OR lower(trim(v_zone.name)) = 'kashmir';
 
       FOR v_courier IN
-        SELECT 99 AS id, 'Delhivery Metro Air' AS name, 'air' AS mode
+        SELECT 100 AS id, 'Delhivery Metro Air' AS name, 'air' AS mode
         UNION ALL
-        SELECT 100 AS id, 'Delhivery Metro Surface' AS name, 'surface' AS mode
+        SELECT 99 AS id, 'Delhivery Metro Surface' AS name, 'surface' AS mode
       LOOP
         IF v_is_kashmir THEN
           IF v_plan.name = 'Premium' THEN
@@ -263,4 +263,3 @@ BEGIN
   VALUES ('seed_basic_premium_kashmir_b2c_rates_v3')
   ON CONFLICT (key) DO NOTHING;
 END $$;
-

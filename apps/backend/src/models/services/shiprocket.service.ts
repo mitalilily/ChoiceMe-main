@@ -1504,56 +1504,70 @@ export const fetchAvailableCouriersWithRates = async (
       })
 
       if (originPincode && destinationPincode) {
-        const [originResp, destinationResp] = await Promise.all([
-          delhivery.checkServiceability(originPincode),
-          delhivery.checkServiceability(destinationPincode),
-        ])
-        delhiveryResp = destinationResp
+        try {
+          const [originResult, destinationResult] = await Promise.allSettled([
+            delhivery.checkServiceability(originPincode),
+            delhivery.checkServiceability(destinationPincode),
+          ])
+          if (originResult.status === 'rejected') throw originResult.reason
+          if (destinationResult.status === 'rejected') throw destinationResult.reason
 
-        const originService = originResp?.delivery_codes?.[0]?.postal_code
-        const destinationService = destinationResp?.delivery_codes?.[0]?.postal_code
+          const originResp = originResult.value
+          const destinationResp = destinationResult.value
+          delhiveryResp = destinationResp
 
-        delhiveryOriginServiceable =
-          Boolean(originResp?.delivery_codes?.length) && originService?.pickup === 'Y'
-        delhiveryDestinationServiceable =
-          Boolean(destinationResp?.delivery_codes?.length) &&
-          (delhiveryRequiresCOD
-            ? destinationService?.cod === 'Y'
-            : destinationService?.pre_paid === 'Y')
+          const originService = originResp?.delivery_codes?.[0]?.postal_code
+          const destinationService = destinationResp?.delivery_codes?.[0]?.postal_code
 
-        console.log('[Serviceability] Delhivery pincode check result', {
-          mode: isCalculator ? 'calculator' : 'standard',
-          origin: originPincode,
-          destination: destinationPincode,
-          paymentType: normalizedPaymentType,
-          requiresCOD: delhiveryRequiresCOD,
-          originAvailableRecords: originResp?.delivery_codes?.length ?? 0,
-          destinationAvailableRecords: destinationResp?.delivery_codes?.length ?? 0,
-          originPickup: originService?.pickup,
-          destinationPrePaid: destinationService?.pre_paid,
-          destinationCod: destinationService?.cod,
-          destinationRemark: destinationService?.remark ?? '',
-        })
+          delhiveryOriginServiceable =
+            Boolean(originResp?.delivery_codes?.length) && originService?.pickup === 'Y'
+          delhiveryDestinationServiceable =
+            Boolean(destinationResp?.delivery_codes?.length) &&
+            (delhiveryRequiresCOD
+              ? destinationService?.cod === 'Y'
+              : destinationService?.pre_paid === 'Y')
 
-        delhiveryAvailable = delhiveryOriginServiceable && delhiveryDestinationServiceable
-
-        // Keep calculator path lighter: serviceability is required, TAT is optional.
-        if (delhiveryAvailable && !isCalculator) {
-          const tatResp = await delhivery.getExpectedTAT(
-            originPincode,
-            destinationPincode,
-            'S',
-            'B2C',
-          )
-          if (tatResp && Number.isFinite(Number(tatResp)) && Number(tatResp) > 0) {
-            delhiveryEDD = `${Number(tatResp)} Days`
-          }
-          console.log('[Serviceability] Delhivery TAT evaluated', {
-            mode: 'standard',
+          console.log('[Serviceability] Delhivery pincode check result', {
+            mode: isCalculator ? 'calculator' : 'standard',
             origin: originPincode,
             destination: destinationPincode,
-            tat: tatResp,
-            edd: delhiveryEDD,
+            paymentType: normalizedPaymentType,
+            requiresCOD: delhiveryRequiresCOD,
+            originAvailableRecords: originResp?.delivery_codes?.length ?? 0,
+            destinationAvailableRecords: destinationResp?.delivery_codes?.length ?? 0,
+            originPickup: originService?.pickup,
+            destinationPrePaid: destinationService?.pre_paid,
+            destinationCod: destinationService?.cod,
+            destinationRemark: destinationService?.remark ?? '',
+          })
+
+          delhiveryAvailable = delhiveryOriginServiceable && delhiveryDestinationServiceable
+
+          // Keep calculator path lighter: serviceability is required, TAT is optional.
+          if (delhiveryAvailable && !isCalculator) {
+            const tatResp = await delhivery.getExpectedTAT(
+              originPincode,
+              destinationPincode,
+              'S',
+              'B2C',
+            )
+            if (tatResp && Number.isFinite(Number(tatResp)) && Number(tatResp) > 0) {
+              delhiveryEDD = `${Number(tatResp)} Days`
+            }
+            console.log('[Serviceability] Delhivery TAT evaluated', {
+              mode: 'standard',
+              origin: originPincode,
+              destination: destinationPincode,
+              tat: tatResp,
+              edd: delhiveryEDD,
+            })
+          }
+        } catch (err: any) {
+          console.error('[Serviceability] Delhivery pincode check failed', {
+            mode: isCalculator ? 'calculator' : 'standard',
+            origin: originPincode,
+            destination: destinationPincode,
+            error: err?.message || err,
           })
         }
       } else {
@@ -1932,6 +1946,56 @@ export const fetchAvailableCouriersWithRates = async (
       }
     }
 
+    if (isCalculator && localRates.length) {
+      const existingCandidateKeys = new Set(
+        combinedCouriers.map(
+          (courier) =>
+            `${String(courier.id)}__${normalizeProviderKey(
+              courier.integration_type || courier.serviceProvider || null,
+            )}`,
+        ),
+      )
+
+      for (const rateCard of localRates) {
+        const providerKey = normalizeProviderKey(rateCard.service_provider)
+        if (!providerKey || !enabledProviders.has(providerKey)) continue
+
+        const candidateKey = `${String(rateCard.courier_id)}__${providerKey}`
+        if (existingCandidateKeys.has(candidateKey)) continue
+
+        const bucket = providerCourierBuckets.get(providerKey)
+        const courierRow = bucket?.rows.find(
+          (row) => String(row.id) === String(rateCard.courier_id),
+        )
+        if (!courierRow) continue
+
+        existingCandidateKeys.add(candidateKey)
+        combinedCouriers.push({
+          id: courierRow.id,
+          name: courierRow.name,
+          integration_type: providerKey,
+          serviceProvider: courierRow.serviceProvider ?? providerKey,
+          cod: true,
+          prepaid: true,
+          edd: '3-5 Days',
+          approxZone,
+          createdAt: courierRow.createdAt,
+          courier_cost_estimate: null,
+          provider_rate: null,
+          freight_charges: null,
+          cod_charges: null,
+          total_charges: null,
+          chargeable_weight: null,
+          provider_serviceability: {
+            source: 'local_rate_card',
+            live_serviceability: serviceableProviders.has(providerKey)
+              ? 'available'
+              : 'unavailable',
+          },
+        })
+      }
+    }
+
     // 🔹 Calculate chargeable weight if dimensions are provided
     const serviceabilityWeightG = normalizeServiceabilityWeightToGrams(params.weight)
     let chargeableWeight: number | null = null
@@ -2225,6 +2289,12 @@ export const fetchAvailableCouriersWithRates = async (
           combined.map(async (courier: any) => {
             const providerKey = normalizeProviderKey(courier.integration_type)
             if (!quoteBackedProviders.has(providerKey)) return courier
+            if (
+              courier.provider_serviceability?.source === 'local_rate_card' &&
+              courier.provider_serviceability?.live_serviceability === 'unavailable'
+            ) {
+              return courier
+            }
 
             const rateType = isReverseShipment ? 'rto' : 'forward'
             const localRate = courier.localRates?.[rateType] ?? null

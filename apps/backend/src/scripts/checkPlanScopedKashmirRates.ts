@@ -5,7 +5,14 @@ import { plans } from '../models/schema/plans'
 import { userPlans } from '../models/schema/userPlans'
 import { users } from '../models/schema/users'
 import { zones } from '../models/schema/zones'
-import { computeB2CFreightForOrder } from '../models/services/shiprocket.service'
+import {
+  computeB2CFreightForOrder,
+  fetchAvailableCouriersWithRates,
+} from '../models/services/shiprocket.service'
+import { DelhiveryService } from '../models/services/couriers/delhivery.service'
+import { DeliveryOneService } from '../models/services/couriers/deliveryone.service'
+import { EkartService } from '../models/services/couriers/ekart.service'
+import { XpressbeesService } from '../models/services/couriers/xpressbees.service'
 
 type PlanRow = {
   id: string
@@ -70,7 +77,7 @@ async function quoteFor({
 }: QuoteParams) {
   return computeB2CFreightForOrder({
     userId,
-    courierId: mode === 'air' ? 99 : 100,
+    courierId: mode === 'air' ? 100 : 99,
     serviceProvider: 'delhivery',
     mode,
     paymentType,
@@ -98,6 +105,68 @@ async function zoneCodeFor(zoneId: string) {
     .limit(1)
 
   return zone?.code ?? zone?.name ?? 'missing'
+}
+
+async function assertCalculatorLocalFallback(userId: string) {
+  const originalDelhiveryCheck = DelhiveryService.prototype.checkServiceability
+  const originalDeliveryOneCheck = DeliveryOneService.prototype.checkPairServiceability
+  const originalEkartCheck = EkartService.prototype.checkServiceability
+  const originalXpressbeesCheck = XpressbeesService.prototype.checkServiceability
+
+  ;(DelhiveryService.prototype as any).checkServiceability = async () => {
+    throw new Error('simulated Delhivery serviceability outage')
+  }
+  ;(DeliveryOneService.prototype as any).checkPairServiceability = async () => ({
+    serviceable: false,
+  })
+  ;(EkartService.prototype as any).checkServiceability = async () => ({ serviceable: false })
+  ;(XpressbeesService.prototype as any).checkServiceability = async () => ({
+    serviceable: false,
+    records: [],
+  })
+
+  try {
+    const results = await fetchAvailableCouriersWithRates(
+      {
+        origin: 193123,
+        destination: 110001,
+        payment_type: 'cod',
+        order_amount: 2500,
+        cod_charge_basis: 2500,
+        shipment_type: 'b2c',
+        weight: 500,
+        length: 10,
+        breadth: 10,
+        height: 10,
+        isCalculator: true,
+      } as any,
+      userId,
+    )
+
+    const surfaceOption = results.find(
+      (row: any) =>
+        Number(row.id) === 99 &&
+        row.approxZone?.code === 'KASHMIR' &&
+        Number(row.localRates?.forward?.rate) === 80,
+    )
+
+    if (!surfaceOption) {
+      throw new Error('Calculator fallback did not return the Kashmir surface local rate.')
+    }
+    if (surfaceOption.provider_rate !== null) {
+      throw new Error('Calculator fallback should leave provider_rate null when live quote is unavailable.')
+    }
+
+    return {
+      count: results.length,
+      sample: `${surfaceOption.name}=${money(surfaceOption.localRates.forward.rate)}`,
+    }
+  } finally {
+    DelhiveryService.prototype.checkServiceability = originalDelhiveryCheck
+    DeliveryOneService.prototype.checkPairServiceability = originalDeliveryOneCheck
+    EkartService.prototype.checkServiceability = originalEkartCheck
+    XpressbeesService.prototype.checkServiceability = originalXpressbeesCheck
+  }
 }
 
 async function main() {
@@ -236,6 +305,7 @@ async function main() {
         )
       }
     })
+    const fallbackCheck = await assertCalculatorLocalFallback(basicUserId)
 
     console.log('Plan-scoped image rate card check')
     console.log(`Basic plan (${basic.id})`)
@@ -245,6 +315,9 @@ async function main() {
     }
     console.log(
       `  COD slabs: 1999=${money(codChecks[0].cod_charges)}, 2000=${money(codChecks[1].cod_charges)}, 2500=${money(codChecks[2].cod_charges)}`,
+    )
+    console.log(
+      `  Calculator local fallback: ${fallbackCheck.count} options, ${fallbackCheck.sample}`,
     )
     console.log('PASS: image rates were created and assigned users only received their active plan rates.')
   } finally {

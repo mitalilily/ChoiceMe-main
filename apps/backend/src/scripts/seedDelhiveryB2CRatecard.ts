@@ -24,7 +24,7 @@ type ZoneSeed = {
 
 const courierSeeds: CourierSeed[] = [
   {
-    id: 99,
+    id: 100,
     name: 'Delhivery Metro Air',
     serviceProvider: 'delhivery',
     mode: 'Air',
@@ -33,7 +33,7 @@ const courierSeeds: CourierSeed[] = [
     extraRto: 10,
   },
   {
-    id: 100,
+    id: 99,
     name: 'Delhivery Metro Surface',
     serviceProvider: 'delhivery',
     mode: 'Surface',
