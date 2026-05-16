@@ -17,6 +17,7 @@ export interface CreateShipmentParams {
   freight_charges?: number // What platform charges seller (based on rate card)
   courier_cost?: number // Estimated courier cost from serviceability (what platform pays courier - can be updated via webhook)
   cod_charges?: number
+  other_charges?: number
   cod_charge_basis?: number
   codChargeBasis?: number
   discount?: number
