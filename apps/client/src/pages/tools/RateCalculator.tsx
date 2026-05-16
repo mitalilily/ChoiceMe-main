@@ -152,6 +152,7 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
         shipmentType,
         payment_type: formData.paymentType,
         context: 'rate_calculator',
+        useGuest: isPublic,
       }
 
       const result = await mutateAsync(payload)

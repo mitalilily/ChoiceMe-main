@@ -147,6 +147,8 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
   }
 
   const formatCurrency = (value?: number | string | null) => `₹${Number(value || 0).toFixed(2)}`
+  const formatOptionalCurrency = (value?: number | string | null) =>
+    toChargeNumber(value) > 0 ? formatCurrency(value) : 'Unavailable'
 
   const formatWeightKg = (value?: number | null) =>
     value ? `${(Number(value) / 1000).toFixed(2)} kg` : '—'
@@ -205,6 +207,17 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
       ? selectedCourierOptionKey === courierOptionKey
       : String(selectedCourierId) === String(courier?.id ?? courier?.courier_id ?? '')
   })
+  const selectedCourierFreight = selectedCourierSummary
+    ? getCourierFreightCharge(selectedCourierSummary)
+    : 0
+  const selectedCourierCod =
+    selectedCourierSummary && orderType === 'cod'
+      ? toChargeNumber(selectedCourierSummary?.localRates?.forward?.cod_charges)
+      : 0
+  const selectedChoiceMeeRate = selectedCourierFreight + selectedCourierCod
+  const selectedProviderCost = selectedCourierSummary
+    ? getCourierProviderCost(selectedCourierSummary)
+    : 0
 
   return (
     <Grid container spacing={3}>
@@ -430,7 +443,11 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
                       {getCourierDisplayName(selectedCourierSummary)}
                     </Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
-                      <Chip size="small" label={`Rate ${formatCurrency(getCourierFreightCharge(selectedCourierSummary))}`} />
+                      <Chip size="small" label={`ChoiceMee ${formatCurrency(selectedChoiceMeeRate)}`} />
+                      <Chip
+                        size="small"
+                        label={`Courier service ${formatOptionalCurrency(selectedProviderCost)}`}
+                      />
                       <Chip
                         size="small"
                         label={`Chargeable ${formatWeightKg(selectedCourierSummary.chargeable_weight)}`}
@@ -491,6 +508,9 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
 
               const providerCost = getCourierProviderCost(courier)
               const freightCharge = getCourierFreightCharge(courier)
+              const codCharge =
+                orderType === 'cod' ? toChargeNumber(local?.forward?.cod_charges) : 0
+              const choiceMeeRate = freightCharge + codCharge
 
               return (
                 <Paper
@@ -597,21 +617,26 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
 
                       <Stack alignItems={{ xs: 'flex-start', sm: 'flex-end' }} spacing={0.25}>
                         <Typography sx={{ fontSize: 12, color: TEXT_SECONDARY }}>
-                          Total Rate
+                          ChoiceMee Rate
                         </Typography>
                         <Typography sx={{ fontSize: 28, fontWeight: 900, color: TEXT_PRIMARY }}>
-                          {formatCurrency(freightCharge)}
+                          {formatCurrency(choiceMeeRate)}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: TEXT_SECONDARY, fontWeight: 700 }}>
+                          Courier service {formatOptionalCurrency(providerCost)}
                         </Typography>
                       </Stack>
                     </Stack>
 
                     <Grid container spacing={1.1}>
                       {[
-                        ['Total Rate', formatCurrency(freightCharge)],
+                        ['ChoiceMee Rate', formatCurrency(choiceMeeRate)],
+                        ['Courier Service Rate', formatOptionalCurrency(providerCost)],
+                        ...(codCharge > 0 ? [['COD Charge', formatCurrency(codCharge)]] : []),
                         ['Chargeable', formatWeightKg(courier?.chargeable_weight)],
                         ['Volumetric', formatWeightKg(courier?.volumetric_weight)],
                       ].map(([label, value]) => (
-                        <Grid key={label} size={{ xs: 6, lg: 2 }}>
+                        <Grid key={label} size={{ xs: 6, lg: 3 }}>
                           <Box
                             sx={{
                               p: 1.25,

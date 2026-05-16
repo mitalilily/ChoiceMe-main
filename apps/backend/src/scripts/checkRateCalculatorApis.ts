@@ -38,11 +38,13 @@ const run = async () => {
   const originalFetchB2C = shiprocketService.fetchAvailableCouriersWithRates
   const originalFetchB2B = shiprocketService.fetchAvailableCouriersWithRatesB2B
   const originalFetchAdmin = shiprocketService.fetchAvailableCouriersWithRatesAdmin
+  const originalFetchGuest = shiprocketService.fetchAvailableCouriersForGuest
   const originalCalculateB2BRate = b2bAdminService.calculateB2BRate
 
   let b2cCall: any = null
   let b2bCall: any = null
   let adminCall: any = null
+  let guestCall: any = null
   let calcCall: any = null
 
   try {
@@ -64,6 +66,20 @@ const run = async () => {
       return [{ id: 3, name: 'Mock Admin', rate: 250, edd: '4 Days' }]
     }
 
+    shiprocketService.fetchAvailableCouriersForGuest = async (params: any) => {
+      guestCall = { params }
+      return [
+        {
+          id: 4,
+          name: 'Mock Guest B2C',
+          rate: 110,
+          edd: '2 Days',
+          localRates: { forward: { rate: 110, cod_charges: 40 } },
+          provider_rate: { provider: 'delhivery', total: 95, freight: 55, cod: 40 },
+        },
+      ]
+    }
+
     b2bAdminService.calculateB2BRate = async (params: any) => {
       calcCall = params
       return {
@@ -75,6 +91,7 @@ const run = async () => {
     }
 
     const { fetchAvailableCouriersToUser } = require('../controllers/courierIntegration.controller')
+    const { fetchAvailableCouriersForGuestController } = require('../controllers/courierIntegration.controller')
     const { fetchAvailableCouriersForAdmin } = require('../controllers/admin/courier.controller')
     const { calculateRateController } = require('../controllers/admin/b2b/b2bAdmin.controller')
     const { getShippingRatesController } = require('../controllers/externalApi/shipping.controller')
@@ -85,6 +102,52 @@ const run = async () => {
       await fetchAvailableCouriersToUser(req as any, res as any)
       assert.equal(res.statusCode, 400)
       assert.equal(res.body?.success, false)
+    }
+
+    {
+      const req: MockReq = {
+        body: {
+          origin: 400001,
+          destination: 560001,
+          payment_type: 'cod',
+          order_amount: 2500,
+          cod_charge_basis: 2500,
+          shipment_type: 'b2c',
+          weight: 750,
+          length: 10,
+          breadth: 10,
+          height: 10,
+          context: 'rate_calculator',
+        },
+      }
+      const res = createRes()
+      await fetchAvailableCouriersForGuestController(req as any, res as any)
+      assert.equal(res.statusCode, 200)
+      assert.equal(res.body?.success, true)
+      assert.equal(res.body?.data?.[0]?.name, 'Mock Guest B2C')
+      assert.equal(res.body?.data?.[0]?.localRates?.forward?.rate, 110)
+      assert.equal(res.body?.data?.[0]?.provider_rate?.total, 95)
+      assert.equal(guestCall?.params?.shipment_type, 'b2c')
+      assert.equal(guestCall?.params?.isCalculator, true)
+    }
+
+    {
+      const req: MockReq = {
+        body: {
+          origin: 400001,
+          destination: 560001,
+          payment_type: 'prepaid',
+          shipment_type: 'b2b',
+          weight: 5000,
+        },
+      }
+      const res = createRes()
+      await fetchAvailableCouriersForGuestController(req as any, res as any)
+      assert.equal(res.statusCode, 200)
+      assert.equal(res.body?.success, true)
+      assert.equal(res.body?.data?.[0]?.name, 'Mock B2B')
+      assert.equal(b2bCall?.params?.shipment_type, 'b2b')
+      assert.equal(b2bCall?.userId?.planFallbackName, 'Basic')
     }
 
     {
@@ -195,6 +258,7 @@ const run = async () => {
     shiprocketService.fetchAvailableCouriersWithRates = originalFetchB2C
     shiprocketService.fetchAvailableCouriersWithRatesB2B = originalFetchB2B
     shiprocketService.fetchAvailableCouriersWithRatesAdmin = originalFetchAdmin
+    shiprocketService.fetchAvailableCouriersForGuest = originalFetchGuest
     b2bAdminService.calculateB2BRate = originalCalculateB2BRate
   }
 }

@@ -111,9 +111,11 @@ interface FetchCouriersResponse {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const fetchAvailableCouriers = async (params: any): Promise<any[]> => {
   try {
-    const res = await axiosInstance.post<FetchCouriersResponse>('/couriers/available-to-user', {
-      ...params,
-    })
+    const { useGuest, guest, ...payload } = params ?? {}
+    const endpoint =
+      useGuest || guest ? '/couriers/available-to-guest' : '/couriers/available-to-user'
+
+    const res = await axiosInstance.post<FetchCouriersResponse>(endpoint, payload)
 
     if (!res.data.success) {
       throw new Error(res.data.error || 'Failed to fetch couriers')

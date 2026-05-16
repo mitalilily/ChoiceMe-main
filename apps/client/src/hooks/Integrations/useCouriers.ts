@@ -41,6 +41,7 @@ export interface UseAvailableCouriersParams {
   payment_type: 'cod' | 'prepaid'
   context?: string
   isCalculator?: boolean
+  useGuest?: boolean
 }
 
 export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
@@ -85,6 +86,7 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
       breadth,
       height,
       shipmentType,
+      params.useGuest,
       params?.pickupName,
     ],
     queryFn: () =>
@@ -101,6 +103,7 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
         isCalculator: params.isCalculator === true || params.context === 'rate_calculator',
         breadth,
         height,
+        useGuest: params.useGuest === true,
     }),
     enabled: enabled && !!pickupPincode && !!deliveryPincode && (!!weight || !!cod),
     staleTime: 0,
@@ -134,6 +137,7 @@ export const useAvailableCouriersMutation = () => {
         height: params.height,
         shipment_type: params?.shipmentType,
         isCalculator: params.isCalculator === true || params.context === 'rate_calculator',
+        useGuest: params.useGuest === true,
       })
     },
     retry: 1,

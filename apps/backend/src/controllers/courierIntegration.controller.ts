@@ -251,7 +251,8 @@ export const fetchAvailableCouriers = async (req: Request, res: Response) => {
 
 export const fetchAvailableCouriersForGuestController = async (req: Request, res: Response) => {
   try {
-    const { origin, destination, payment_type, weight, length, breadth, height } = req.body
+    const { origin, destination, payment_type, weight, length, breadth, height, shipment_type } =
+      req.body
 
     // Validate required fields
     if (!origin || !destination) {
@@ -320,6 +321,13 @@ export const fetchAvailableCouriersForGuestController = async (req: Request, res
       })
     }
 
+    if (shipment_type && !['b2b', 'b2c'].includes(shipment_type)) {
+      return res.status(400).json({
+        success: false,
+        error: 'shipment_type must be either "b2b" or "b2c"',
+      })
+    }
+
     const orderAmountResult = extractOrderAmountFromBody(req.body)
     if (orderAmountResult.invalid) {
       return res.status(400).json({
@@ -335,17 +343,25 @@ export const fetchAvailableCouriersForGuestController = async (req: Request, res
       })
     }
 
-    const couriers = await fetchAvailableCouriersForGuest({
+    const serviceabilityOptions = buildServiceabilityOptions(req.body)
+    const serviceParams = {
       origin: originNum,
       destination: destinationNum,
       payment_type: payment_type,
       order_amount: orderAmountResult.value,
       cod_charge_basis: codChargeBasisResult.value,
+      shipment_type: shipment_type || 'b2c',
       weight: weightNum,
       length: lengthNum,
       breadth: breadthNum,
       height: heightNum,
-    })
+      ...serviceabilityOptions,
+    }
+
+    const couriers =
+      shipment_type === 'b2b'
+        ? await fetchAvailableCouriersWithRatesB2B(serviceParams, { planFallbackName: 'Basic' })
+        : await fetchAvailableCouriersForGuest(serviceParams)
 
     return res.json({ success: true, data: couriers ?? [] })
   } catch (err: any) {
