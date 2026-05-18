@@ -16,6 +16,7 @@
     "seed:holidays": "ts-node src/scripts/seedHolidays.ts",
     "seed:holidays:year": "ts-node src/scripts/seedHolidays.ts",
     "seed:delhivery-b2c": "tsx src/scripts/seedDelhiveryB2CRatecard.ts",
+    "seed:delhivery-b2c:force": "tsx src/scripts/seedDelhiveryB2CRatecard.ts --force",
     "seed:delivery-one-b2c": "tsx src/scripts/seedDeliveryOneB2CRatecard.ts",
     "zones:remove-kashmir-special": "tsx src/scripts/removeKashmirFromSpecialZone.ts",
     "verify:smtp": "tsx src/scripts/verifySmtp.ts",

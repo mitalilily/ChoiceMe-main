@@ -15,6 +15,9 @@ const DELHIVERY_SURFACE_COURIER_ID = 99
 const DELHIVERY_SURFACE_COURIER_NAME = 'Delhivery Surface'
 const BUSINESS_TYPE = 'B2C'
 const MODE = 'Surface'
+const forceReseed =
+  process.argv.includes('--force') ||
+  ['1', 'true', 'yes'].includes(String(process.env.FORCE_DELHIVERY_B2C_RESEED || '').toLowerCase())
 
 type RateSlab = {
   weight_from: number
@@ -236,7 +239,13 @@ async function purgeExistingSurfaceRates(planIds: string[], zoneIds: string[]) {
         inArray(shippingRates.plan_id, planIds),
         inArray(shippingRates.zone_id, zoneIds),
         eq(shippingRates.courier_id, DELHIVERY_SURFACE_COURIER_ID),
-        sql`lower(trim(${shippingRates.service_provider})) = ${DELHIVERY_PROVIDER}`,
+        sql`(
+          lower(trim(coalesce(${shippingRates.service_provider}, ''))) = ${DELHIVERY_PROVIDER}
+          or (
+            trim(coalesce(${shippingRates.service_provider}, '')) = ''
+            and lower(trim(${shippingRates.courier_name})) like '%delhivery%'
+          )
+        )`,
         sql`lower(trim(${shippingRates.mode})) = 'surface'`,
       ),
     )
@@ -249,6 +258,72 @@ async function purgeExistingSurfaceRates(planIds: string[], zoneIds: string[]) {
   await db.delete(shippingRates).where(inArray(shippingRates.id, rateIds))
 
   return rateIds.length
+}
+
+async function normalizeLegacyBlankProviderRows(planIds: string[], zoneIds: string[]) {
+  if (!planIds.length || !zoneIds.length) return { normalized: 0, removedDuplicates: 0 }
+
+  const legacyRows = await db
+    .select({
+      id: shippingRates.id,
+      plan_id: shippingRates.plan_id,
+      zone_id: shippingRates.zone_id,
+      type: shippingRates.type,
+    })
+    .from(shippingRates)
+    .where(
+      and(
+        eq(shippingRates.business_type, 'b2c'),
+        inArray(shippingRates.plan_id, planIds),
+        inArray(shippingRates.zone_id, zoneIds),
+        eq(shippingRates.courier_id, DELHIVERY_SURFACE_COURIER_ID),
+        sql`trim(coalesce(${shippingRates.service_provider}, '')) = ''`,
+        sql`lower(trim(${shippingRates.courier_name})) like '%delhivery%'`,
+        sql`lower(trim(${shippingRates.mode})) = 'surface'`,
+      ),
+    )
+
+  let normalized = 0
+  let removedDuplicates = 0
+
+  for (const row of legacyRows) {
+    const [providerRow] = await db
+      .select({ id: shippingRates.id })
+      .from(shippingRates)
+      .where(
+        and(
+          eq(shippingRates.business_type, 'b2c'),
+          eq(shippingRates.plan_id, row.plan_id),
+          eq(shippingRates.zone_id, row.zone_id),
+          eq(shippingRates.courier_id, DELHIVERY_SURFACE_COURIER_ID),
+          eq(shippingRates.type, row.type),
+          sql`lower(trim(${shippingRates.service_provider})) = ${DELHIVERY_PROVIDER}`,
+          sql`lower(trim(${shippingRates.mode})) = 'surface'`,
+        ),
+      )
+      .limit(1)
+
+    if (providerRow) {
+      await db.delete(shippingRateCodSlabs).where(eq(shippingRateCodSlabs.shipping_rate_id, row.id))
+      await db.delete(shippingRateSlabs).where(eq(shippingRateSlabs.shipping_rate_id, row.id))
+      await db.delete(shippingRates).where(eq(shippingRates.id, row.id))
+      removedDuplicates += 1
+      continue
+    }
+
+    await db
+      .update(shippingRates)
+      .set({
+        courier_name: DELHIVERY_SURFACE_COURIER_NAME,
+        service_provider: DELHIVERY_PROVIDER,
+        mode: MODE,
+        last_updated: new Date(),
+      })
+      .where(eq(shippingRates.id, row.id))
+    normalized += 1
+  }
+
+  return { normalized, removedDuplicates }
 }
 
 async function insertRateCardSlabs(shippingRateId: string, slabs: RateSlab[]) {
@@ -286,6 +361,7 @@ async function seedRates(
   zoneRows: { id: string; code: string; name: string }[],
 ) {
   let inserted = 0
+  let skippedExisting = 0
 
   for (const planRateCard of planRateCards) {
     const plan = planMap.get(planRateCard.planName)
@@ -297,6 +373,27 @@ async function seedRates(
       const baseRate = slabs[0].rate
 
       for (const type of ['forward', 'rto'] as const) {
+        const [existing] = await db
+          .select({ id: shippingRates.id })
+          .from(shippingRates)
+          .where(
+            and(
+              eq(shippingRates.plan_id, plan.id),
+              eq(shippingRates.business_type, 'b2c'),
+              eq(shippingRates.zone_id, zone.id),
+              eq(shippingRates.courier_id, DELHIVERY_SURFACE_COURIER_ID),
+              eq(shippingRates.type, type),
+              sql`lower(trim(${shippingRates.service_provider})) = ${DELHIVERY_PROVIDER}`,
+              sql`lower(trim(${shippingRates.mode})) = 'surface'`,
+            ),
+          )
+          .limit(1)
+
+        if (existing) {
+          skippedExisting += 1
+          continue
+        }
+
         const [rateRow] = await db
           .insert(shippingRates)
           .values({
@@ -326,7 +423,7 @@ async function seedRates(
     }
   }
 
-  return inserted
+  return { inserted, skippedExisting }
 }
 
 async function main() {
@@ -336,12 +433,19 @@ async function main() {
     const zoneRows = await ensureZones()
     const planIds = Array.from(planMap.values()).map((plan) => plan.id)
     const zoneIds = zoneRows.map((zone) => zone.id)
-    const removed = await purgeExistingSurfaceRates(planIds, zoneIds)
-    const inserted = await seedRates(planMap, zoneRows)
+    const legacyCleanup = await normalizeLegacyBlankProviderRows(planIds, zoneIds)
+    const removed = forceReseed ? await purgeExistingSurfaceRates(planIds, zoneIds) : 0
+    const { inserted, skippedExisting } = await seedRates(planMap, zoneRows)
 
     console.log(
-      `Updated Delhivery surface image rate card: removed ${removed} old rows, inserted ${inserted} Basic/Premium forward/RTO rows.`,
+      `Updated Delhivery surface image rate card: removed ${removed} old rows, inserted ${inserted} missing Basic/Premium forward/RTO rows, skipped ${skippedExisting} existing manual rows.`,
     )
+    console.log(
+      `Legacy blank-provider cleanup: normalized ${legacyCleanup.normalized}, removed ${legacyCleanup.removedDuplicates} duplicates.`,
+    )
+    if (!forceReseed) {
+      console.log('Existing Delhivery surface rows were preserved so manual admin edits are not overwritten.')
+    }
     console.log('Express/Air rates were not changed.')
   } catch (error) {
     console.error('Delhivery B2C image rate card seed failed:', error)

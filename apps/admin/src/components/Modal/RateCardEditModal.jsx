@@ -28,6 +28,47 @@ const normalizeMode = (value) => {
 const makeCourierKey = (courierId, serviceProvider) =>
   `${courierId || ''}__${normalizeProvider(serviceProvider)}`
 
+const providerNameMatchesCourierName = (serviceProvider, courierName) => {
+  const provider = normalizeProvider(serviceProvider)
+  const name = String(courierName || '').trim().toLowerCase()
+  if (!provider || !name) return false
+  if (provider === 'deliveryone') {
+    return name.includes('delivery one') || name.includes('deliveryone')
+  }
+  return name.includes(provider)
+}
+
+const findCourierOption = (couriers, { courierId, serviceProvider, courierName, courierKey }) => {
+  const normalizedId = String(courierId || '')
+  const normalizedProvider = normalizeProvider(serviceProvider)
+  const normalizedName = String(courierName || '').trim().toLowerCase()
+
+  if (courierKey) {
+    const byKey = couriers.find(
+      (c) => makeCourierKey(c?.id?.toString(), c?.serviceProvider || c?.service_provider || '') === courierKey,
+    )
+    if (byKey) return byKey
+  }
+
+  const sameId = couriers.filter((c) => String(c?.id || '') === normalizedId)
+  if (!sameId.length) return null
+
+  if (normalizedProvider) {
+    const byProvider = sameId.find(
+      (c) => normalizeProvider(c?.serviceProvider || c?.service_provider || '') === normalizedProvider,
+    )
+    if (byProvider) return byProvider
+  }
+
+  return (
+    sameId.find((c) => String(c?.name || '').trim().toLowerCase() === normalizedName) ||
+    sameId.find((c) =>
+      providerNameMatchesCourierName(c?.serviceProvider || c?.service_provider, courierName),
+    ) ||
+    (sameId.length === 1 ? sameId[0] : null)
+  )
+}
+
 const getZoneKey = (zone) => String(zone?.id || zone?.code || zone?.name || '')
 const getZoneLookupKeys = (zone) =>
   [
@@ -62,7 +103,7 @@ export const RateCardEditModal = ({
   couriers = [], // 👈 pass from parent
   existingRates = [],
 }) => {
-  const { mutate: updateRate, isLoading } = useUpdateShippingRate()
+  const { mutate: updateRate, isPending } = useUpdateShippingRate()
   const [form, setForm] = useState({})
   const resolvedBusinessType = String(
     businessType || data?.business_type || data?.businessType || '',
@@ -244,15 +285,12 @@ export const RateCardEditModal = ({
       }
     })
 
-    const selectedCourier = availableCouriers.find(
-      (c) =>
-        makeCourierKey(c?.id?.toString(), c?.serviceProvider || c?.service_provider || '') ===
-        (form.courier_key ||
-          makeCourierKey(
-            form.courier_id || data?.courier_id,
-            data?.service_provider || data?.serviceProvider || '',
-          )),
-    )
+    const selectedCourier = findCourierOption(availableCouriers, {
+      courierId: form.courier_id || data?.courier_id,
+      serviceProvider: data?.service_provider || data?.serviceProvider,
+      courierName: form.courier_name || data?.courier_name,
+      courierKey: form.courier_key,
+    })
 
     // Always get service_provider from selectedCourier if available, otherwise from data
     const serviceProviderValue =
@@ -380,15 +418,12 @@ export const RateCardEditModal = ({
       })
 
   // Get selected courier info for display
-  const selectedCourier = availableCouriers.find(
-    (c) =>
-      makeCourierKey(c?.id?.toString(), c?.serviceProvider || c?.service_provider || '') ===
-      (form.courier_key ||
-        makeCourierKey(
-          form.courier_id || data?.courier_id,
-          data?.service_provider || data?.serviceProvider || '',
-        )),
-  )
+  const selectedCourier = findCourierOption(availableCouriers, {
+    courierId: form.courier_id || data?.courier_id,
+    serviceProvider: data?.service_provider || data?.serviceProvider,
+    courierName: form.courier_name || data?.courier_name,
+    courierKey: form.courier_key,
+  })
   const displayCourierName = form.courier_name || data?.courier_name || ''
   const displayServiceProvider =
     selectedCourier?.serviceProvider ||
@@ -408,7 +443,7 @@ export const RateCardEditModal = ({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button colorScheme="green" variant="solid" onClick={handleSave} isLoading={isLoading}>
+          <Button colorScheme="green" variant="solid" onClick={handleSave} isLoading={isPending}>
             {isEdit ? 'Save' : 'Add'}
           </Button>
         </Stack>

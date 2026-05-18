@@ -150,6 +150,45 @@ const getZonePayloadEntry = <T>(
   return undefined
 }
 
+const providerNameMatchesCourierName = (serviceProvider: unknown, courierName: unknown) => {
+  const provider = normalizeB2CServiceProvider(serviceProvider)
+  const name = String(courierName ?? '').trim().toLowerCase()
+  if (!provider || !name) return false
+  if (provider === 'deliveryone') {
+    return name.includes('delivery one') || name.includes('deliveryone')
+  }
+  return name.includes(provider)
+}
+
+const resolveCourierServiceProvider = async (
+  courierId: number | string,
+  courierName?: string | null,
+  providedServiceProvider?: string | null,
+) => {
+  const normalizedProvided = normalizeB2CServiceProvider(providedServiceProvider) || null
+  if (normalizedProvided) return normalizedProvided
+
+  const matchingCouriers = await db
+    .select({
+      name: couriers.name,
+      serviceProvider: couriers.serviceProvider,
+    })
+    .from(couriers)
+    .where(eq(couriers.id, Number(courierId)))
+
+  const normalizedCourierName = String(courierName || '').trim().toLowerCase()
+  const exactNameMatch = matchingCouriers.find(
+    (courier) => courier.name?.trim().toLowerCase() === normalizedCourierName,
+  )
+  const providerNameMatch = matchingCouriers.find((courier) =>
+    providerNameMatchesCourierName(courier.serviceProvider, courierName),
+  )
+  const onlyMatch = matchingCouriers.length === 1 ? matchingCouriers[0] : null
+  const resolved = exactNameMatch || providerNameMatch || onlyMatch
+
+  return normalizeB2CServiceProvider(resolved?.serviceProvider) || null
+}
+
 const buildZoneLookup = (zoneRows: Pick<typeof zones.$inferSelect, 'id' | 'code' | 'name'>[]) => {
   const lookup = new Map<string, Pick<typeof zones.$inferSelect, 'id' | 'code' | 'name'>>()
 
@@ -473,11 +512,15 @@ export const updateShippingRate = async (
     throw new Error('Both courierId and courier_name are required')
   }
 
-  // Save exactly what the frontend sends - no override logic
-  const finalServiceProvider = service_provider?.trim() || null
-  const normalizedServiceProvider = normalizeB2CServiceProvider(finalServiceProvider) || null
+  const normalizedServiceProvider = await resolveCourierServiceProvider(
+    courierId,
+    courier_name,
+    service_provider,
+  )
   const previousServiceProvider =
     normalizeB2CServiceProvider(previous_service_provider) || normalizedServiceProvider
+  const shouldMatchLegacyBlankProvider =
+    Boolean(normalizedServiceProvider) && !normalizeB2CServiceProvider(previous_service_provider)
   const normalizedMode = normalizeB2CShippingMode(mode)
   const previousMode = normalizeB2CShippingMode(previous_mode ?? mode)
 
@@ -549,7 +592,12 @@ export const updateShippingRate = async (
               eq(shippingRates.type, type),
               eq(sql`LOWER(${shippingRates.mode})`, previousMode),
               previousServiceProvider
-                ? eq(sql`LOWER(${shippingRates.service_provider})`, previousServiceProvider)
+                ? shouldMatchLegacyBlankProvider
+                  ? or(
+                      eq(sql`LOWER(${shippingRates.service_provider})`, previousServiceProvider),
+                      sql`trim(coalesce(${shippingRates.service_provider}, '')) = ''`,
+                    )
+                  : eq(sql`LOWER(${shippingRates.service_provider})`, previousServiceProvider)
                 : sql`1=1`,
             ),
           )
