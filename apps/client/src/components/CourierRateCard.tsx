@@ -14,7 +14,7 @@ import {
 import { BiPackage, BiRupee, BiTimeFive } from 'react-icons/bi'
 import { FaShippingFast, FaWeight } from 'react-icons/fa'
 import { brand, brandGradients } from '../theme/brand'
-import { getCourierDisplayName, getCourierLogo, isDelhiveryCourier } from '../utils/courierDisplay'
+import { getCourierDisplayName, getCourierLogo } from '../utils/courierDisplay'
 
 type ForwardRate = {
   mode?: string | null
@@ -159,14 +159,6 @@ export default function CourierRateList({
           const isCOD = shipmentType === 'cod'
           const codIncluded = isCOD ? codCharges : 0
           const rateCardTotal = freight + codIncluded
-          const providerFreight = toChargeNumber(courier?.provider_rate?.freight)
-          const providerCod = toChargeNumber(courier?.provider_rate?.cod)
-          const providerParts = providerFreight + providerCod
-          const providerTotal =
-            toChargeNumber(courier?.provider_rate?.total) ||
-            providerParts ||
-            toChargeNumber(courier?.courier_cost_estimate ?? courier?.rateEstimate)
-          const hasProviderQuote = providerTotal > 0
           const eddText = courier?.edd ?? '-'
           const isClickable = Boolean(onSelect)
           const zoneLabel = courier?.approxZone?.code || courier?.approxZone?.name || null
@@ -303,11 +295,6 @@ export default function CourierRateList({
                               />
                             ) : null}
                           </Stack>
-                          <Typography variant="caption" sx={{ color: brand.inkSoft, fontWeight: 600 }}>
-                            {hasProviderQuote || !isDelhiveryCourier(courier)
-                              ? 'Manual rate card amount. Delivery One quote is checked separately.'
-                              : 'Manual rate card amount. Live Delivery One quote unavailable.'}
-                          </Typography>
                         </Stack>
                       </Grid>
                     </Grid>
