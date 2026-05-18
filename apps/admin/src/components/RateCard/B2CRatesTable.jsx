@@ -5,6 +5,25 @@ import { useMemo } from 'react'
 import { getCourierDisplayName, getProviderDisplayName } from 'utils/courierDisplay'
 import { GenericTable } from 'views/Dashboard/Tables/components/GenericTable'
 
+const getZoneLookupKeys = (zone) =>
+  [
+    zone?.id,
+    zone?.code,
+    zone?.name,
+    zone?.code && zone?.name ? `${zone.code} - ${zone.name}` : '',
+    zone?.code && zone?.name ? `${zone.name} (${zone.code})` : '',
+  ].filter(Boolean)
+
+const getZoneEntry = (collection, zone) => {
+  if (!collection) return {}
+  for (const key of getZoneLookupKeys(zone)) {
+    if (collection[key] !== undefined) return collection[key] || {}
+  }
+  return {}
+}
+
+const getZoneLabel = (zone) => [zone?.code, zone?.name].filter(Boolean).join(' - ') || 'Zone'
+
 export const B2CTable = ({ data, zones, onEdit, planId, loading }) => {
   const deleteB2CZoneMutation = useDeleteB2CZone(planId)
 
@@ -32,11 +51,11 @@ export const B2CTable = ({ data, zones, onEdit, planId, loading }) => {
     const zoneColumns =
       zones?.map((zone) => ({
         key: zone.code,
-        label: `${zone.name} (F | RTO)`,
+        label: `${getZoneLabel(zone)} (F | RTO)`,
         width: '180px',
         renderer: (_, row) => {
-          const rates = row.rates?.[zone.name] || {}
-          const zoneSlabs = row.zone_slabs?.[zone.name] || {}
+          const rates = getZoneEntry(row.rates, zone)
+          const zoneSlabs = getZoneEntry(row.zone_slabs, zone)
           return `${renderSlabSummary(zoneSlabs.forward, rates.forward)} | ${renderSlabSummary(zoneSlabs.rto, rates.rto)}`
         },
       })) || []

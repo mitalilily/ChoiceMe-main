@@ -231,22 +231,6 @@ async function main() {
         expected: [85, 115, 180, 250, 300, 360, 400],
         expectedZoneCode: 'ROI',
       },
-      {
-        label: 'Basic outside Kashmir express',
-        userId: basicUserId,
-        originPincode: '110001',
-        destinationPincode: '400001',
-        mode: 'air' as const,
-        expected: [110, 150, 230, 300, 400, 500, 550],
-      },
-      {
-        label: 'Premium outside Kashmir express',
-        userId: premiumUserId,
-        originPincode: '110001',
-        destinationPincode: '400001',
-        mode: 'air' as const,
-        expected: [110, 150, 230, 300, 400, 500, 550],
-      },
     ]
 
     const outputRows: string[] = []

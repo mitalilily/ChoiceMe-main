@@ -1161,6 +1161,29 @@ const parseSlabJsonCell = (value?: string) => {
 
 const parseCodSlabJsonCell = (value?: string) => parseSlabJsonCell(value)
 
+const zoneColumnBase = (zone: { code?: string | null; name?: string | null }) => {
+  const code = String(zone.code || '').trim()
+  const name = String(zone.name || '').trim()
+  return [
+    code && name ? `${code} - ${name}` : '',
+    code,
+    name,
+  ].filter(Boolean)
+}
+
+const readZoneCell = (
+  row: CSVRow,
+  zone: { code?: string | null; name?: string | null },
+  suffix: string,
+) => {
+  for (const base of zoneColumnBase(zone)) {
+    const value = row[`${base} (${suffix})`]
+    if (value !== undefined && value !== null && value !== '') return value
+  }
+
+  return undefined
+}
+
 const isSlabValidationError = (err: unknown) =>
   /slab|overlap|extra_rate|extra_weight_unit|charge_type|charge_value/i.test(
     String((err as any)?.message || err || ''),
@@ -1233,7 +1256,7 @@ export const importShippingRatesController = async (req: any, res: Response) => 
 
     const data = parseShippingRateImportRows(req.file)
 
-    const zonesList = await getAllZones()
+    const zonesList = await getAllZones(normalizedBusinessType)
 
     for (const row of data as CSVRow[]) {
       const courierId = row['Courier ID']
@@ -1253,34 +1276,39 @@ export const importShippingRatesController = async (req: any, res: Response) => 
       // Parse rates for each zone
       type RateItem = { zone_id: string; type: 'forward' | 'rto'; rate: number }
 
-      const rates: RateItem[] = Object.entries(row)
-        .filter(([key]) =>
+      const rates: RateItem[] = zonesList.flatMap((zone): RateItem[] => {
+        const forwardValue =
           normalizedBusinessType === 'b2b'
-            ? key.toLowerCase().includes('forward') || key.toLowerCase().includes('rto')
-            : key.includes('(Forward)') || key.includes('(RTO)'),
-        )
-        .flatMap(([zoneKey, value]): RateItem[] => {
-          if (!value) return []
+            ? readZoneCell(row, zone, 'Per Kg Forward') ?? readZoneCell(row, zone, 'Forward')
+            : readZoneCell(row, zone, 'Forward')
+        const rtoValue =
+          normalizedBusinessType === 'b2b'
+            ? readZoneCell(row, zone, 'Per Kg RTO') ?? readZoneCell(row, zone, 'RTO')
+            : readZoneCell(row, zone, 'RTO')
+        const zoneRates: RateItem[] = []
 
-          const zone = zonesList.find((z) => zoneKey.includes(z.name))
-          if (!zone) return []
-
-          if (zoneKey.toLowerCase().includes('forward')) {
-            return [{ zone_id: zone.id, type: 'forward', rate: Number(value) }]
+        if (forwardValue !== undefined) {
+          const forwardRate = Number(forwardValue)
+          if (Number.isFinite(forwardRate)) {
+            zoneRates.push({ zone_id: zone.id, type: 'forward', rate: forwardRate })
           }
+        }
 
-          if (zoneKey.toLowerCase().includes('rto')) {
-            return [{ zone_id: zone.id, type: 'rto', rate: Number(value) }]
+        if (rtoValue !== undefined) {
+          const rtoRate = Number(rtoValue)
+          if (Number.isFinite(rtoRate)) {
+            zoneRates.push({ zone_id: zone.id, type: 'rto', rate: rtoRate })
           }
+        }
 
-          return []
-        })
+        return zoneRates
+      })
 
       const zoneSlabs: Record<string, { forward?: any[]; rto?: any[] }> = {}
       if (normalizedBusinessType === 'b2c') {
         for (const zone of zonesList) {
-          const forwardSlabs = parseSlabJsonCell(row[`${zone.name} (Forward Slabs)`])
-          const rtoSlabs = parseSlabJsonCell(row[`${zone.name} (RTO Slabs)`])
+          const forwardSlabs = parseSlabJsonCell(readZoneCell(row, zone, 'Forward Slabs'))
+          const rtoSlabs = parseSlabJsonCell(readZoneCell(row, zone, 'RTO Slabs'))
           if (forwardSlabs.length || rtoSlabs.length) {
             zoneSlabs[zone.id] = {}
             if (forwardSlabs.length) zoneSlabs[zone.id].forward = forwardSlabs

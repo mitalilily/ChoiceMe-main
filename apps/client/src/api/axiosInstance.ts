@@ -45,7 +45,42 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-/* ----- attach access token to every request ----- */
+let refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null
+
+const redirectToLogin = () => {
+  if (!window.location.pathname.includes('/login')) {
+    window.location.replace('/login')
+  }
+}
+
+const refreshAuthTokens = (refreshToken: string) => {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(
+        `${API_BASE_URL}/auth/refresh-token`,
+        { refreshToken },
+        {
+          headers: {
+            'x-refresh-token': refreshToken,
+          },
+        },
+      )
+      .then(({ data }) => {
+        if (!data?.accessToken || !data?.refreshToken) {
+          throw new Error('Invalid response from refresh token endpoint')
+        }
+
+        setAuthTokens(data.accessToken, data.refreshToken)
+        return data
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+
+  return refreshPromise
+}
+
 api.interceptors.request.use((cfg) => {
   const { accessToken } = getAuthTokens()
   if (accessToken) cfg.headers.Authorization = `Bearer ${accessToken}`
@@ -62,20 +97,17 @@ api.interceptors.request.use((cfg) => {
   return cfg
 })
 
-/* ----- silent‑refresh once per 401 ----- */
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config
+    const requestUrl = original?.url || ''
 
-    // Skip refresh if:
-    // 1. Not a 401 error
-    // 2. Already retried
-    // 3. This is the refresh token endpoint itself (avoid infinite loop)
     if (
       err.response?.status !== 401 ||
+      !original ||
       original._retry ||
-      original.url?.includes('/auth/refresh-token')
+      requestUrl.includes('/auth/')
     ) {
       return Promise.reject(err)
     }
@@ -84,42 +116,19 @@ api.interceptors.response.use(
 
     const { refreshToken } = getAuthTokens()
     if (!refreshToken) {
-      console.warn('⚠️ No refresh token available, redirecting to login')
       clearAuthTokens()
-      window.location.href = '/login'
+      redirectToLogin()
       return Promise.reject(err)
     }
 
     try {
-      console.log('🔄 Attempting to refresh access token...')
-      const { data } = await axios.post(
-        `${API_BASE_URL}/auth/refresh-token`,
-        { refreshToken },
-        {
-          headers: {
-            'x-refresh-token': refreshToken, // ✅ Send in header for better security
-          },
-        },
-      )
-
-      if (!data?.accessToken || !data?.refreshToken) {
-        throw new Error('Invalid response from refresh token endpoint')
-      }
-
-      setAuthTokens(data.accessToken, data.refreshToken)
+      const data = await refreshAuthTokens(refreshToken)
+      original.headers = original.headers ?? {}
       original.headers.Authorization = `Bearer ${data.accessToken}`
-      
-      console.log('✅ Token refreshed successfully, retrying original request')
-      return api(original) // retry original request with new token
-    } catch (e: unknown) {
-      const error = e as { response?: { data?: { error?: string } }; message?: string }
-      console.error('❌ Refresh token failed:', error?.response?.data?.error || error?.message || e)
+      return api(original)
+    } catch (e) {
       clearAuthTokens()
-      
-      // Only redirect if not already on login page
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login'
-      }
+      redirectToLogin()
       return Promise.reject(e)
     }
   },

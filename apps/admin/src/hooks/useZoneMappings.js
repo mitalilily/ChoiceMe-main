@@ -22,6 +22,11 @@ export function useZoneMappings(
 
   const normalizedType = businessType ? String(businessType).toUpperCase() : null
   const isB2B = normalizedType === 'B2B'
+  const zoneMappingsQueryKey = ['zoneMappings', zoneId]
+  const refreshMappings = () => {
+    queryClient.invalidateQueries({ queryKey: zoneMappingsQueryKey })
+    queryClient.invalidateQueries({ queryKey: ['zones'] })
+  }
 
   const { data: mappingsData = {}, isLoading, isError } = useQuery({
     queryKey: [
@@ -49,18 +54,18 @@ export function useZoneMappings(
     enabled: !!zoneId,
   })
 
-  const rawMappings = isB2B ? mappingsData.data || [] : mappingsData.data || []
-  const mappings = isB2B
-    ? rawMappings.map((item) => ({
-        ...item,
-        is_oda: item.is_oda ?? item.isOda ?? false,
-        is_remote: item.is_remote ?? item.isRemote ?? false,
-        is_mall: item.is_mall ?? item.isMall ?? false,
-        is_sez: item.is_sez ?? item.isSez ?? false,
-        is_airport: item.is_airport ?? item.isAirport ?? false,
-        is_high_security: item.is_high_security ?? item.isHighSecurity ?? false,
-      }))
-    : rawMappings
+  const rawMappings = mappingsData.data || []
+  const mappings = rawMappings.map((item) => ({
+    ...item,
+    id: item.id ?? item.mappingId,
+    mappingId: item.mappingId ?? item.id,
+    is_oda: item.is_oda ?? item.isOda ?? false,
+    is_remote: item.is_remote ?? item.isRemote ?? false,
+    is_mall: item.is_mall ?? item.isMall ?? false,
+    is_sez: item.is_sez ?? item.isSez ?? false,
+    is_airport: item.is_airport ?? item.isAirport ?? false,
+    is_high_security: item.is_high_security ?? item.isHighSecurity ?? false,
+  }))
   const total = isB2B
     ? mappingsData.pagination?.total || 0
     : mappingsData.total || 0
@@ -75,10 +80,8 @@ export function useZoneMappings(
             serviceProvider,
           })
         : zoneService.createZoneMapping(zoneId, data),
-    onSuccess: (newMapping) => {
-      queryClient.setQueryData(['zoneMappings', zoneId], (old) =>
-        old ? [...old, newMapping] : [newMapping],
-      )
+    onSuccess: () => {
+      refreshMappings()
       toast({
         title: 'Mapping created successfully!',
         status: 'success',
@@ -100,7 +103,7 @@ export function useZoneMappings(
           })
         : zoneService.updateZoneMapping(mappingId, mappingData),
     onSuccess: () => {
-      queryClient.invalidateQueries(['zoneMappings', zoneId])
+      refreshMappings()
       toast({
         title: isB2B ? 'Pincode attributes updated.' : 'Mapping updated successfully!',
         status: 'success',
@@ -113,8 +116,8 @@ export function useZoneMappings(
   const deleteMapping = useMutation({
     mutationFn: (mappingId) =>
       isB2B ? b2bAdminService.deletePincode(mappingId) : zoneService.deleteZoneMapping(mappingId),
-    onSuccess: (id) => {
-      queryClient.invalidateQueries(['zoneMappings', zoneId])
+    onSuccess: () => {
+      refreshMappings()
       toast({
         title: 'Mapping deleted successfully!',
         status: 'success',
@@ -130,7 +133,7 @@ export function useZoneMappings(
         ? b2bAdminService.bulkDeletePincodes({ ids: mappingIds })
         : zoneService.bulkDeleteMappings(mappingIds),
     onSuccess: () => {
-      queryClient.invalidateQueries(['zoneMappings', zoneId])
+      refreshMappings()
       toast({
         title: 'Selected mappings deleted successfully!',
         status: 'success',
@@ -146,7 +149,7 @@ export function useZoneMappings(
         ? b2bAdminService.bulkMovePincodes({ ids: mappingIds, targetZoneId: newZoneId })
         : zoneService.bulkMoveMappings(mappingIds, newZoneId),
     onSuccess: () => {
-      queryClient.invalidateQueries(['zoneMappings', zoneId])
+      refreshMappings()
       toast({
         title: 'Selected mappings moved successfully!',
         status: 'success',
@@ -164,7 +167,7 @@ export function useZoneMappings(
       return b2bAdminService.bulkUpdatePincodeFlags({ ids: mappingIds, flags })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['zoneMappings', zoneId])
+      refreshMappings()
       toast({
         title: 'Pincode attributes updated successfully!',
         status: 'success',
@@ -205,14 +208,14 @@ export function useZoneMappings(
       return zoneService.importZoneMappings(zoneId, file, additionalFields?.userChoices)
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries(['zoneMappings', zoneId])
+      refreshMappings()
     },
   })
 
   const remapZone = useMutation({
     mutationFn: () => b2bAdminService.remapZone(zoneId),
     onSuccess: () => {
-      queryClient.invalidateQueries(['zoneMappings', zoneId])
+      refreshMappings()
       toast({
         title: 'Pincodes remapped from state list.',
         status: 'success',

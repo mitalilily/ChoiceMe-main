@@ -43,6 +43,30 @@ const normalizeMode = (value) => {
   return raw
 }
 
+const getZoneLookupKeys = (zone) =>
+  [
+    zone?.id,
+    zone?.code,
+    zone?.name,
+    zone?.code && zone?.name ? `${zone.code} - ${zone.name}` : '',
+    zone?.code && zone?.name ? `${zone.name} (${zone.code})` : '',
+  ].filter(Boolean)
+
+const getZoneEntry = (collection, zone) => {
+  if (!collection) return {}
+  for (const key of getZoneLookupKeys(zone)) {
+    if (collection[key] !== undefined) return collection[key] || {}
+  }
+  return {}
+}
+
+const getZoneColumnLabel = (zone, suffix) => {
+  const code = String(zone?.code || '').trim()
+  const name = String(zone?.name || '').trim()
+  const base = code && name ? `${code} - ${name}` : name || code
+  return `${base} (${suffix})`
+}
+
 // CSV exporter
 const downloadCSV = (allCouriers = [], allZones = [], existingData = [], filters = {}) => {
   if (!allCouriers?.length || !allZones?.length) return
@@ -64,10 +88,10 @@ const downloadCSV = (allCouriers = [], allZones = [], existingData = [], filters
     headers = [
       ...baseHeaders,
       ...allZones.flatMap((zone) => [
-        `${zone.name} (Forward)`,
-        `${zone.name} (RTO)`,
-        `${zone.name} (Forward Slabs)`,
-        `${zone.name} (RTO Slabs)`,
+        getZoneColumnLabel(zone, 'Forward'),
+        getZoneColumnLabel(zone, 'RTO'),
+        getZoneColumnLabel(zone, 'Forward Slabs'),
+        getZoneColumnLabel(zone, 'RTO Slabs'),
       ]),
       'COD Charges',
       'COD Percent',
@@ -88,8 +112,8 @@ const downloadCSV = (allCouriers = [], allZones = [], existingData = [], filters
           ) || {}
 
         const zoneValues = allZones.flatMap((zone) => {
-          const zoneRates = row.rates?.[zone.name] || {}
-          const zoneSlabs = row.zone_slabs?.[zone.name] || {}
+          const zoneRates = getZoneEntry(row.rates, zone)
+          const zoneSlabs = getZoneEntry(row.zone_slabs, zone)
           return [
             zoneRates.forward ?? '',
             zoneRates.rto ?? '',
@@ -117,7 +141,10 @@ const downloadCSV = (allCouriers = [], allZones = [], existingData = [], filters
     headers = [
       ...baseHeaders,
       'Min Weight',
-      ...allZones.flatMap((zone) => [`${zone.name} (Per Kg Forward)`, `${zone.name} (Per Kg RTO)`]),
+      ...allZones.flatMap((zone) => [
+        getZoneColumnLabel(zone, 'Per Kg Forward'),
+        getZoneColumnLabel(zone, 'Per Kg RTO'),
+      ]),
       'COD Charges',
       'COD Percent',
       'Other Charges',
@@ -136,8 +163,11 @@ const downloadCSV = (allCouriers = [], allZones = [], existingData = [], filters
           ) || {}
 
         const zoneValues = allZones.flatMap((zone) => {
-          const zoneRates = row.rates?.[zone.name] || {}
-          return [zoneRates.forward_per_kg ?? '', zoneRates.rto_per_kg ?? '']
+          const zoneRates = getZoneEntry(row.rates, zone)
+          return [
+            zoneRates.forward_per_kg ?? zoneRates.forward ?? '',
+            zoneRates.rto_per_kg ?? zoneRates.rto ?? '',
+          ]
         })
 
         return [

@@ -18,7 +18,24 @@ import {
 import { useDeleteB2BCourier, useDeleteB2BZone } from 'hooks/useCouriers'
 import { getCourierDisplayName, getProviderDisplayName } from 'utils/courierDisplay'
 
-export const B2BTable = ({ data, onEdit, planId }) => {
+const getZoneLookupKeys = (zone) =>
+  [
+    zone?.id,
+    zone?.code,
+    zone?.name,
+    zone?.code && zone?.name ? `${zone.code} - ${zone.name}` : '',
+    zone?.code && zone?.name ? `${zone.name} (${zone.code})` : '',
+  ].filter(Boolean)
+
+const getZoneEntry = (collection, zone) => {
+  if (!collection) return {}
+  for (const key of getZoneLookupKeys(zone)) {
+    if (collection[key] !== undefined) return collection[key] || {}
+  }
+  return {}
+}
+
+export const B2BTable = ({ data, zones = [], onEdit, planId }) => {
   const deleteB2BZoneMutation = useDeleteB2BZone(planId)
   const deleteB2BCourierMutation = useDeleteB2BCourier(planId)
 
@@ -43,11 +60,19 @@ export const B2BTable = ({ data, onEdit, planId }) => {
   return (
     <Stack spacing={6}>
       {data.map((courier) => {
-        const courierZones = Object.keys(courier.rates || {})?.map((zoneName) => ({
-          name: zoneName,
-          rates: courier.rates[zoneName],
-          id: courier?.zone_id, // optional if available
-        }))
+        const courierZones = zones?.length
+          ? zones
+              .map((zone) => ({
+                name: zone.name,
+                rates: getZoneEntry(courier.rates, zone),
+                id: zone.id,
+              }))
+              .filter((zone) => Object.keys(zone.rates || {}).length > 0)
+          : Object.keys(courier.rates || {})?.map((zoneName) => ({
+              name: zoneName,
+              rates: courier.rates[zoneName],
+              id: courier?.zone_id, // optional if available
+            }))
 
         return (
           <Box

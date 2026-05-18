@@ -33,7 +33,6 @@ const SPECIAL_ZONE_STATES = new Set(
     'Mizoram',
     'Nagaland',
     'Tripura',
-    'Jammu and Kashmir',
   ].map((s) => s.toLowerCase()),
 )
 

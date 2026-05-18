@@ -56,6 +56,29 @@ interface ShippingRate {
   }
 }
 
+const getZoneLookupKeys = (zone: { id?: string; code?: string; name?: string }) =>
+  [
+    zone?.id,
+    zone?.code,
+    zone?.name,
+    zone?.code && zone?.name ? `${zone.code} - ${zone.name}` : '',
+    zone?.code && zone?.name ? `${zone.name} (${zone.code})` : '',
+  ].filter(Boolean) as string[]
+
+const getZoneEntry = (
+  collection: ShippingRate['rates'] | undefined,
+  zone: { id?: string; code?: string; name?: string },
+) => {
+  if (!collection) return {}
+  for (const key of getZoneLookupKeys(zone)) {
+    if (collection[key] !== undefined) return collection[key] || {}
+  }
+  return {}
+}
+
+const getZoneLabel = (zone: { code?: string; name?: string }) =>
+  [zone.code, zone.name].filter(Boolean).join(' - ') || 'Zone'
+
 // --- B2C Table ---
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const B2CClientTable = ({ data, zones }: { data: ShippingRate[]; zones: any[] }) => {
@@ -107,11 +130,11 @@ const B2CClientTable = ({ data, zones }: { data: ShippingRate[]; zones: any[] })
       (zone: { code: string; description: string; name: string }) =>
         ({
           id: zone.code,
-          label: `${zone.name} (F | RTO)`,
+          label: `${getZoneLabel(zone)} (F | RTO)`,
           label_desc: zone?.description,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           render: (_: any, row: any) => {
-            const rates = row.rates?.[zone.name] || {}
+            const rates = getZoneEntry(row.rates, zone)
 
             const forward = rates.forward ?? 'NA'
             const rto = rates.rto ?? 'NA'
@@ -187,12 +210,12 @@ const B2BClientTable = ({
               </TableHead>
               <TableBody>
                 {zones.map((zone) => {
-                  const rates = courier.rates?.[zone.name] || {}
+                  const rates = getZoneEntry(courier.rates, zone)
                   return (
                     <TableRow key={zone.code}>
-                      <TableCell>{zone.name}</TableCell>
-                      <TableCell>₹{rates.forward_per_kg ?? 'NA'}</TableCell>
-                      <TableCell>₹{rates.rto_per_kg ?? 'NA'}</TableCell>
+                      <TableCell>{getZoneLabel(zone)}</TableCell>
+                      <TableCell>₹{rates.forward_per_kg ?? rates.forward ?? 'NA'}</TableCell>
+                      <TableCell>₹{rates.rto_per_kg ?? rates.rto ?? 'NA'}</TableCell>
                       <TableCell>{rates.min_weight ?? courier.min_weight ?? 'NA'} kg</TableCell>
                     </TableRow>
                   )
@@ -239,15 +262,13 @@ const RateCard = () => {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       zones.forEach((zone: any) => {
-        // NOTE: UI tables use `zone.name` as the key into `rates`, so CSV export
-        // should use the same to avoid returning NA for all values.
-        const zoneRates = r.rates?.[zone.name] || {}
+        const zoneRates = getZoneEntry(r.rates, zone)
         if (businessType === 'b2b') {
-          base[`${zone.name} (Per Kg)`] = `F: ₹${zoneRates.forward_per_kg ?? 'NA'} | RTO: ₹${
-            zoneRates.rto_per_kg ?? 'NA'
+          base[`${getZoneLabel(zone)} (Per Kg)`] = `F: ₹${zoneRates.forward_per_kg ?? zoneRates.forward ?? 'NA'} | RTO: ₹${
+            zoneRates.rto_per_kg ?? zoneRates.rto ?? 'NA'
           }`
         } else {
-          base[`${zone.name} (F | RTO)`] = `F: ₹${zoneRates.forward ?? 'NA'} | RTO: ₹${
+          base[`${getZoneLabel(zone)} (F | RTO)`] = `F: ₹${zoneRates.forward ?? 'NA'} | RTO: ₹${
             zoneRates.rto ?? 'NA'
           }`
         }

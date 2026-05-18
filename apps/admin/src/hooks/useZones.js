@@ -11,6 +11,11 @@ export function useZones(businessType = null, filters = {}) {
   const queryKey = ['zones', businessType, filters]
   const normalizedType = businessType ? String(businessType).toUpperCase() : null
   const isB2B = normalizedType === 'B2B'
+  const refreshZoneBackedViews = () => {
+    queryClient.invalidateQueries({ queryKey: ['zones'] })
+    queryClient.invalidateQueries({ queryKey: ['shippingRates'] })
+    queryClient.invalidateQueries({ queryKey: ['b2b-zone-rates'] })
+  }
 
   const { data: zones = [], isLoading, isError } = useQuery({
     queryKey,
@@ -30,7 +35,7 @@ export function useZones(businessType = null, filters = {}) {
         ? b2bAdminService.createZone({ ...payload, business_type: 'B2B' })
         : zoneService.createZone(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries(['zones'])
+      refreshZoneBackedViews()
       toast({
         title: isB2B ? 'Zone saved & pincodes auto-mapped.' : 'Zone created successfully.',
         description: isB2B
@@ -57,7 +62,7 @@ export function useZones(businessType = null, filters = {}) {
         ? b2bAdminService.updateZone(zone.id, zone)
         : zoneService.updateZone(zone),
     onSuccess: (data) => {
-      queryClient.invalidateQueries(queryKey)
+      refreshZoneBackedViews()
       toast({
         title: isB2B ? 'Zone updated & pincodes refreshed.' : data.message || 'Zone updated successfully',
         description: isB2B
@@ -81,7 +86,7 @@ export function useZones(businessType = null, filters = {}) {
   const deleteZone = useMutation({
     mutationFn: (id) => (isB2B ? b2bAdminService.deleteZone(id) : zoneService.deleteZone(id)),
     onSuccess: () => {
-      queryClient.invalidateQueries(queryKey)
+      refreshZoneBackedViews()
       toast({
         title: 'Zone deleted successfully.',
         status: 'success',

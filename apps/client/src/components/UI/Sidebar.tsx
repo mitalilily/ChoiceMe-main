@@ -62,6 +62,7 @@ interface SidebarProps {
   handleDrawerToggle: () => void
   setHovered: Dispatch<SetStateAction<boolean>>
   hovered: boolean
+  onNavigate?: () => void
 }
 
 export const COLLAPSED_WIDTH = 80
@@ -232,7 +233,13 @@ const navItems: NavItem[] = [
   },
 ]
 
-export default function Sidebar({ role = 'customer', pinned, hovered, setHovered }: SidebarProps) {
+export default function Sidebar({
+  role = 'customer',
+  pinned,
+  hovered,
+  setHovered,
+  onNavigate,
+}: SidebarProps) {
   const location = useLocation()
   const theme = useTheme()
   const isSidebarExpanded = pinned || hovered
@@ -287,7 +294,7 @@ export default function Sidebar({ role = 'customer', pinned, hovered, setHovered
           <ListItemButton
             component={hasChildren ? 'div' : NavLink}
             to={hasChildren ? undefined : item.path}
-            onClick={hasChildren ? () => toggleExpand(item.text) : undefined}
+            onClick={hasChildren ? () => toggleExpand(item.text) : onNavigate}
             sx={{
               ...navItemSx,
               justifyContent: isSidebarExpanded ? 'flex-start' : 'center',
@@ -354,6 +361,7 @@ export default function Sidebar({ role = 'customer', pinned, hovered, setHovered
                         key={sub.text}
                         component={NavLink}
                         to={sub.path}
+                        onClick={onNavigate}
                         sx={{
                           py: 0.65,
                           px: 1.3,

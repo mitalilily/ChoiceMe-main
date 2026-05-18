@@ -6,7 +6,7 @@ export const createZone = async (req: Request, res: Response) => {
     const zone = await zoneService.createZone(req.body, req?.body?.business_type?.toLowerCase())
     res.status(201).json(zone)
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message })
+    res.status(400).json({ error: (err as Error).message })
     console.log('[creatzezone controller:', err)
   }
 }
@@ -83,7 +83,7 @@ export const addZoneMapping = async (req: Request, res: Response) => {
     const mapping = await zoneService.addZoneMapping(req.params.zoneId, req.body)
     res.status(201).json(mapping)
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message })
+    res.status(400).json({ error: (err as Error).message })
   }
 }
 
@@ -92,7 +92,7 @@ export const updateZoneMappingController = async (req: Request, res: Response) =
     const updated = await zoneService.updateZoneMapping({ id: req.params.mappingId, ...req.body })
     res.json(updated)
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message })
+    res.status(400).json({ error: (err as Error).message })
   }
 }
 

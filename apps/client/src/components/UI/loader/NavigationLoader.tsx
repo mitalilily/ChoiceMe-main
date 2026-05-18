@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import FullScreenLoader from './FullScreenLoader'
+import './loader.css'
 
-const MIN_DISPLAY_TIME = 700 // 2 seconds
+const MIN_DISPLAY_TIME = 180
 
 /**
- * NavigationLoader - Shows the loader for at least 2 seconds on every route change
+ * Shows lightweight route feedback without blocking clicks during quick navigation.
  */
 export default function NavigationLoader() {
   const location = useLocation()
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    // Show loader immediately on route change
     setIsLoading(true)
 
-    // Hide loader after minimum display time
     const timer = setTimeout(() => {
       setIsLoading(false)
     }, MIN_DISPLAY_TIME)
@@ -23,9 +21,9 @@ export default function NavigationLoader() {
     return () => {
       clearTimeout(timer)
     }
-  }, [location.pathname]) // Trigger on route change
+  }, [location.pathname, location.search, location.hash])
 
   if (!isLoading) return null
 
-  return <FullScreenLoader />
+  return <div className="navigation-progress" aria-hidden="true" />
 }

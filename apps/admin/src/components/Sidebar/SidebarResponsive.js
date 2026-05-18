@@ -35,6 +35,7 @@ function SidebarResponsive(props) {
   const hamburgerBorder = useColorModeValue('rgba(12,59,128,0.12)', 'rgba(255,255,255,0.12)')
   const defaultHamburgerColor = useColorModeValue('gray.700', 'gray.200')
   const hamburgerColor = props.secondary ? 'white' : defaultHamburgerColor
+  const { isOpen, onOpen, onClose } = useDisclosure()
 
   const createLinks = (routes) => {
     return routes
@@ -56,7 +57,7 @@ function SidebarResponsive(props) {
         const isActive = activeRoute(prop.layout + prop.path) === 'active'
 
         return (
-          <NavLink to={prop.layout + prop.path} key={prop.name}>
+          <NavLink to={prop.layout + prop.path} key={prop.name} onClick={onClose}>
             <Button
               boxSize="initial"
               justifyContent="flex-start"
@@ -110,8 +111,12 @@ function SidebarResponsive(props) {
     </Box>
   )
 
-  const { isOpen, onOpen, onClose } = useDisclosure()
   const btnRef = React.useRef()
+
+  React.useEffect(() => {
+    if (isOpen) onClose()
+  }, [location.pathname, location.search])
+
   return (
     <Flex display={{ sm: 'flex', xl: 'none' }} ref={mainPanel} alignItems="center">
       <Box

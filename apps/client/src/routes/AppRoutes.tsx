@@ -1,6 +1,6 @@
 // AppRoutes.tsx
 import { Component, lazy, Suspense, useEffect, type ErrorInfo, type ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import RequireAuth from '../components/auth/wrapper/RequireAuth'
 import RequireMerchantReady from '../components/auth/wrapper/RequireMerchantReady'
 import RequireOnboard from '../components/auth/wrapper/RequireOnboard'
@@ -117,7 +117,7 @@ const reloadOnceForFreshAssets = () => {
 }
 
 class RouteErrorBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; resetKey: string },
   { hasError: boolean; chunkError: boolean }
 > {
   state = { hasError: false, chunkError: false }
@@ -132,6 +132,12 @@ class RouteErrorBoundary extends Component<
       return
     }
     console.error('Route render failed', error, info)
+  }
+
+  componentDidUpdate(prevProps: { resetKey: string }) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false, chunkError: false })
+    }
   }
 
   render() {
@@ -168,13 +174,16 @@ function RouteAssetRecovery() {
   return null
 }
 
-export default function AppRoutes() {
+function RoutedApp() {
+  const location = useLocation()
+  const routeKey = `${location.pathname}${location.search}${location.hash}`
+
   return (
-    <BrowserRouter>
+    <>
       <NavigationLoader />
       <GlobalRedirectHandler />
       <RouteAssetRecovery />
-      <RouteErrorBoundary>
+      <RouteErrorBoundary resetKey={routeKey}>
         <Suspense fallback={<FullScreenLoader />}>
           <Routes>
           {/* public */}
@@ -268,6 +277,14 @@ export default function AppRoutes() {
           </Routes>
         </Suspense>
       </RouteErrorBoundary>
+    </>
+  )
+}
+
+export default function AppRoutes() {
+  return (
+    <BrowserRouter>
+      <RoutedApp />
     </BrowserRouter>
   )
 }

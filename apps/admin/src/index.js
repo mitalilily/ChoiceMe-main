@@ -9,7 +9,14 @@ import { BrowserRouter, Redirect, Route, Switch } from "react-router-dom";
 import theme from "theme/theme.js";
 import "./index.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const root = createRoot(document.getElementById("root"));
 

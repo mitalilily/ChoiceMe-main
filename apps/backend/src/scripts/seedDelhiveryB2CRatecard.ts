@@ -1,16 +1,27 @@
 import { randomUUID } from 'crypto'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db, pool } from '../models/client'
-import { couriers, plans, shippingRates, zones } from '../schema/schema'
+import { couriers } from '../models/schema/couriers'
+import { plans } from '../models/schema/plans'
+import {
+  shippingRateCodSlabs,
+  shippingRates,
+  shippingRateSlabs,
+} from '../models/schema/shippingRates'
+import { zones } from '../models/schema/zones'
 
-type CourierSeed = {
-  id: number
-  name: string
-  serviceProvider: string
-  mode: 'Air' | 'Surface'
-  businessTypes: ('b2c' | 'b2b')[]
-  extraForward: number
-  extraRto: number
+const DELHIVERY_PROVIDER = 'delhivery'
+const DELHIVERY_SURFACE_COURIER_ID = 99
+const DELHIVERY_SURFACE_COURIER_NAME = 'Delhivery Surface'
+const BUSINESS_TYPE = 'B2C'
+const MODE = 'Surface'
+
+type RateSlab = {
+  weight_from: number
+  weight_to: number
+  rate: number
+  extra_rate?: number
+  extra_weight_unit?: number
 }
 
 type ZoneSeed = {
@@ -22,281 +33,318 @@ type ZoneSeed = {
   metadata?: Record<string, unknown>
 }
 
-const courierSeeds: CourierSeed[] = [
-  {
-    id: 100,
-    name: 'Delhivery Metro Air',
-    serviceProvider: 'delhivery',
-    mode: 'Air',
-    businessTypes: ['b2c'],
-    extraForward: 25,
-    extraRto: 10,
-  },
-  {
-    id: 99,
-    name: 'Delhivery Metro Surface',
-    serviceProvider: 'delhivery',
-    mode: 'Surface',
-    businessTypes: ['b2c'],
-    extraForward: 5,
-    extraRto: 5,
-  },
-]
+type PlanRateCard = {
+  planName: 'Basic' | 'Premium'
+  kashmir: RateSlab[]
+  outsideKashmir: RateSlab[]
+}
 
 const zoneSeeds: ZoneSeed[] = [
+  {
+    code: 'KASHMIR',
+    name: 'Kashmir',
+    description: 'Dedicated Kashmir and Ladakh B2C pricing zone.',
+    region: 'Kashmir',
+    states: ['Jammu and Kashmir', 'Jammu & Kashmir', 'Ladakh'],
+    metadata: { source: 'choice-mee-image-rate-card' },
+  },
   {
     code: 'METRO_TO_METRO',
     name: 'Metro to Metro',
     description: 'Shipments between major metros across the network.',
     region: 'Metro to Metro',
-    metadata: {
-      note: 'Metro-to-metro corridor seeded 11 Feb 2026 16:34.',
-    },
   },
   {
     code: 'ROI',
-    name: 'Metro to Metro',
-    description: 'Cover all metro city shipments when flows traverse the rest of India.',
+    name: 'Rest of India',
+    description: 'Default outside-Kashmir B2C pricing zone.',
     region: 'Rest of India',
-    metadata: {
-      note: 'Created 11 Feb 2026 16:34 UTC',
-      origin: 'manual-injection',
-    },
   },
   {
     code: 'SPECIAL_ZONE',
     name: 'Special Zone',
-    description:
-      'Special Zones that need extra handling when the shipment leaves the regular network.',
+    description: 'Special zones that need extra handling, excluding Kashmir/Ladakh.',
     region: 'Special Zones',
-    metadata: {
-      note: 'When shipment travels rest of India',
-    },
   },
   {
     code: 'WITHIN_CITY',
     name: 'Within City',
-    description: 'Shipments that stay within a single city boundary (incl. north-east metros).',
+    description: 'Shipments that stay within a single city boundary.',
     region: 'Within City',
-    states: ['Nagaland', 'Mizoram', 'Manipur', 'Meghalaya', 'Assam', 'Sikkim'],
-    metadata: {
-      note: 'All seven sister states listed for the rollout (11 Feb 2026 16:34).',
-    },
   },
   {
     code: 'WITHIN_REGION',
     name: 'Within Region',
-    description: 'When a shipment travels within a region comprising neighbouring states.',
+    description: 'Shipments moving within neighbouring regions.',
     region: 'Within Region',
-    metadata: {
-      note: 'Region-only movement',
-    },
   },
   {
     code: 'WITHIN_STATE',
     name: 'Within State',
-    description: 'Shipment travels entirely within the same state.',
+    description: 'Shipments moving within the same state.',
     region: 'Within State',
-    metadata: {
-      note: 'Refer to 11 Feb 2026 change log for this zone',
-    },
   },
 ]
 
-const forwardRateGuide: Record<string, number> = {
-  METRO_TO_METRO: 145,
-  ROI: 150,
-  SPECIAL_ZONE: 180,
-  WITHIN_CITY: 110,
-  WITHIN_REGION: 130,
-  WITHIN_STATE: 140,
-}
+const planRateCards: PlanRateCard[] = [
+  {
+    planName: 'Basic',
+    kashmir: [
+      { weight_from: 0.1, weight_to: 0.5, rate: 80 },
+      { weight_from: 0.5, weight_to: 1, rate: 100 },
+      { weight_from: 1, weight_to: 2, rate: 150 },
+      { weight_from: 2, weight_to: 3, rate: 200 },
+      { weight_from: 3, weight_to: 4, rate: 230 },
+      { weight_from: 4, weight_to: 5, rate: 260, extra_rate: 20, extra_weight_unit: 1 },
+    ],
+    outsideKashmir: [
+      { weight_from: 0.1, weight_to: 0.5, rate: 95 },
+      { weight_from: 0.5, weight_to: 1, rate: 140 },
+      { weight_from: 1, weight_to: 2, rate: 195 },
+      { weight_from: 2, weight_to: 3, rate: 260 },
+      { weight_from: 3, weight_to: 4, rate: 320 },
+      { weight_from: 4, weight_to: 5, rate: 380, extra_rate: 50, extra_weight_unit: 1 },
+    ],
+  },
+  {
+    planName: 'Premium',
+    kashmir: [
+      { weight_from: 0.1, weight_to: 0.5, rate: 70 },
+      { weight_from: 0.5, weight_to: 1, rate: 85 },
+      { weight_from: 1, weight_to: 2, rate: 115 },
+      { weight_from: 2, weight_to: 3, rate: 165 },
+      { weight_from: 3, weight_to: 4, rate: 200 },
+      { weight_from: 4, weight_to: 5, rate: 225, extra_rate: 25, extra_weight_unit: 2 },
+    ],
+    outsideKashmir: [
+      { weight_from: 0.1, weight_to: 0.5, rate: 85 },
+      { weight_from: 0.5, weight_to: 1, rate: 115 },
+      { weight_from: 1, weight_to: 2, rate: 180 },
+      { weight_from: 2, weight_to: 3, rate: 250 },
+      { weight_from: 3, weight_to: 4, rate: 300 },
+      { weight_from: 4, weight_to: 5, rate: 360, extra_rate: 40, extra_weight_unit: 1 },
+    ],
+  },
+]
 
-const rtoRateGuide: Record<string, number> = {
-  METRO_TO_METRO: 95,
-  ROI: 90,
-  SPECIAL_ZONE: 110,
-  WITHIN_CITY: 70,
-  WITHIN_REGION: 80,
-  WITHIN_STATE: 85,
-}
+const codSlabs = [
+  { amount_from: 0, amount_to: 2000, charge_type: 'flat', charge_value: 40 },
+  { amount_from: 2000, amount_to: null, charge_type: 'percent', charge_value: 2 },
+] as const
 
-const codCharges = 45.0
-const codPercent = 1.5
-const otherCharges = 18.0
-const minWeight = 0.5
+const money = (value: number) => value.toFixed(2)
+const kg = (value: number) => value.toFixed(3)
 
-async function ensureBasicPlan() {
-  const [existing] = await db.select().from(plans).where(eq(plans.name, 'Basic')).limit(1)
-  if (existing) return existing
+async function ensurePlans() {
+  const planMap = new Map<string, { id: string; name: string }>()
 
-  const [plan] = await db
-    .insert(plans)
-    .values({ id: randomUUID(), name: 'Basic', description: 'Default B2C plan', is_active: true })
-    .returning()
+  for (const name of ['Basic', 'Premium'] as const) {
+    const [existing] = await db
+      .select({ id: plans.id, name: plans.name })
+      .from(plans)
+      .where(sql`lower(trim(${plans.name})) = ${name.toLowerCase()}`)
+      .limit(1)
 
-  console.log('🌱 Inserted Basic plan because it did not exist yet')
-  return plan
-}
+    if (existing) {
+      planMap.set(name, existing)
+      continue
+    }
 
-async function upsertCouriers() {
-  for (const courier of courierSeeds) {
-    await db
-      .insert(couriers)
+    const [created] = await db
+      .insert(plans)
       .values({
-        id: courier.id,
-        name: courier.name,
-        serviceProvider: courier.serviceProvider,
-        businessType: courier.businessTypes,
-        isEnabled: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [couriers.id, couriers.serviceProvider],
-        set: {
-          name: courier.name,
-          businessType: courier.businessTypes,
-          isEnabled: true,
-          updatedAt: new Date(),
-        },
-      })
-    console.log(`✅ Ensured courier ${courier.name} (ID ${courier.id}) exists`)
+        id: randomUUID(),
+        name,
+        description: `${name} B2C plan`,
+        is_active: true,
+      } as any)
+      .returning({ id: plans.id, name: plans.name })
+
+    planMap.set(name, created)
+    console.log(`Inserted ${name} plan`)
   }
+
+  return planMap
 }
 
-async function upsertZones() {
-  const insertedZones: { id: string; code: string; name: string }[] = []
+async function ensureDelhiverySurfaceCourier() {
+  await db
+    .insert(couriers)
+    .values({
+      id: DELHIVERY_SURFACE_COURIER_ID,
+      name: DELHIVERY_SURFACE_COURIER_NAME,
+      serviceProvider: DELHIVERY_PROVIDER,
+      businessType: ['b2c'],
+      isEnabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [couriers.id, couriers.serviceProvider],
+      set: {
+        name: DELHIVERY_SURFACE_COURIER_NAME,
+        businessType: ['b2c'],
+        isEnabled: true,
+        updatedAt: new Date(),
+      },
+    })
+}
 
+async function ensureZones() {
   for (const seed of zoneSeeds) {
-    const [zoneRow] = await db
+    await db
       .insert(zones)
       .values({
         code: seed.code,
         name: seed.name,
         description: seed.description,
         region: seed.region,
-        business_type: 'B2C',
-        metadata: seed.metadata ?? null,
+        business_type: BUSINESS_TYPE,
         states: seed.states ?? [],
+        metadata: seed.metadata ?? { source: 'choice-mee-image-rate-card' },
         created_at: new Date(),
         updated_at: new Date(),
-      })
+      } as any)
       .onConflictDoUpdate({
         target: [zones.code, zones.business_type],
         set: {
           name: seed.name,
           description: seed.description,
           region: seed.region,
-          metadata: seed.metadata ?? null,
           states: seed.states ?? [],
+          metadata: seed.metadata ?? { source: 'choice-mee-image-rate-card' },
           updated_at: new Date(),
         },
       })
-      .returning()
-
-    insertedZones.push({ id: zoneRow.id, code: zoneRow.code, name: zoneRow.name })
-    console.log(`✅ Upserted zone ${seed.code} (${seed.name})`)
   }
 
-  return insertedZones
+  return db
+    .select({ id: zones.id, code: zones.code, name: zones.name })
+    .from(zones)
+    .where(sql`lower(trim(${zones.business_type})) = 'b2c'`)
 }
 
-async function purgeExistingRates() {
-  const courierIds = courierSeeds.map((courier) => courier.id)
-  await db
-    .delete(shippingRates)
-    .where(and(eq(shippingRates.business_type, 'b2c'), inArray(shippingRates.courier_id, courierIds)))
-  console.log('🧹 Removed existing B2C rates for the configured Delhivery couriers to avoid duplicates')
+async function purgeExistingSurfaceRates(planIds: string[], zoneIds: string[]) {
+  if (!planIds.length || !zoneIds.length) return 0
+
+  const existingRates = await db
+    .select({ id: shippingRates.id })
+    .from(shippingRates)
+    .where(
+      and(
+        eq(shippingRates.business_type, 'b2c'),
+        inArray(shippingRates.plan_id, planIds),
+        inArray(shippingRates.zone_id, zoneIds),
+        eq(shippingRates.courier_id, DELHIVERY_SURFACE_COURIER_ID),
+        sql`lower(trim(${shippingRates.service_provider})) = ${DELHIVERY_PROVIDER}`,
+        sql`lower(trim(${shippingRates.mode})) = 'surface'`,
+      ),
+    )
+
+  const rateIds = existingRates.map((row) => row.id)
+  if (!rateIds.length) return 0
+
+  await db.delete(shippingRateCodSlabs).where(inArray(shippingRateCodSlabs.shipping_rate_id, rateIds))
+  await db.delete(shippingRateSlabs).where(inArray(shippingRateSlabs.shipping_rate_id, rateIds))
+  await db.delete(shippingRates).where(inArray(shippingRates.id, rateIds))
+
+  return rateIds.length
 }
 
-async function seedRates(planId: string, insertedZones: { id: string; code: string }[]) {
-  const zoneMap = insertedZones.reduce<Record<string, string>>((acc, zone) => {
-    acc[zone.code] = zone.id
-    return acc
-  }, {})
+async function insertRateCardSlabs(shippingRateId: string, slabs: RateSlab[]) {
+  await db.insert(shippingRateSlabs).values(
+    slabs.map((slab) => ({
+      shipping_rate_id: shippingRateId,
+      weight_from: kg(slab.weight_from),
+      weight_to: kg(slab.weight_to),
+      rate: money(slab.rate),
+      extra_rate: slab.extra_rate === undefined ? null : money(slab.extra_rate),
+      extra_weight_unit:
+        slab.extra_weight_unit === undefined ? null : kg(slab.extra_weight_unit),
+      created_at: new Date(),
+      updated_at: new Date(),
+    })),
+  )
+}
 
-  type ShippingRateInsert = {
-    plan_id: string
-    courier_id: number
-    courier_name: string
-    service_provider: string
-    mode: string
-    business_type: string
-    min_weight: string
-    zone_id: string
-    type: 'forward' | 'rto'
-    rate: string
-    cod_charges: string
-    cod_percent: string
-    other_charges: string
-  }
+async function insertCodSlabs(shippingRateId: string) {
+  await db.insert(shippingRateCodSlabs).values(
+    codSlabs.map((slab) => ({
+      shipping_rate_id: shippingRateId,
+      amount_from: money(slab.amount_from),
+      amount_to: slab.amount_to === null ? null : money(slab.amount_to),
+      charge_type: slab.charge_type,
+      charge_value: money(slab.charge_value),
+      created_at: new Date(),
+      updated_at: new Date(),
+    })),
+  )
+}
 
-  const rateRecords: ShippingRateInsert[] = []
-  const targetZoneCodes = Object.keys(zoneMap)
+async function seedRates(
+  planMap: Map<string, { id: string; name: string }>,
+  zoneRows: { id: string; code: string; name: string }[],
+) {
+  let inserted = 0
 
-  for (const code of targetZoneCodes) {
-    const zoneId = zoneMap[code]
-    const baseForward = forwardRateGuide[code] ?? 150
-    const baseRto = rtoRateGuide[code] ?? 90
+  for (const planRateCard of planRateCards) {
+    const plan = planMap.get(planRateCard.planName)
+    if (!plan) throw new Error(`${planRateCard.planName} plan is missing`)
 
-    for (const courier of courierSeeds) {
-      const forwardRate = baseForward + courier.extraForward
-      const rtoRate = baseRto + courier.extraRto
+    for (const zone of zoneRows) {
+      const isKashmir = zone.code.trim().toUpperCase() === 'KASHMIR'
+      const slabs = isKashmir ? planRateCard.kashmir : planRateCard.outsideKashmir
+      const baseRate = slabs[0].rate
 
-      rateRecords.push({
-        plan_id: planId,
-        courier_id: courier.id,
-        courier_name: courier.name,
-        service_provider: courier.serviceProvider,
-        mode: courier.mode,
-        business_type: 'b2c',
-        min_weight: minWeight.toFixed(2),
-        zone_id: zoneId,
-        type: 'forward',
-        rate: forwardRate.toFixed(2),
-        cod_charges: codCharges.toFixed(2),
-        cod_percent: codPercent.toFixed(2),
-        other_charges: otherCharges.toFixed(2),
-      })
+      for (const type of ['forward', 'rto'] as const) {
+        const [rateRow] = await db
+          .insert(shippingRates)
+          .values({
+            id: randomUUID(),
+            plan_id: plan.id,
+            courier_id: DELHIVERY_SURFACE_COURIER_ID,
+            courier_name: DELHIVERY_SURFACE_COURIER_NAME,
+            service_provider: DELHIVERY_PROVIDER,
+            mode: MODE,
+            business_type: 'b2c',
+            min_weight: '0.50',
+            zone_id: zone.id,
+            type,
+            rate: money(baseRate),
+            cod_charges: '40.00',
+            cod_percent: '2.00',
+            other_charges: '0.00',
+            created_at: new Date(),
+            last_updated: new Date(),
+          } as any)
+          .returning({ id: shippingRates.id })
 
-      rateRecords.push({
-        plan_id: planId,
-        courier_id: courier.id,
-        courier_name: courier.name,
-        service_provider: courier.serviceProvider,
-        mode: courier.mode,
-        business_type: 'b2c',
-        min_weight: minWeight.toFixed(2),
-        zone_id: zoneId,
-        type: 'rto',
-        rate: rtoRate.toFixed(2),
-        cod_charges: codCharges.toFixed(2),
-        cod_percent: codPercent.toFixed(2),
-        other_charges: otherCharges.toFixed(2),
-      })
+        await insertRateCardSlabs(rateRow.id, slabs)
+        await insertCodSlabs(rateRow.id)
+        inserted += 1
+      }
     }
   }
 
-  if (!rateRecords.length) {
-    console.warn('⚠️ No rate records to insert; check the zone seeds')
-    return
-  }
-
-  await db.insert(shippingRates).values(rateRecords)
-  console.log(`📦 Inserted ${rateRecords.length} dummy B2C rate entries for Delhivery couriers`)
+  return inserted
 }
 
 async function main() {
   try {
-    const plan = await ensureBasicPlan()
-    await upsertCouriers()
-    const zones = await upsertZones()
-    await purgeExistingRates()
-    await seedRates(plan.id, zones)
-    console.log('🎉 Delhivery B2C rate card seeding complete')
+    const planMap = await ensurePlans()
+    await ensureDelhiverySurfaceCourier()
+    const zoneRows = await ensureZones()
+    const planIds = Array.from(planMap.values()).map((plan) => plan.id)
+    const zoneIds = zoneRows.map((zone) => zone.id)
+    const removed = await purgeExistingSurfaceRates(planIds, zoneIds)
+    const inserted = await seedRates(planMap, zoneRows)
+
+    console.log(
+      `Updated Delhivery surface image rate card: removed ${removed} old rows, inserted ${inserted} Basic/Premium forward/RTO rows.`,
+    )
+    console.log('Express/Air rates were not changed.')
   } catch (error) {
-    console.error('❌ Error while seeding Delhivery metadata:', error)
+    console.error('Delhivery B2C image rate card seed failed:', error)
     process.exitCode = 1
   } finally {
     await pool.end()

@@ -4,7 +4,13 @@ import fs from 'fs'
 import Papa from 'papaparse'
 import { db } from '../client'
 import { locations } from '../schema/locations'
+import {
+  shippingRateCodSlabs,
+  shippingRates,
+  shippingRateSlabs,
+} from '../schema/shippingRates'
 import { b2bPincodes, zoneMappings, zones } from '../schema/zones'
+import { b2bZoneToZoneRates } from '../schema/zones'
 
 const sanitizeStates = (input: any): string[] => {
   if (!Array.isArray(input)) return []
@@ -15,6 +21,83 @@ const sanitizeStates = (input: any): string[] => {
     if (trimmed) unique.add(trimmed)
   }
   return Array.from(unique)
+}
+
+const cleanText = (value: any) => String(value ?? '').trim()
+
+const isValidPincode = (pincode: string) => {
+  const indianRegex = /^[1-9][0-9]{5}$/ // 6 digits, no leading 0
+  const intlRegex = /^[A-Za-z0-9]{3,10}$/ // simple alphanumeric 3-10 chars
+  return indianRegex.test(pincode) || intlRegex.test(pincode)
+}
+
+const normalizeLocationPayload = (data: any) => {
+  const pincode = cleanText(data?.pincode)
+  const city = cleanText(data?.city)
+  const state = cleanText(data?.state)
+  const country = cleanText(data?.country) || 'India'
+
+  if (!pincode || !city || !state) {
+    throw new Error('Pincode, city and state are required')
+  }
+
+  if (!isValidPincode(pincode)) {
+    throw new Error('Invalid pincode')
+  }
+
+  return { pincode, city, state, country }
+}
+
+const findOrCreateLocation = async (tx: any, data: any) => {
+  const payload = normalizeLocationPayload(data)
+  const [existing] = await tx
+    .select()
+    .from(locations)
+    .where(
+      and(
+        eq(locations.pincode, payload.pincode),
+        eq(locations.city, payload.city),
+        eq(locations.state, payload.state),
+      ),
+    )
+    .limit(1)
+
+  if (existing) return existing
+
+  const [created] = await tx
+    .insert(locations)
+    .values({
+      ...payload,
+      tags: Array.isArray(data?.tags) ? data.tags : [],
+      created_at: new Date(),
+    })
+    .returning()
+
+  return created
+}
+
+const getZoneMappingRow = async (mappingId: string, client: any = db) => {
+  const [row] = await client
+    .select({
+      id: zoneMappings.id,
+      mappingId: zoneMappings.id,
+      zoneId: zoneMappings.zone_id,
+      zone_id: zoneMappings.zone_id,
+      createdAt: zoneMappings.created_at,
+      created_at: zoneMappings.created_at,
+      locationId: locations.id,
+      location_id: locations.id,
+      pincode: locations.pincode,
+      city: locations.city,
+      state: locations.state,
+      country: locations.country,
+    })
+    .from(zoneMappings)
+    .innerJoin(locations, eq(zoneMappings.location_id, locations.id))
+    .where(eq(zoneMappings.id, mappingId))
+    .limit(1)
+
+  return row
 }
 
 // Zones
@@ -132,13 +215,30 @@ export const getAllZones = async (
 }
 
 export const updateZoneMapping = async (mapping: any) => {
-  const { id, created_at, ...safeData } = mapping
-  const [updated] = await db
-    .update(zoneMappings)
-    .set(safeData)
-    .where(eq(zoneMappings.id, id))
-    .returning()
-  return updated
+  const { id, mappingId, created_at, createdAt, locationId, location_id, ...safeData } = mapping
+  const targetId = id || mappingId
+  if (!targetId) throw new Error('Mapping ID is required')
+
+  return db.transaction(async (tx) => {
+    const updatePayload: Record<string, any> = {}
+
+    if (safeData.zone_id || safeData.zoneId) {
+      updatePayload.zone_id = safeData.zone_id || safeData.zoneId
+    }
+
+    if (safeData.pincode || safeData.city || safeData.state) {
+      const location = await findOrCreateLocation(tx, safeData)
+      updatePayload.location_id = location.id
+    } else if (locationId || location_id) {
+      updatePayload.location_id = locationId || location_id
+    }
+
+    if (Object.keys(updatePayload).length) {
+      await tx.update(zoneMappings).set(updatePayload).where(eq(zoneMappings.id, targetId))
+    }
+
+    return getZoneMappingRow(targetId, tx)
+  })
 }
 
 export const getZoneById = async (id: string) => {
@@ -201,6 +301,36 @@ export const updateZone = async (id: string, data: any) => {
 
 export const deleteZone = async (id: string) => {
   await db.transaction(async (tx) => {
+    const [zone] = await tx.select({ id: zones.id }).from(zones).where(eq(zones.id, id)).limit(1)
+    if (!zone) {
+      throw new Error('Zone not found')
+    }
+
+    const rateRows = await tx
+      .select({ id: shippingRates.id })
+      .from(shippingRates)
+      .where(eq(shippingRates.zone_id, id))
+    const rateIds = rateRows.map((rate) => rate.id)
+
+    if (rateIds.length) {
+      await tx
+        .delete(shippingRateCodSlabs)
+        .where(inArray(shippingRateCodSlabs.shipping_rate_id, rateIds))
+      await tx
+        .delete(shippingRateSlabs)
+        .where(inArray(shippingRateSlabs.shipping_rate_id, rateIds))
+      await tx.delete(shippingRates).where(inArray(shippingRates.id, rateIds))
+    }
+
+    await tx
+      .delete(b2bZoneToZoneRates)
+      .where(
+        or(
+          eq(b2bZoneToZoneRates.origin_zone_id, id),
+          eq(b2bZoneToZoneRates.destination_zone_id, id),
+        ),
+      )
+
     // First, delete all pincode mappings associated with this zone
     // This handles both B2B (b2bPincodes) and B2C (zoneMappings) zones
     await tx.delete(b2bPincodes).where(eq(b2bPincodes.zone_id, id))
@@ -213,12 +343,38 @@ export const deleteZone = async (id: string) => {
 
 // Zone Mappings
 export const addZoneMapping = async (zoneId: string, data: any) => {
-  const { id, ...safeData } = data
-  const [mapping] = await db
-    .insert(zoneMappings)
-    .values({ ...safeData, zone_id: zoneId, id: randomUUID(), created_at: new Date() })
-    .returning()
-  return mapping
+  return db.transaction(async (tx) => {
+    const [zone] = await tx
+      .select({ id: zones.id })
+      .from(zones)
+      .where(eq(zones.id, zoneId))
+      .limit(1)
+    if (!zone) throw new Error('Zone not found')
+
+    const location = await findOrCreateLocation(tx, data)
+
+    const [existing] = await tx
+      .select({ id: zoneMappings.id })
+      .from(zoneMappings)
+      .where(and(eq(zoneMappings.zone_id, zoneId), eq(zoneMappings.location_id, location.id)))
+      .limit(1)
+
+    if (existing) {
+      return getZoneMappingRow(existing.id, tx)
+    }
+
+    const [mapping] = await tx
+      .insert(zoneMappings)
+      .values({
+        zone_id: zoneId,
+        location_id: location.id,
+        id: randomUUID(),
+        created_at: new Date(),
+      })
+      .returning({ id: zoneMappings.id })
+
+    return getZoneMappingRow(mapping.id, tx)
+  })
 }
 
 export const getZoneMappingsPaginated = async (
@@ -265,10 +421,14 @@ export const getZoneMappingsPaginated = async (
     // Data query with join
     const data = await db
       .select({
+        id: zoneMappings.id,
         mappingId: zoneMappings.id,
         zoneId: zoneMappings.zone_id,
+        zone_id: zoneMappings.zone_id,
         createdAt: zoneMappings.created_at,
+        created_at: zoneMappings.created_at,
         locationId: locations.id,
+        location_id: locations.id,
         pincode: locations.pincode,
         city: locations.city,
         state: locations.state,
@@ -325,11 +485,6 @@ export const bulkMoveMappings = async (mappingIds: string[], targetZoneId: strin
   return { success: true, moved, targetZone: targetZoneId }
 }
 
-const isValidPincode = (pincode: string) => {
-  const indianRegex = /^[1-9][0-9]{5}$/ // 6 digits, no leading 0
-  const intlRegex = /^[A-Za-z0-9]{3,10}$/ // simple alphanumeric 3-10 chars
-  return indianRegex.test(pincode) || intlRegex.test(pincode)
-}
 type CSVRecord = {
   pincode: string
   city: string

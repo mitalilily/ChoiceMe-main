@@ -50,7 +50,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 2, // only retry failed queries once
+      retry: 1,
     },
   },
 });

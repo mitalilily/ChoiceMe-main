@@ -2,9 +2,10 @@ import { Box, ChakraProvider, Portal, useColorModeValue, useDisclosure } from '@
 import Configurator from 'components/Configurator/Configurator'
 import Footer from 'components/Footer/Footer.js'
 import AdminNavbar from 'components/Navbars/AdminNavbar.js'
+import { RouteAssetRecovery, RouteErrorBoundary } from 'components/RouteRecovery/RouteErrorBoundary'
 import Sidebar from 'components/Sidebar'
 import { useEffect, useState } from 'react'
-import { Redirect, Route, Switch } from 'react-router-dom'
+import { Redirect, Route, Switch, useLocation } from 'react-router-dom'
 import routes from 'routes.js'
 import theme from 'theme/theme.js'
 import FixedPlugin from '../components/FixedPlugin/FixedPlugin'
@@ -15,6 +16,7 @@ import { brandIdentity } from '../theme/brand'
 
 export default function Dashboard(props) {
   const { ...rest } = props
+  const location = useLocation()
   const [sidebarVariant, setSidebarVariant] = useState('transparent')
   const [fixed, setFixed] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(292)
@@ -82,6 +84,7 @@ export default function Dashboard(props) {
 
   return (
     <ChakraProvider theme={theme} resetCss={false}>
+      <RouteAssetRecovery />
       <Sidebar
         routes={routes}
         logoText={brandIdentity.name}
@@ -111,10 +114,12 @@ export default function Dashboard(props) {
         {getRoute() ? (
           <PanelContent>
             <PanelContainer>
-              <Switch>
-                {getRoutes(routes)}
-                <Redirect from="/admin" to="/admin/dashboard" />
-              </Switch>
+              <RouteErrorBoundary resetKey={`${location.pathname}${location.search}`}>
+                <Switch>
+                  {getRoutes(routes)}
+                  <Redirect from="/admin" to="/admin/dashboard" />
+                </Switch>
+              </RouteErrorBoundary>
             </PanelContainer>
           </PanelContent>
         ) : null}

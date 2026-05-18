@@ -888,7 +888,7 @@ const ZoneMappingsPage = () => {
               <Button
                 colorScheme="blue"
                 onClick={handleSaveMapping}
-                isLoading={createMapping.isPending}
+                isLoading={isEdit ? updateMapping.isPending : createMapping.isPending}
               >
                 {isEdit ? 'Update' : 'Save Mapping'}
               </Button>

@@ -28,6 +28,24 @@ const normalizeMode = (value) => {
 const makeCourierKey = (courierId, serviceProvider) =>
   `${courierId || ''}__${normalizeProvider(serviceProvider)}`
 
+const getZoneKey = (zone) => String(zone?.id || zone?.code || zone?.name || '')
+const getZoneLookupKeys = (zone) =>
+  [
+    zone?.id,
+    zone?.code,
+    zone?.name,
+    zone?.code && zone?.name ? `${zone.code} - ${zone.name}` : '',
+    zone?.code && zone?.name ? `${zone.name} (${zone.code})` : '',
+  ].filter(Boolean)
+
+const getZoneEntry = (collection, zone) => {
+  if (!collection) return undefined
+  for (const key of getZoneLookupKeys(zone)) {
+    if (collection[key] !== undefined) return collection[key]
+  }
+  return undefined
+}
+
 const DEFAULT_COD_SLABS = [
   { amount_from: 0, amount_to: 2000, charge_type: 'flat', charge_value: 40 },
   { amount_from: 2000, amount_to: '', charge_type: 'percent', charge_value: 2 },
@@ -53,17 +71,20 @@ export const RateCardEditModal = ({
     .toLowerCase()
   const isB2C = resolvedBusinessType === 'b2c'
 
-  const buildLegacySlabs = (zoneName, type, minWeight, ratesObj) => {
-    const rate = ratesObj?.[zoneName]?.[type]
+  const buildLegacySlabs = (rate, minWeight) => {
     if (rate === undefined || rate === null || rate === '') return []
     const parsedMinWeight = Number(minWeight)
-    return [
-      {
-        weight_from: 0,
-        weight_to: Number.isFinite(parsedMinWeight) && parsedMinWeight > 0 ? parsedMinWeight : '',
-        rate,
-      },
-    ]
+    const legacyWeight = Number.isFinite(parsedMinWeight) && parsedMinWeight > 0 ? parsedMinWeight : ''
+    const slab = {
+      weight_from: 0,
+      weight_to: legacyWeight,
+      rate,
+    }
+    if (legacyWeight) {
+      slab.extra_rate = rate
+      slab.extra_weight_unit = legacyWeight
+    }
+    return [slab]
   }
 
   // Initialize form (new vs edit)
@@ -90,13 +111,22 @@ export const RateCardEditModal = ({
     }
 
     zones.forEach((zone) => {
-      initialForm[zone.name] = {
-        forward: data?.rates?.[zone.name]?.forward ?? '',
-        rto: data?.rates?.[zone.name]?.rto ?? '',
+      const zoneKey = getZoneKey(zone)
+      const zoneRates = getZoneEntry(data?.rates, zone) || {}
+      const zoneSlabs = getZoneEntry(data?.zone_slabs, zone) || {}
+      initialForm[zoneKey] = {
+        forward: zoneRates.forward ?? '',
+        rto: zoneRates.rto ?? '',
       }
-      initialForm.zone_slabs[zone.name] = {
-        forward: data?.zone_slabs?.[zone.name]?.forward ?? [],
-        rto: data?.zone_slabs?.[zone.name]?.rto ?? [],
+      initialForm.zone_slabs[zoneKey] = {
+        forward:
+          zoneSlabs.forward?.length > 0
+            ? zoneSlabs.forward
+            : buildLegacySlabs(zoneRates.forward, data?.min_weight),
+        rto:
+          zoneSlabs.rto?.length > 0
+            ? zoneSlabs.rto
+            : buildLegacySlabs(zoneRates.rto, data?.min_weight),
       }
     })
 
@@ -201,15 +231,16 @@ export const RateCardEditModal = ({
     // Build rates per zone
     const rates = {}
     zones.forEach((zone) => {
+      const zoneKey = getZoneKey(zone)
       if (isB2C) {
-        const forwardSlabs = form.zone_slabs?.[zone.name]?.forward || []
-        const rtoSlabs = form.zone_slabs?.[zone.name]?.rto || []
-        rates[zone.name] = {
+        const forwardSlabs = form.zone_slabs?.[zoneKey]?.forward || []
+        const rtoSlabs = form.zone_slabs?.[zoneKey]?.rto || []
+        rates[zoneKey] = {
           forward: forwardSlabs[0]?.rate ?? '',
           rto: rtoSlabs[0]?.rate ?? '',
         }
       } else {
-        rates[zone.name] = { ...form[zone.name] }
+        rates[zoneKey] = { ...form[zoneKey] }
       }
     })
 
@@ -627,8 +658,10 @@ export const RateCardEditModal = ({
 
       {/* Zone-wise grouped inputs */}
       <Stack spacing={4}>
-        {zones.map((zone) => (
-          <Box key={zone.code} p={3} border="1px solid" borderColor="gray.200" borderRadius="md">
+        {zones.map((zone) => {
+          const zoneKey = getZoneKey(zone)
+          return (
+          <Box key={zoneKey} p={3} border="1px solid" borderColor="gray.200" borderRadius="md">
             <Text fontWeight="bold" mb={2}>
               {zone.name}
             </Text>
@@ -645,12 +678,12 @@ export const RateCardEditModal = ({
                           Example: `0-0.5`, `0.5-2`, `5-10`
                         </Text>
                       </Box>
-                      <Button size="xs" onClick={() => addSlab(zone.name, type)}>
+                      <Button size="xs" onClick={() => addSlab(zoneKey, type)}>
                         Add Slab
                       </Button>
                     </Flex>
                     <Stack spacing={3}>
-                      {(form.zone_slabs?.[zone.name]?.[type] || []).map((slab, index, slabList) => {
+                      {(form.zone_slabs?.[zoneKey]?.[type] || []).map((slab, index, slabList) => {
                         const isLastSlab = index === slabList.length - 1
                         return (
                         <SimpleGrid
@@ -664,7 +697,7 @@ export const RateCardEditModal = ({
                               type="number"
                               value={slab.weight_from ?? ''}
                               onChange={(e) =>
-                                handleSlabChange(zone.name, type, index, 'weight_from', e.target.value)
+                                handleSlabChange(zoneKey, type, index, 'weight_from', e.target.value)
                               }
                             />
                           </FormControl>
@@ -674,7 +707,7 @@ export const RateCardEditModal = ({
                               type="number"
                               value={slab.weight_to ?? ''}
                               onChange={(e) =>
-                                handleSlabChange(zone.name, type, index, 'weight_to', e.target.value)
+                                handleSlabChange(zoneKey, type, index, 'weight_to', e.target.value)
                               }
                             />
                           </FormControl>
@@ -684,7 +717,7 @@ export const RateCardEditModal = ({
                               type="number"
                               value={slab.rate ?? ''}
                               onChange={(e) =>
-                                handleSlabChange(zone.name, type, index, 'rate', e.target.value)
+                                handleSlabChange(zoneKey, type, index, 'rate', e.target.value)
                               }
                             />
                           </FormControl>
@@ -695,7 +728,7 @@ export const RateCardEditModal = ({
                               value={slab.extra_rate ?? ''}
                               isDisabled={!isLastSlab}
                               onChange={(e) =>
-                                handleSlabChange(zone.name, type, index, 'extra_rate', e.target.value)
+                                handleSlabChange(zoneKey, type, index, 'extra_rate', e.target.value)
                               }
                             />
                             <Text fontSize="xs" color="gray.500" mt={1}>
@@ -712,7 +745,7 @@ export const RateCardEditModal = ({
                               isDisabled={!isLastSlab}
                               onChange={(e) =>
                                 handleSlabChange(
-                                  zone.name,
+                                  zoneKey,
                                   type,
                                   index,
                                   'extra_weight_unit',
@@ -731,15 +764,15 @@ export const RateCardEditModal = ({
                             <Button
                               colorScheme="red"
                               variant="outline"
-                              onClick={() => removeSlab(zone.name, type, index)}
+                              onClick={() => removeSlab(zoneKey, type, index)}
                             >
                               Remove
                             </Button>
                           </FormControl>
                         </SimpleGrid>
                       )})}
-                      {(!form.zone_slabs?.[zone.name]?.[type] ||
-                        form.zone_slabs?.[zone.name]?.[type]?.length === 0) && (
+                      {(!form.zone_slabs?.[zoneKey]?.[type] ||
+                        form.zone_slabs?.[zoneKey]?.[type]?.length === 0) && (
                         <Text fontSize="sm" color="gray.500">
                           No slabs added.
                         </Text>
@@ -754,22 +787,22 @@ export const RateCardEditModal = ({
                   <FormLabel>Forward</FormLabel>
                   <Input
                     type="number"
-                    value={form[zone.name]?.forward ?? ''}
-                    onChange={(e) => handleChange(zone.name, e.target.value, 'forward')}
+                    value={form[zoneKey]?.forward ?? ''}
+                    onChange={(e) => handleChange(zoneKey, e.target.value, 'forward')}
                   />
                 </FormControl>
                 <FormControl>
                   <FormLabel>RTO</FormLabel>
                   <Input
                     type="number"
-                    value={form[zone.name]?.rto ?? ''}
-                    onChange={(e) => handleChange(zone.name, e.target.value, 'rto')}
+                    value={form[zoneKey]?.rto ?? ''}
+                    onChange={(e) => handleChange(zoneKey, e.target.value, 'rto')}
                   />
                 </FormControl>
               </SimpleGrid>
             )}
           </Box>
-        ))}
+        )})}
       </Stack>
     </CustomModal>
   )

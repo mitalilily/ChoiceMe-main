@@ -55,6 +55,14 @@ export const zoneService = {
     await api.delete(`${API_URL}mappings/${mappingId}`)
     return mappingId
   },
+  bulkDeleteMappings: async (mappingIds) => {
+    const res = await api.post(`${API_URL}mappings/bulk-delete`, { mappingIds })
+    return res.data
+  },
+  bulkMoveMappings: async (mappingIds, zoneId) => {
+    const res = await api.post(`${API_URL}mappings/bulk-move`, { mappingIds, zoneId })
+    return res.data
+  },
   importZoneMappings: async (zoneId, fileObj, userChoices) => {
     const formData = new FormData()
     formData.append('file', fileObj)

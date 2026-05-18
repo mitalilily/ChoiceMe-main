@@ -5,16 +5,63 @@ const isLocalhost =
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL ||
-  (isLocalhost
-    ? 'http://127.0.0.1:5002/api'
-    : 'https://api.choicemee.in/api')
+  (isLocalhost ? 'http://127.0.0.1:5002/api' : 'https://api.choicemee.in/api')
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true, // only if using cookies
+  withCredentials: true,
 })
 
-// Request interceptor: attach access token
+let refreshPromise = null
+
+const redirectToSignIn = () => {
+  if (window.location.pathname !== '/auth/signin') {
+    window.location.replace('/auth/signin')
+  }
+}
+
+const clearStoredAuth = () => {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('refreshToken')
+  localStorage.removeItem('userId')
+}
+
+const updateAuthStore = async (accessToken, refreshToken) => {
+  const { useAuthStore } = await import('../store/useAuthStore')
+  const userId = localStorage.getItem('userId')
+  useAuthStore.getState().login(accessToken, userId, refreshToken)
+}
+
+const refreshAuthTokens = (refreshToken) => {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(
+        `${API_BASE_URL}/auth/refresh-token`,
+        { refreshToken },
+        {
+          headers: {
+            'x-refresh-token': refreshToken,
+          },
+        },
+      )
+      .then(async ({ data }) => {
+        if (!data?.accessToken || !data?.refreshToken) {
+          throw new Error('Invalid response from refresh token endpoint')
+        }
+
+        localStorage.setItem('accessToken', data.accessToken)
+        localStorage.setItem('refreshToken', data.refreshToken)
+        await updateAuthStore(data.accessToken, data.refreshToken)
+        return data
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+
+  return refreshPromise
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken')
   if (token && config.headers) {
@@ -23,65 +70,42 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Response interceptor: auto-refresh token on 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
+    const requestUrl = originalRequest?.url || ''
 
-    // Prevent infinite loops
     if (
-      error.response?.status === 401 &&
-      !originalRequest._retry &&
-      localStorage.getItem('refreshToken')
+      error.response?.status !== 401 ||
+      !originalRequest ||
+      originalRequest._retry ||
+      requestUrl.includes('/auth/')
     ) {
-      originalRequest._retry = true
-
-      try {
-        const refreshToken = localStorage.getItem('refreshToken')
-        const res = await axios.post(
-          `${API_BASE_URL}/auth/refresh-token`,
-          { refreshToken },
-          {
-            headers: {
-              'x-refresh-token': refreshToken, // ✅ Send in header for better security
-            },
-          },
-        )
-
-        const newAccessToken = res.data.accessToken
-        const newRefreshToken = res.data.refreshToken
-
-        // Save tokens
-        localStorage.setItem('accessToken', newAccessToken)
-        localStorage.setItem('refreshToken', newRefreshToken)
-
-        // Update Zustand store - import it dynamically to avoid circular dependencies
-        import('../store/useAuthStore').then(({ useAuthStore }) => {
-          const userId = localStorage.getItem('userId')
-          useAuthStore.getState().login(newAccessToken, userId, newRefreshToken)
-        })
-
-        // Retry original request with new access token
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
-        return api(originalRequest)
-      } catch (refreshErr) {
-        console.error('❌ Refresh token failed:', refreshErr)
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
-        localStorage.removeItem('userId')
-
-        // Update Zustand store
-        import('../store/useAuthStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout()
-        })
-
-        window.location.href = '/auth/signin' // Force logout
-      }
+      return Promise.reject(error)
     }
 
-    // Reject if not handled
-    return Promise.reject(error)
+    const refreshToken = localStorage.getItem('refreshToken')
+    if (!refreshToken) {
+      clearStoredAuth()
+      redirectToSignIn()
+      return Promise.reject(error)
+    }
+
+    originalRequest._retry = true
+
+    try {
+      const data = await refreshAuthTokens(refreshToken)
+      originalRequest.headers = originalRequest.headers || {}
+      originalRequest.headers.Authorization = `Bearer ${data.accessToken}`
+      return api(originalRequest)
+    } catch (refreshErr) {
+      clearStoredAuth()
+      const { useAuthStore } = await import('../store/useAuthStore')
+      useAuthStore.getState().logout()
+      redirectToSignIn()
+      return Promise.reject(refreshErr)
+    }
   },
 )
 

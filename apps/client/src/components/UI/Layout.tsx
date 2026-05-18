@@ -1,6 +1,6 @@
 import { Box, Container, Drawer, Stack, useMediaQuery, useTheme } from '@mui/material'
-import { Suspense, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Suspense, useEffect, useState } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { brandGradients } from '../../theme/brand'
 import { DRAWER_WIDTH } from '../../utils/constants'
 import Navbar from '../Navbar/Navbar'
@@ -10,6 +10,7 @@ import Sidebar, { COLLAPSED_WIDTH } from './Sidebar'
 
 export default function Layout() {
   const theme = useTheme()
+  const location = useLocation()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const [pinned, setPinned] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -19,6 +20,11 @@ export default function Layout() {
     if (isMobile) setMobileOpen(!mobileOpen)
     else setPinned((prev) => !prev)
   }
+
+  useEffect(() => {
+    setMobileOpen(false)
+    setHovered(false)
+  }, [location.pathname, location.search])
 
   return (
     <Box
@@ -52,6 +58,7 @@ export default function Layout() {
             setHovered={setHovered}
             pinned
             handleDrawerToggle={handleDrawerToggle}
+            onNavigate={() => setMobileOpen(false)}
           />
         </Drawer>
       ) : (

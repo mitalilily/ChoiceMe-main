@@ -182,23 +182,37 @@ type LocationInfo = {
 export const determineB2CZone = (origin: LocationInfo, destination: LocationInfo): string => {
   const hasTag = (loc: LocationInfo, tag: string) =>
     loc.tags?.map((t) => t.toLowerCase()).includes(tag.toLowerCase())
+  const isKashmirLocation = (loc: LocationInfo) => {
+    const state = loc.state?.toLowerCase() || ''
+    return state.includes('kashmir') || state.includes('ladakh')
+  }
 
-  // 1. Special Zone (highest priority)
-  if (hasTag(origin, 'special_zones') || hasTag(destination, 'special_zones')) {
+  // 1. Kashmir has its own zone and should not fall into generic special-zone pricing.
+  if (isKashmirLocation(origin) || isKashmirLocation(destination)) {
+    return 'KASHMIR'
+  }
+
+  // 2. Special Zone
+  if (
+    hasTag(origin, 'special_zone') ||
+    hasTag(origin, 'special_zones') ||
+    hasTag(destination, 'special_zone') ||
+    hasTag(destination, 'special_zones')
+  ) {
     return 'SPECIAL_ZONE'
   }
 
-  // 2. Within City
+  // 3. Within City
   if (origin.city?.toLowerCase() === destination.city?.toLowerCase()) {
     return 'WITHIN_CITY'
   }
 
-  // 3. Within State
+  // 4. Within State
   if (origin.state?.toLowerCase() === destination.state?.toLowerCase()) {
     return 'WITHIN_STATE'
   }
 
-  // 4. Within Region
+  // 5. Within Region
   const regions = ['north', 'south', 'east', 'west']
   for (const r of regions) {
     if (hasTag(origin, r) && hasTag(destination, r)) {
@@ -206,7 +220,7 @@ export const determineB2CZone = (origin: LocationInfo, destination: LocationInfo
     }
   }
 
-  // 5. Metro to Metro
+  // 6. Metro to Metro
   if (
     hasTag(origin, 'metros') &&
     hasTag(destination, 'metros') &&

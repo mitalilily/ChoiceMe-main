@@ -47,8 +47,6 @@ function determineZone(record: any): string {
 
   // Zone S – Special handling (UTs)
   const zoneS = [
-    'JAMMU & KASHMIR',
-    'LADAKH',
     'ANDAMAN & NICOBAR',
     'CHANDIGARH',
     'DADRA & NAGAR HAVELI & DAMAN & DIU',

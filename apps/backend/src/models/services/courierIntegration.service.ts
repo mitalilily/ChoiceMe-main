@@ -123,6 +123,48 @@ const pickLatestShippingRateRows = (rows: ShippingRateJoinRow[]) => {
   return Array.from(latestRows.values())
 }
 
+const normalizeZoneLookupKey = (value: unknown) =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+
+const getZonePayloadKeys = (zone: Pick<typeof zones.$inferSelect, 'id' | 'code' | 'name'>) =>
+  [
+    zone.id,
+    zone.code,
+    zone.name,
+    zone.code && zone.name ? `${zone.code} - ${zone.name}` : '',
+    zone.code && zone.name ? `${zone.name} (${zone.code})` : '',
+  ].filter((key): key is string => Boolean(String(key || '').trim()))
+
+const getZonePayloadEntry = <T>(
+  payload: Record<string, T> | null | undefined,
+  zone: Pick<typeof zones.$inferSelect, 'id' | 'code' | 'name'>,
+) => {
+  if (!payload) return undefined
+
+  for (const key of getZonePayloadKeys(zone)) {
+    if (payload[key] !== undefined) return payload[key]
+  }
+
+  return undefined
+}
+
+const buildZoneLookup = (zoneRows: Pick<typeof zones.$inferSelect, 'id' | 'code' | 'name'>[]) => {
+  const lookup = new Map<string, Pick<typeof zones.$inferSelect, 'id' | 'code' | 'name'>>()
+
+  for (const zone of zoneRows) {
+    for (const key of getZonePayloadKeys(zone)) {
+      const normalizedKey = normalizeZoneLookupKey(key)
+      if (normalizedKey && !lookup.has(normalizedKey)) {
+        lookup.set(normalizedKey, zone)
+      }
+    }
+  }
+
+  return lookup
+}
+
 // =========================
 // 📦 Get Paginated Couriers
 // =========================
@@ -283,7 +325,7 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
       if (businessType === 'b2c') {
         // B2C → initialize all zones
         for (const z of allZones) {
-          rates[z.name] = {}
+          rates[z.id] = {}
         }
       } else {
         // B2B → only zones associated with the courier
@@ -314,12 +356,13 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
     }
 
     if (row.zone) {
-      grouped[key].rates[row.zone.name] = grouped[key].rates[row.zone.name] || {}
-      grouped[key].rates[row.zone.name][row.rate.type] = row.rate.rate.toString()
+      const zoneKey = row.zone.id
+      grouped[key].rates[zoneKey] = grouped[key].rates[zoneKey] || {}
+      grouped[key].rates[zoneKey][row.rate.type] = row.rate.rate.toString()
 
       if (businessType === 'b2c') {
-        grouped[key].zone_slabs[row.zone.name] = grouped[key].zone_slabs[row.zone.name] || {}
-        grouped[key].zone_slabs[row.zone.name][row.rate.type] = slabMap.get(row.rate.id) || []
+        grouped[key].zone_slabs[zoneKey] = grouped[key].zone_slabs[zoneKey] || {}
+        grouped[key].zone_slabs[zoneKey][row.rate.type] = slabMap.get(row.rate.id) || []
         if (!grouped[key].cod_slabs?.length && codSlabMap.get(row.rate.id)?.length) {
           grouped[key].cod_slabs = codSlabMap.get(row.rate.id)
         }
@@ -392,7 +435,7 @@ const getB2CGroupKey = (rate: any) =>
   `${rate.courier_id}_${rate.plan_id}_${normalizeB2CServiceProvider(rate.service_provider)}_${normalizeB2CShippingMode(rate.mode)}`
 
 const getB2BGroupKey = (rate: any) =>
-  `${rate.courier_name}_${rate.plan_id}_${normalizeB2CShippingMode(rate.mode)}`
+  `${rate.courier_id}_${rate.plan_id}_${normalizeB2CServiceProvider(rate.service_provider)}_${normalizeB2CShippingMode(rate.mode)}`
 
 export const updateShippingRate = async (
   courierId: number,
@@ -442,11 +485,11 @@ export const updateShippingRate = async (
         `[updateShippingRate] Saving service_provider from frontend: "${normalizedServiceProvider}" for courier_id: ${courierId}, courier_name: "${courier_name}"`,
       )
 
-  const zoneNames = Array.from(
+  const zoneKeys = Array.from(
     new Set([
       ...Object.keys(rates || {}).filter((z) => z !== 'cod' && z !== 'other'),
       ...Object.keys(zone_slabs || {}),
-    ]),
+    ].map((key) => String(key || '').trim()).filter(Boolean)),
   )
   const shouldReplaceCodSlabs = normalizedBusinessType === 'b2c' && Array.isArray(cod_slabs)
   const explicitCodSlabs = shouldReplaceCodSlabs ? normaliseCodSlabs(cod_slabs || []) : []
@@ -454,20 +497,33 @@ export const updateShippingRate = async (
     validateCodSlabs(explicitCodSlabs)
   }
 
-  if (zoneNames.length > 0) {
+  if (zoneKeys.length > 0) {
     const zoneRows = await db
-      .select({ id: zones.id, name: zones.name })
+      .select({ id: zones.id, code: zones.code, name: zones.name })
       .from(zones)
-      .where(
-        and(
-          inArray(zones.name, zoneNames),
-          sql`lower(trim(${zones.business_type})) = ${normalizedBusinessType}`,
-        ),
+      .where(sql`lower(trim(${zones.business_type})) = ${normalizedBusinessType}`)
+    const zoneLookup = buildZoneLookup(zoneRows)
+    const resolvedZones = zoneKeys
+      .map((zoneKey) => ({
+        zoneKey,
+        zone: zoneLookup.get(normalizeZoneLookupKey(zoneKey)),
+      }))
+      .filter((entry): entry is { zoneKey: string; zone: typeof zoneRows[number] } =>
+        Boolean(entry.zone),
       )
 
-    for (const zn of zoneRows) {
-      const zoneRate = rates[zn.name] || {}
-      const zoneSlabs = zone_slabs?.[zn.name] || {}
+    for (const { zone: zn } of resolvedZones) {
+      const zoneRate = (getZonePayloadEntry<Record<string, any>>(rates, zn) || {}) as Record<
+        string,
+        any
+      >
+      const zoneSlabs = (getZonePayloadEntry<{
+        forward?: RateCardSlabInput[]
+        rto?: RateCardSlabInput[]
+      }>(zone_slabs, zn) || {}) as {
+        forward?: RateCardSlabInput[]
+        rto?: RateCardSlabInput[]
+      }
 
       for (const type of ['forward', 'rto'] as const) {
         const value = zoneRate[type]
@@ -481,7 +537,7 @@ export const updateShippingRate = async (
           explicitSlabs[0]?.weight_from ?? min_weight ?? '0'
         const rateStr = toMoney(fallbackRate)
 
-        const [existing] = await db
+        const existingRows = await db
           .select({ id: shippingRates.id })
           .from(shippingRates)
           .where(
@@ -498,7 +554,8 @@ export const updateShippingRate = async (
             ),
           )
 
-        if (existing) {
+        if (existingRows.length) {
+          for (const existing of existingRows) {
           console.log(
             `[updateShippingRate] Updating existing rate ${existing.id} with service_provider: ${normalizedServiceProvider}`,
           )
@@ -528,6 +585,7 @@ export const updateShippingRate = async (
             }
           }
           console.log(`[updateShippingRate] ✅ Updated rate ${existing.id} successfully`)
+          }
         } else {
           console.log(
             `[updateShippingRate] Inserting new rate with service_provider: ${normalizedServiceProvider}`,
@@ -651,7 +709,30 @@ export const upsertShippingRate = async (input: RateInput) => {
     validateCodSlabs(explicitCodSlabs)
   }
 
-  for (const r of input.rates) {
+  const rateItemsByKey = new Map<string, RateInput['rates'][number]>()
+  for (const rate of input.rates || []) {
+    rateItemsByKey.set(`${rate.zone_id}_${rate.type}`, rate)
+  }
+
+  if (input.business_type === 'b2c' && input.zone_slabs) {
+    for (const [zoneId, zoneSlabs] of Object.entries(input.zone_slabs)) {
+      for (const type of ['forward', 'rto'] as const) {
+        const key = `${zoneId}_${type}`
+        if (rateItemsByKey.has(key)) continue
+
+        const explicitSlabs = normaliseRateCardSlabs(zoneSlabs?.[type] || [])
+        if (!explicitSlabs.length) continue
+
+        rateItemsByKey.set(key, {
+          zone_id: zoneId,
+          type,
+          rate: explicitSlabs[0].rate,
+        })
+      }
+    }
+  }
+
+  for (const r of Array.from(rateItemsByKey.values())) {
     const explicitSlabs = normaliseRateCardSlabs(input.zone_slabs?.[r.zone_id]?.[r.type] || [])
     validateRateCardSlabs(explicitSlabs)
     const fallbackRate = explicitSlabs[0]?.rate ?? r.rate
