@@ -345,7 +345,7 @@ export class DeliveryOneService {
     })
   }
 
-  private async getHeaders() {
+  private async getHeaders({ includeContentType = true }: { includeContentType?: boolean } = {}) {
     await this.ensureConfigLoaded()
 
     if (!this.apiKey) {
@@ -355,11 +355,12 @@ export class DeliveryOneService {
       )
     }
 
-    return {
+    const headers: Record<string, string> = {
       Authorization: `Token ${this.apiKey}`,
       Accept: 'application/json',
-      'Content-Type': 'application/json',
     }
+    if (includeContentType) headers['Content-Type'] = 'application/json'
+    return headers
   }
 
   private async getToken() {
@@ -857,7 +858,7 @@ export class DeliveryOneService {
       throw new HttpError(400, 'Delivery One tracking supports up to 50 waybills per request.')
     }
 
-    const headers = await this.getHeaders()
+    const headers = await this.getHeaders({ includeContentType: false })
 
     try {
       const response = await axios.get(`${this.apiBase}/api/v1/packages/json/`, {
@@ -1003,7 +1004,7 @@ export class DeliveryOneService {
 
     const pdf = normalizeBoolean(source.pdf, false)
     const pdfSize = normalizePdfSize(source.pdf_size ?? source.pdfSize)
-    const headers = await this.getHeaders()
+    const headers = await this.getHeaders({ includeContentType: false })
 
     try {
       const response = await axios.get(`${this.apiBase}/api/p/packing_slip`, {
@@ -1529,7 +1530,7 @@ export class DeliveryOneService {
     if (height !== undefined) requestParams.h = height
     if (packageType) requestParams.ipkg_type = packageType
 
-    const headers = await this.getHeaders()
+    const headers = await this.getHeaders({ includeContentType: false })
 
     try {
       const response = await axios.get(`${this.apiBase}/api/kinko/v1/invoice/charges/.json`, {
@@ -1978,7 +1979,7 @@ export class DeliveryOneService {
       throw new HttpError(400, 'A valid 6-digit pincode is required for Delivery One serviceability.')
     }
 
-    const headers = await this.getHeaders()
+    const headers = await this.getHeaders({ includeContentType: false })
     const url = `${this.apiBase}/c/api/pin-codes/json/`
 
     try {
@@ -2081,7 +2082,7 @@ export class DeliveryOneService {
       )
     }
 
-    const headers = await this.getHeaders()
+    const headers = await this.getHeaders({ includeContentType: false })
     const url = `${this.apiBase}/api/dc/fetch/serviceability/pincode`
 
     try {

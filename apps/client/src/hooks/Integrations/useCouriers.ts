@@ -69,8 +69,12 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
     typeof codChargeBasis === 'number' && codChargeBasis >= 0
       ? codChargeBasis
       : normalizedOrderAmount
+  const normalizedWeight = Number(weight ?? 0)
+  const normalizedLength = Number(length ?? 0)
+  const normalizedBreadth = Number(breadth ?? 0)
+  const normalizedHeight = Number(height ?? 0)
   const hasRequiredShipmentInputs =
-    !!pickupPincode && !!deliveryPincode && typeof weight === 'number' && weight > 0
+    !!pickupPincode && !!deliveryPincode && Number.isFinite(normalizedWeight) && normalizedWeight > 0
 
   return useQuery({
     queryKey: [
@@ -80,13 +84,13 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
       pickupId,
       pickupAddressKey,
       deliveryAddressKey,
-      weight,
+      normalizedWeight,
       cod,
       orderAmount,
       codChargeBasis,
-      length,
-      breadth,
-      height,
+      normalizedLength,
+      normalizedBreadth,
+      normalizedHeight,
       shipmentType,
       params.useGuest,
       params?.pickupName,
@@ -99,12 +103,12 @@ export const useAvailableCouriers = (params: UseAvailableCouriersParams) => {
         payment_type: payment_type,
         order_amount: normalizedOrderAmount,
         cod_charge_basis: normalizedCodChargeBasis,
-        weight,
-        length,
+        weight: normalizedWeight,
+        length: normalizedLength,
         ...(shipmentType && { shipment_type: shipmentType }),
         isCalculator: params.isCalculator === true || params.context === 'rate_calculator',
-        breadth,
-        height,
+        breadth: normalizedBreadth,
+        height: normalizedHeight,
         useGuest: params.useGuest === true,
     }),
     enabled: enabled && hasRequiredShipmentInputs,

@@ -31,9 +31,9 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
   const deliveryAddressLine = watch('address') ?? ''
   const deliveryCity = watch('city') ?? ''
   const deliveryState = watch('state') ?? ''
-  const length = watch('length') ?? 0
-  const breadth = watch('breadth') ?? 0
-  const height = watch('height') ?? 0
+  const length = Number(watch('length') ?? 0)
+  const breadth = Number(watch('breadth') ?? 0)
+  const height = Number(watch('height') ?? 0)
   const prepaidAmount = Number(watch('prepaidAmount') ?? 0)
   const orderType = watch('orderType') ?? 'prepaid'
   const selectedCourierId = watch('courierPartnerId') ?? ''
@@ -78,7 +78,7 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
     // For B2B, product price is not stored in boxes, it's in invoices
     // totalProductPrice remains 0 or can be calculated from invoices if needed
   } else if (shipment_type === 'b2c') {
-    totalWeight = watch('weight') ?? 0
+    totalWeight = Number(watch('weight') ?? 0)
     totalProductPrice = products?.reduce(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sum, p: any) => sum + Number(p.price ?? 0) * Number(p.quantity ?? 1),

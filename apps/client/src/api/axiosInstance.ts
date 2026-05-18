@@ -4,6 +4,7 @@ import { clearAuthTokens, getAuthTokens, setAuthTokens } from './tokenVault'
 
 const RAW_API_BASE_URL = import.meta.env.VITE_API_URL
 const DEFAULT_API_BASE_URL = 'https://api.choicemee.in/api'
+const LEGACY_RAILWAY_API_HOST = 'choiceme-backend-production.up.railway.app'
 
 const getApiBaseUrl = () => {
   const fallback = DEFAULT_API_BASE_URL.replace(/\/+$/, '')
@@ -13,6 +14,7 @@ const getApiBaseUrl = () => {
 
     const candidate = new URL(RAW_API_BASE_URL, window.location.origin)
     const currentHost = window.location.hostname
+    const pointsToLegacyRailwayApi = candidate.hostname === LEGACY_RAILWAY_API_HOST
     const isHostedFrontend =
       currentHost.endsWith('netlify.app') ||
       currentHost.endsWith('vercel.app') ||
@@ -26,6 +28,12 @@ const getApiBaseUrl = () => {
     // In preview/prod frontend hosting, sending API calls back to the same
     // frontend origin often causes 405s on POST auth routes like request-otp.
     if (pointsBackToFrontend && (isHostedFrontend || !isLocalhost)) {
+      return fallback
+    }
+
+    // The old Railway backend host can lag behind the live API and has caused
+    // courier calculator requests to fail with unsupported-media responses.
+    if (pointsToLegacyRailwayApi) {
       return fallback
     }
 
