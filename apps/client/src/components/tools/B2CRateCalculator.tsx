@@ -5,6 +5,7 @@ import { useFormContext, useWatch } from 'react-hook-form'
 import { FiInfo } from 'react-icons/fi'
 import { TbRulerMeasure, TbScale } from 'react-icons/tb'
 import { brand } from '../../theme/brand'
+import { kgToGrams, MIN_B2C_CHARGEABLE_WEIGHT_GRAMS } from '../../utils/weight'
 import CustomInput from '../UI/inputs/CustomInput'
 
 export default function B2CRateCalculator() {
@@ -26,8 +27,8 @@ export default function B2CRateCalculator() {
   }, [length, breadth, height])
 
   const applicableWeightGrams = useMemo(() => {
-    const actualWeightGrams = (Number(actualWeightKg) || 0) * 1000
-    return Math.max(actualWeightGrams, volumetricWeightGrams, 500)
+    const actualWeightGrams = kgToGrams(actualWeightKg)
+    return Math.max(actualWeightGrams, volumetricWeightGrams, MIN_B2C_CHARGEABLE_WEIGHT_GRAMS)
   }, [actualWeightKg, volumetricWeightGrams])
 
   const volumetricWeightKg = (volumetricWeightGrams / 1000).toFixed(2)
@@ -166,7 +167,10 @@ export default function B2CRateCalculator() {
             </Typography>
             <Typography
               sx={{
-                color: applicableWeightGrams === 500 ? brand.accent : brand.ink,
+                color:
+                  applicableWeightGrams === MIN_B2C_CHARGEABLE_WEIGHT_GRAMS
+                    ? brand.accent
+                    : brand.ink,
                 fontWeight: 800,
                 fontSize: '1.08rem',
               }}

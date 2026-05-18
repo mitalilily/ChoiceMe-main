@@ -8,6 +8,7 @@ import { fetchLocations } from '../../../api/locations'
 import type { CreateShipmentParams } from '../../../api/order.service'
 import { useCreateShipment } from '../../../hooks/Orders/useOrders'
 import { usePaymentOptions } from '../../../hooks/usePaymentOptions'
+import { normalizeParcelWeightInputToGrams } from '../../../utils/weight'
 import FormSectionAccordion from '../../UI/accordion/FormSectionAccordion'
 import AmountSummaryCard from '../AmountSummaryCard'
 import DeliveryDetailsForm from '../DeliveryDetailsForm'
@@ -199,7 +200,7 @@ export default function B2COrderFormSteps({ onClose }: { onClose?: () => void })
         order_amount: subtotal,
         cod_charge_basis: Math.max(totalCollectable, 0),
         order_date: data?.orderDate,
-        package_weight: data.weight,
+        package_weight: normalizeParcelWeightInputToGrams(data.weight),
         package_length: data.length,
         cod_charges: data?.courierCod,
         package_breadth: data.breadth,

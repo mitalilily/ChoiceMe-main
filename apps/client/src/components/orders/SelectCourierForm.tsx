@@ -7,6 +7,7 @@ import {
   type UseAvailableCouriersParams,
 } from '../../hooks/Integrations/useCouriers'
 import { courierLogos, defaultLogo } from '../../utils/constants'
+import { normalizeParcelWeightInputToGrams } from '../../utils/weight'
 import { toast } from '../UI/Toast'
 import type { Box as B2BBox, B2BFormData } from './b2b/B2BOrderForm'
 import type { B2CFormData } from './b2c/B2COrderForm'
@@ -78,7 +79,7 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
     // For B2B, product price is not stored in boxes, it's in invoices
     // totalProductPrice remains 0 or can be calculated from invoices if needed
   } else if (shipment_type === 'b2c') {
-    totalWeight = Number(watch('weight') ?? 0)
+    totalWeight = normalizeParcelWeightInputToGrams(watch('weight') ?? 0)
     totalProductPrice = products?.reduce(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sum, p: any) => sum + Number(p.price ?? 0) * Number(p.quantity ?? 1),

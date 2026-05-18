@@ -1,6 +1,7 @@
 import { Alert, Box, Grid, Paper, Stack, Typography, alpha } from '@mui/material'
 import { Controller, useFormContext, useWatch } from 'react-hook-form'
 import { FaWeightHanging } from 'react-icons/fa'
+import { kgToGrams, MIN_B2C_CHARGEABLE_WEIGHT_GRAMS } from '../../../utils/weight'
 import CustomInput from '../../UI/inputs/CustomInput'
 import type { B2CFormData } from './B2COrderForm'
 
@@ -16,9 +17,13 @@ const PackageDimensionsForm = () => {
   const breadth = useWatch({ control, name: 'breadth' }) || 0
   const height = useWatch({ control, name: 'height' }) || 0
 
-  const actualWeightKg = weight / 1000
+  const actualWeightKg = Number(weight) || 0
+  const actualWeightGrams = kgToGrams(actualWeightKg)
   const volumetricWeight = (length * breadth * height) / 5000
-  const chargedWeight = Math.max(actualWeightKg, volumetricWeight, 0.5)
+  const minimumWeightKg = MIN_B2C_CHARGEABLE_WEIGHT_GRAMS / 1000
+  const chargedWeight = Math.max(actualWeightKg, volumetricWeight, minimumWeightKg)
+  const chargedByMinimum = Math.abs(chargedWeight - minimumWeightKg) < 0.001
+  const chargedByActual = Math.abs(chargedWeight - actualWeightKg) < 0.001
 
   const fields = ['weight', 'length', 'breadth', 'height'] as const
 
@@ -50,13 +55,16 @@ const PackageDimensionsForm = () => {
               rules={{
                 required: `${key.charAt(0).toUpperCase() + key.slice(1)} is required`,
                 min: { value: 0.01, message: 'Cannot be zero or negative' },
+                ...(key === 'weight'
+                  ? { max: { value: 50, message: 'Use kg. For 0.5 kg enter 0.5' } }
+                  : {}),
               }}
               render={({ field, fieldState }) => (
                 <CustomInput
                   label={
                     key.charAt(0).toUpperCase() +
                     key.slice(1) +
-                    (key === 'weight' ? ' (g)' : ' (cm)')
+                    (key === 'weight' ? ' (kg)' : ' (cm)')
                   }
                   type="number"
                   required
@@ -114,7 +122,7 @@ const PackageDimensionsForm = () => {
                 </Typography>
               </Typography>
               <Typography variant="caption" sx={{ color: TEXT_MUTED }}>
-                {weight} grams
+                {actualWeightGrams} grams
               </Typography>
             </Paper>
           </Grid>
@@ -139,7 +147,7 @@ const PackageDimensionsForm = () => {
                 </Typography>
               </Typography>
               <Typography variant="caption" sx={{ color: TEXT_MUTED }}>
-                L×B×H ÷ 5000
+                L x B x H / 5000
               </Typography>
             </Paper>
           </Grid>
@@ -167,9 +175,9 @@ const PackageDimensionsForm = () => {
                   }}
                 >
                   <Typography variant="caption" fontWeight={700} sx={{ color: ACCENT }}>
-                    {chargedWeight === 0.5
+                    {chargedByMinimum
                       ? 'MIN'
-                      : chargedWeight === actualWeightKg
+                      : chargedByActual
                       ? 'ACTUAL'
                       : 'VOLUMETRIC'}
                   </Typography>
@@ -182,9 +190,9 @@ const PackageDimensionsForm = () => {
                 </Typography>
               </Typography>
               <Typography variant="caption" sx={{ color: TEXT_MUTED }}>
-                {chargedWeight === 0.5
+                {chargedByMinimum
                   ? 'Minimum weight applied'
-                  : chargedWeight === actualWeightKg
+                  : chargedByActual
                   ? 'Based on actual weight'
                   : 'Based on dimensions'}
               </Typography>

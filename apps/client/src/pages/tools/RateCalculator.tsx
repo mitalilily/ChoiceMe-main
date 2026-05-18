@@ -29,6 +29,7 @@ import { usePaymentOptions } from '../../hooks/usePaymentOptions'
 import { usePincodeLookup } from '../../hooks/User/usePincodeLookup'
 import { brand, brandGradients } from '../../theme/brand'
 import { defaultLogo } from '../../utils/constants'
+import { kgToGrams, MIN_B2C_CHARGEABLE_WEIGHT_GRAMS } from '../../utils/weight'
 
 type ShipmentType = 'b2b' | 'b2c'
 
@@ -135,8 +136,12 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
       const height = Number(formData.height) || 0
       const actualWeightKg = Number(formData.weight) || 0
       const volumetricWeightGrams = ((length * breadth * height) / 5000) * 1000
-      const actualWeightGrams = actualWeightKg * 1000
-      const applicableWeightGrams = Math.max(actualWeightGrams, volumetricWeightGrams, 500)
+      const actualWeightGrams = kgToGrams(actualWeightKg)
+      const applicableWeightGrams = Math.max(
+        actualWeightGrams,
+        Math.round(volumetricWeightGrams),
+        MIN_B2C_CHARGEABLE_WEIGHT_GRAMS,
+      )
       const orderAmountValue = Number(formData.orderAmount || 0)
 
       const payload = {
