@@ -432,6 +432,9 @@ export const trackOrderController = async (req: Request, res: Response) => {
     })
   } catch (err: any) {
     console.error(err)
-    return res.status(500).json({ success: false, message: err.message })
+    const statusCode = Number(err?.statusCode || err?.status || 500)
+    return res
+      .status(statusCode >= 400 && statusCode < 600 ? statusCode : 500)
+      .json({ success: false, message: err.message })
   }
 }

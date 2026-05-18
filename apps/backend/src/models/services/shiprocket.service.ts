@@ -7968,7 +7968,7 @@ const findOrderByAwb = async (awb: string): Promise<OrderSummary | null> => {
       id: b2c.id,
       order_id: b2c.order_id,
       order_number: b2c.order_number,
-      integration_type: b2c.integration_type ?? 'delhivery',
+      integration_type: b2c.integration_type ?? null,
       courier_partner: b2c.courier_partner,
       courier_id: b2c.courier_id ? Number(b2c.courier_id) : null,
       awb_number: b2c.awb_number ?? awb,
@@ -8031,13 +8031,16 @@ export const trackByAwbService = async (awb: string): Promise<TrackingServiceRes
     throw new HttpError(404, `No order found for AWB: ${awb}`)
   }
 
-  let providerKey = normalizeServiceProviderKey(order.integration_type ?? 'delhivery')
+  const courierPartner = String(order.courier_partner || '').toLowerCase()
+  let providerKey = normalizeServiceProviderKey(order.integration_type)
 
-  if (!['delhivery', 'deliveryone'].includes(providerKey) && order.courier_partner) {
-    const partner = order.courier_partner.toLowerCase()
-    if (partner.includes('delhivery')) providerKey = 'delhivery'
-    if (partner.includes('delivery one')) providerKey = 'deliveryone'
+  if (courierPartner.includes('delivery one') || courierPartner.includes('deliveryone')) {
+    providerKey = 'deliveryone'
+  } else if (courierPartner.includes('delhivery')) {
+    providerKey = 'delhivery'
   }
+
+  if (!providerKey) providerKey = 'deliveryone'
 
   let providerData: ProviderNormalizedTracking
 

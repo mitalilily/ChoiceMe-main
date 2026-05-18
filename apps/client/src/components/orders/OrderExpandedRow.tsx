@@ -1,5 +1,6 @@
-import { alpha, Box, Button, Chip, Divider, Paper, Stack, Typography } from '@mui/material'
+import { alpha, Box, Button, Chip, Divider, Link, Paper, Stack, Typography } from '@mui/material'
 import { useState } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
 import { FaFilePdf } from 'react-icons/fa'
 import {
   MdInventory2,
@@ -23,6 +24,7 @@ export const OrderExpandedRow = ({ row, type = 'b2c' }: OrderExpandedRowProps) =
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null)
   const ACCENT = '#0D3B8E'
   const sortCodeValue = String(row?.sort_code || '').trim()
+  const awbValue = String(row?.awb_number || '').trim()
 
   const { mutateAsync, isPending } = usePresignedDownloadMutation()
   const { mutateAsync: regenerateDocuments, isPending: isRegeneratingDocuments } =
@@ -286,7 +288,19 @@ export const OrderExpandedRow = ({ row, type = 'b2c' }: OrderExpandedRowProps) =
         <Stack direction="row" spacing={1} alignItems="center">
           <MdReceipt size={20} />
           <Typography>
-            <strong>AWB:</strong> {row.awb_number}
+            <strong>AWB:</strong>{' '}
+            {awbValue ? (
+              <Link
+                component={RouterLink}
+                to={`/tracking?awb=${encodeURIComponent(awbValue)}`}
+                underline="hover"
+                sx={{ fontWeight: 800 }}
+              >
+                {awbValue}
+              </Link>
+            ) : (
+              '-'
+            )}
           </Typography>
         </Stack>
         <Stack direction="row" spacing={1} alignItems="center">

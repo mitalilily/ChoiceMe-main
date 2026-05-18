@@ -1,4 +1,6 @@
 import { DeliveryOneService } from '../models/services/couriers/deliveryone.service'
+import * as dotenv from 'dotenv'
+import path from 'path'
 
 type SmokeResult = {
   name: string
@@ -12,23 +14,23 @@ type SmokeResult = {
 const boolEnv = (value: unknown) =>
   ['1', 'true', 'yes', 'y'].includes(String(value || '').trim().toLowerCase())
 
+const env = process.env.NODE_ENV || 'development'
+const backendRoot = path.resolve(__dirname, '../..')
+dotenv.config({ path: path.resolve(backendRoot, `.env.${env}`) })
+dotenv.config({ path: path.resolve(backendRoot, '.env') })
+
 const stamp = Date.now()
-const apiBase =
-  process.env.DELIVERY_ONE_SMOKE_API_BASE ||
-  process.env.DELIVERY_ONE_API_BASE ||
-  process.env.DELIVERYONE_API_BASE ||
-  'https://staging-express.delhivery.com'
-const apiKey =
-  process.env.DELIVERY_ONE_SMOKE_API_KEY ||
-  process.env.DELIVERY_ONE_API_KEY ||
-  process.env.DELIVERYONE_API_KEY ||
-  'XXXXXXXXXXXXXXXXX'
+const smokeApiBase = process.env.DELIVERY_ONE_SMOKE_API_BASE
+const smokeApiKey = process.env.DELIVERY_ONE_SMOKE_API_KEY
+const usingSmokeOverride = Boolean(smokeApiBase || smokeApiKey)
 const includeMutations = boolEnv(process.env.DELIVERY_ONE_SMOKE_MUTATIONS)
 const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-process.env.DELIVERY_ONE_API_BASE = apiBase
-process.env.DELIVERY_ONE_API_KEY = apiKey
-process.env.DELIVERY_ONE_FORCE_ENV_CONFIG = 'true'
+if (usingSmokeOverride) {
+  if (smokeApiBase) process.env.DELIVERY_ONE_API_BASE = smokeApiBase
+  if (smokeApiKey) process.env.DELIVERY_ONE_API_KEY = smokeApiKey
+  process.env.DELIVERY_ONE_FORCE_ENV_CONFIG = 'true'
+}
 DeliveryOneService.clearCachedConfig()
 
 const svc = new DeliveryOneService()
@@ -179,6 +181,7 @@ const mutationTests: Array<[string, () => Promise<any>]> = [
 const localValidationPatterns = [
   /\bis required\b/i,
   /\bmust be\b/i,
+  /\bnot configured\b/i,
   /provide at least/i,
   /cannot be more/i,
   /supports up to/i,
@@ -220,14 +223,21 @@ async function runSmoke() {
   }
 
   const unexpected = results.filter((result) => !result.countedAsReached)
+  const credentialFailures = results.filter((result) => [401, 403].includes(Number(result.status)))
+  const successful = results.filter((result) => result.ok)
 
   console.log(
     JSON.stringify(
       {
-        apiBase,
+        credentialSource: usingSmokeOverride
+          ? 'DELIVERY_ONE_SMOKE_* environment override'
+          : 'saved courier credentials with environment fallback',
+        apiBase: smokeApiBase || process.env.DELIVERY_ONE_API_BASE || process.env.DELIVERYONE_API_BASE || 'configured/default service base',
         mode: includeMutations ? 'full' : 'safe',
         total: results.length,
+        successful: successful.length,
         reachedOrSucceeded: results.length - unexpected.length,
+        credentialFailures: credentialFailures.length,
         unexpectedFailures: unexpected.length,
         results,
       },
@@ -236,7 +246,7 @@ async function runSmoke() {
     ),
   )
 
-  if (unexpected.length) process.exit(1)
+  if (unexpected.length || credentialFailures.length || successful.length === 0) process.exit(1)
 }
 
 runSmoke().catch((error) => {

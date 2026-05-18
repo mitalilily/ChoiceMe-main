@@ -12,6 +12,7 @@ import {
 } from '@mui/material'
 import moment from 'moment'
 import { useState, type ReactNode } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
 import { generateManifestService } from '../../../api/order.service'
 import { useAllCouriersWithDetails } from '../../../hooks/Integrations/useCouriers'
 import {
@@ -644,6 +645,22 @@ const B2COrdersList = () => {
 
   const hasInvoiceGenerated = (row: B2COrder) =>
     Boolean(String(row.invoice_url || row.invoice_key || row.invoice_link || '').trim())
+  const renderAwbLink = (value?: string | null) => {
+    const awb = String(value || '').trim()
+    if (!awb) return <Typography color="text.secondary">-</Typography>
+
+    return (
+      <Link
+        component={RouterLink}
+        to={`/tracking?awb=${encodeURIComponent(awb)}`}
+        underline="hover"
+        onClick={(event) => event.stopPropagation()}
+        sx={{ fontWeight: 800 }}
+      >
+        {awb}
+      </Link>
+    )
+  }
 
   const columns: Column<B2COrder>[] = [
     {
@@ -657,7 +674,7 @@ const B2COrdersList = () => {
       ),
     },
     { label: 'Order #', id: 'order_number' },
-    { label: 'AWB', id: 'awb_number' },
+    { label: 'AWB', id: 'awb_number', render: (value) => renderAwbLink(value) },
     {
       label: 'Docs',
       id: 'id',
