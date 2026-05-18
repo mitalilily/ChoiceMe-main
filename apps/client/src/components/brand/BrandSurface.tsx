@@ -16,10 +16,11 @@ const variantStyles: Record<BrandSurfaceVariant, SxProps<Theme>> = {
     boxShadow: brand.shadow,
   },
   glass: {
-    backgroundColor: brand.surfaceGlass,
+    backgroundColor: alpha('#FFFFFF', 0.94),
     border: `1px solid ${alpha('#FFFFFF', 0.72)}`,
-    backdropFilter: 'blur(18px)',
-    boxShadow: brand.shadow,
+    backdropFilter: 'none',
+    WebkitBackdropFilter: 'none',
+    boxShadow: '0 12px 30px rgba(15, 44, 67, 0.08)',
   },
   hero: {
     background: brandGradients.hero,

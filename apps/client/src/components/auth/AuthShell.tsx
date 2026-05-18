@@ -44,8 +44,8 @@ export default function AuthShell({
     <Box
       aria-label={eyebrow}
       sx={{
-        height: { xs: 'auto', lg: '100dvh' },
-        minHeight: { xs: '100dvh', lg: 0 },
+        height: 'auto',
+        minHeight: '100dvh',
         width: '100%',
         boxSizing: 'border-box',
         bgcolor: '#FFFFFF',
@@ -55,7 +55,8 @@ export default function AuthShell({
         alignItems: 'center',
         justifyContent: 'center',
         overflowX: 'hidden',
-        overflowY: { xs: 'auto', lg: 'hidden' },
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
         p: { xs: 0.9, sm: 1.1, md: 1.25, lg: 0.7 },
       }}
     >
@@ -64,12 +65,12 @@ export default function AuthShell({
           position: 'relative',
           width: { xs: '100%', lg: isCompact ? 'min(790px, calc(100vw - 36px))' : 'min(1480px, calc(100vw - 40px))' },
           maxWidth: '100%',
-          height: { xs: 'auto', lg: 'min(720px, calc(100dvh - 14px))' },
-          minHeight: { xs: 'auto', lg: 0 },
-          maxHeight: { lg: 'calc(100dvh - 14px)' },
+          height: 'auto',
+          minHeight: { xs: 'auto', lg: 'min(680px, calc(100dvh - 14px))' },
+          maxHeight: 'none',
           borderRadius: 0,
           border: 'none',
-          overflow: 'hidden',
+          overflow: 'visible',
           bgcolor: 'transparent',
           boxShadow: 'none',
         }}
@@ -97,7 +98,7 @@ export default function AuthShell({
             minHeight: 'inherit',
             minWidth: 0,
             width: '100%',
-            height: { xs: 'auto', lg: '100%' },
+            height: 'auto',
             boxSizing: 'border-box',
             px: { xs: 1.4, sm: 2, md: 2.6, lg: 2.2 },
             py: { xs: 2, sm: 2.4, md: 2.8, lg: 2 },
@@ -174,7 +175,6 @@ export default function AuthShell({
                       fontWeight: 800,
                       letterSpacing: 0,
                       overflowWrap: 'break-word',
-                      textShadow: `0 12px 28px ${alpha(authPalette.navy, 0.1)}`,
                     }}
                   >
                     {titleLines.map((line, index) => (
@@ -222,7 +222,6 @@ export default function AuthShell({
                     alignSelf: { xs: 'center', lg: 'flex-start' },
                     objectFit: 'contain',
                     mixBlendMode: 'multiply',
-                    filter: 'saturate(1.04) contrast(1.02)',
                     userSelect: 'none',
                     pointerEvents: 'none',
                   }}

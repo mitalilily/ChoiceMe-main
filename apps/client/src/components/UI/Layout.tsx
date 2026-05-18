@@ -31,7 +31,9 @@ export default function Layout() {
       sx={{
         display: 'flex',
         width: '100%',
-        minHeight: '100vh',
+        height: '100dvh',
+        minHeight: '100dvh',
+        minWidth: 0,
         overflow: 'hidden',
         backgroundImage: brandGradients.page,
       }}
@@ -68,6 +70,7 @@ export default function Layout() {
             minWidth: pinned ? DRAWER_WIDTH : COLLAPSED_WIDTH,
             flexShrink: 0,
             transition: 'width 240ms ease',
+            willChange: 'width',
             position: 'relative',
           }}
         >
@@ -85,12 +88,13 @@ export default function Layout() {
           flexGrow: 1,
           minWidth: 0,
           position: 'relative',
-          minHeight: '100vh',
-          overflowX: 'hidden',
+          height: '100dvh',
+          minHeight: 0,
+          overflow: 'hidden',
           bgcolor: 'transparent',
         }}
       >
-        <Stack sx={{ flexGrow: 1, minHeight: 0, bgcolor: 'transparent' }}>
+        <Stack sx={{ flexGrow: 1, height: '100%', minHeight: 0, overflow: 'hidden', bgcolor: 'transparent' }}>
           <Navbar handleDrawerToggle={handleDrawerToggle} pinned={pinned} />
 
           <Box
@@ -102,7 +106,12 @@ export default function Layout() {
               bgcolor: 'transparent',
               px: { xs: 1, md: 2 },
               pb: { xs: 1.5, md: 2.5 },
+              height: '100%',
               minHeight: 0,
+              overscrollBehavior: 'contain',
+              scrollBehavior: 'smooth',
+              scrollbarGutter: 'stable',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             <Container

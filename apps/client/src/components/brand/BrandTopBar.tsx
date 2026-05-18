@@ -17,8 +17,10 @@ export default function BrandTopBar({
         position: 'sticky',
         top: 0,
         zIndex: 1200,
+        flexShrink: 0,
         px: { xs: 2, sm: 3 },
         py: { xs: 1.2, sm: 1.4 },
+        transform: 'translateZ(0)',
         ...sx,
       }}
       {...rest}

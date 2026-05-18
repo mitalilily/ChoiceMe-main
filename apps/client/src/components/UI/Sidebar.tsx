@@ -259,7 +259,7 @@ export default function Sidebar({
     color: brand.ink,
     '& .MuiListItemIcon-root': { color: brand.ink },
     '& .MuiListItemText-primary': { fontWeight: 800 },
-    boxShadow: '0 16px 28px rgba(130,194,255,0.22)',
+    boxShadow: '0 8px 18px rgba(130,194,255,0.18)',
   }
 
   const navItemSx = {
@@ -270,7 +270,8 @@ export default function Sidebar({
     px: 1.6,
     color: brand.inkSoft,
     border: '1px solid transparent',
-    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition:
+      'background-color 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
     '&:hover': {
       bgcolor: alpha('#FFFFFF', 0.72),
       color: brand.ink,
@@ -314,7 +315,7 @@ export default function Sidebar({
                 minWidth: isSidebarExpanded ? 36 : 0,
                 justifyContent: 'center',
                 color: isSelected || childSelected ? brand.ink : 'inherit',
-                transition: 'color 0.2s',
+                transition: 'color 160ms ease',
               }}
             >
               {item.icon}
@@ -368,6 +369,7 @@ export default function Sidebar({
                           borderRadius: 999,
                           color: subActive ? brand.ink : alpha(brand.ink, 0.72),
                           bgcolor: subActive ? alpha(brand.sky, 0.46) : 'transparent',
+                          transition: 'background-color 160ms ease, color 160ms ease',
                           '&:hover': {
                             bgcolor: alpha('#FFFFFF', 0.72),
                             color: brand.ink,
@@ -398,24 +400,28 @@ export default function Sidebar({
     <Box
       sx={{
         width: isSidebarExpanded ? DRAWER_WIDTH : COLLAPSED_WIDTH,
-        height: '100vh',
+        height: '100dvh',
+        maxHeight: '100dvh',
         background: 'linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(248,251,255,0.96) 100%)',
         borderRight: `1px solid ${alpha(brand.ink, 0.08)}`,
-        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'width 220ms ease',
         display: 'flex',
         flexDirection: 'column',
         zIndex: theme.zIndex.drawer,
         position: 'fixed',
         left: 0,
         top: 0,
-        overflowX: 'hidden',
-        boxShadow: '16px 0 40px rgba(15,44,67,0.08)',
-        backdropFilter: 'blur(18px)',
+        overflow: 'hidden',
+        boxShadow: '8px 0 24px rgba(15,44,67,0.08)',
+        backdropFilter: 'none',
+        WebkitBackdropFilter: 'none',
+        contain: 'layout paint style',
+        willChange: 'width',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <Box sx={{ p: 1.25, mb: 0.85 }}>
+      <Box sx={{ p: 1.25, mb: 0.85, flexShrink: 0 }}>
         <Box
           sx={{
             p: isSidebarExpanded ? 1.7 : 1,
@@ -459,7 +465,19 @@ export default function Sidebar({
         </Box>
       </Box>
 
-      <Box sx={{ flexGrow: 1, overflowY: 'auto', px: isSidebarExpanded ? 1 : 0.8 }}>
+      <Box
+        sx={{
+          flexGrow: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          overscrollBehavior: 'contain',
+          scrollbarGutter: 'stable',
+          WebkitOverflowScrolling: 'touch',
+          px: isSidebarExpanded ? 1 : 0.8,
+          pb: 0.6,
+        }}
+      >
         <Box
           sx={{
             p: isSidebarExpanded ? 0.7 : 0.2,
@@ -475,6 +493,7 @@ export default function Sidebar({
       <Box
         sx={{
           p: 1.1,
+          flexShrink: 0,
           borderTop: `1px solid ${alpha(brand.ink, 0.08)}`,
           bgcolor: alpha('#FFFFFF', 0.72),
         }}
