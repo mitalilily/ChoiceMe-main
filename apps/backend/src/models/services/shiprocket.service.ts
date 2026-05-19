@@ -8272,6 +8272,7 @@ interface TrackingServiceResponse {
 type ProviderNormalizedTracking = {
   history: TrackingHistoryItem[]
   status?: string
+  status_type?: string | null
   edd?: string | null
   courier_name?: string | null
   shipment_info?: string | null
@@ -8405,17 +8406,20 @@ const mapDelhiveryTracking = (
 
   if (Object.keys(statusObj).length) {
     pushHistoryEvent(history, {
-      statusCode: statusObj?.StatusCode ?? statusObj?.Status,
+      statusCode: statusObj?.StatusCode ?? statusObj?.StatusType ?? statusObj?.Status,
       message: statusObj?.Status ?? statusObj?.StatusType ?? statusObj?.StatusAction,
       location: statusObj?.StatusLocation ?? statusObj?.StatusLocationName,
       time: statusObj?.StatusDateTime ?? statusObj?.StatusDate,
     })
   }
 
+  sortHistoryDescending(history)
+
   const status = sanitizeString(
     statusObj?.Status ?? history[0]?.message ?? order.order_status,
     order.order_status ?? 'In Transit',
   )
+  const statusType = sanitizeString(statusObj?.StatusType ?? statusObj?.StatusCode ?? '')
 
   const eddString = sanitizeString(shipment?.ExpectedDeliveryDate ?? shipment?.EDD ?? '')
 
@@ -8426,6 +8430,7 @@ const mapDelhiveryTracking = (
   return {
     history,
     status,
+    status_type: statusType || undefined,
     edd: eddString || undefined,
     shipment_info: shipmentInfo || undefined,
     courier_name: courierName,
@@ -8481,9 +8486,67 @@ const mapTrackingToOrderStatus = (
 ) => {
   const normalizedCurrent = normalizeStatusToken(currentStatus)
   const normalizedProviderStatus = normalizeStatusToken(providerData.status)
+  const providerStatusText = normalizeStatusText(providerData.status)
+  const providerStatusType = normalizeStatusText(providerData.status_type)
 
   if (TRACKING_SYNC_INTERNAL_STATUSES.has(normalizedProviderStatus)) {
     return normalizedProviderStatus
+  }
+
+  if (providerStatusType) {
+    if (providerStatusType === 'cn') return 'cancelled'
+    if (providerStatusType === 'nd') return 'ndr'
+
+    if (providerStatusType === 'rt') {
+      if (providerStatusText.includes('delivered') || providerStatusText.includes('dto')) {
+        return 'rto_delivered'
+      }
+      if (
+        providerStatusText.includes('in transit') ||
+        providerStatusText.includes('dispatched')
+      ) {
+        return 'rto_in_transit'
+      }
+      return 'rto'
+    }
+
+    if (providerStatusType === 'dl') {
+      if (providerStatusText.includes('rto')) return 'rto_delivered'
+      return 'delivered'
+    }
+
+    if (providerStatusType === 'ud') {
+      if (providerStatusText.includes('manifested')) return 'booked'
+      if (
+        providerStatusText.includes('not picked') ||
+        providerStatusText.includes('not received')
+      ) {
+        return 'pickup_initiated'
+      }
+      if (providerStatusText.includes('dispatched')) return 'out_for_delivery'
+      if (providerStatusText.includes('pending')) return 'in_transit'
+      if (providerStatusText.includes('in transit')) return 'in_transit'
+    }
+
+    if (providerStatusType === 'pp') {
+      if (
+        providerStatusText.includes('open') ||
+        providerStatusText.includes('scheduled')
+      ) {
+        return 'pickup_initiated'
+      }
+      if (providerStatusText.includes('dispatched')) return 'out_for_delivery'
+    }
+
+    if (providerStatusType === 'pu') {
+      if (
+        providerStatusText.includes('in transit') ||
+        providerStatusText.includes('pending')
+      ) {
+        return 'in_transit'
+      }
+      if (providerStatusText.includes('dispatched')) return 'out_for_delivery'
+    }
   }
 
   const latestEvent = providerData.history?.[0]
@@ -8736,7 +8799,7 @@ const buildTrackingResponse = (
   sortHistoryDescending(history)
 
   const status = sanitizeString(
-    providerData.status ?? history[0]?.message ?? order.order_status,
+    order.order_status ?? providerData.status ?? history[0]?.message,
     'In Transit',
   )
 

@@ -19,6 +19,7 @@ import {
   Typography,
 } from '@mui/material'
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Controller, useForm } from 'react-hook-form'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -43,8 +44,38 @@ type FormValues = {
   contact: string
 }
 
+const trackingStatusLabelMap: Record<string, string> = {
+  pending: 'Pending',
+  booked: 'Booked',
+  manifest_generated: 'Manifest Generated',
+  shipment_created: 'Shipment Created',
+  pickup_initiated: 'Pending Pickup',
+  in_transit: 'In Transit',
+  out_for_delivery: 'Out For Delivery',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  canceled: 'Cancelled',
+  ndr: 'NDR',
+  rto: 'RTO Initiated',
+  rto_in_transit: 'RTO In Transit',
+  rto_delivered: 'RTO Delivered',
+  cancellation_requested: 'Cancellation Requested',
+}
+
+const normalizeTrackingStatus = (status?: string | null) =>
+  String(status || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+
+const formatTrackingStatus = (status?: string | null) => {
+  const normalized = normalizeTrackingStatus(status)
+  return trackingStatusLabelMap[normalized] || status || 'Unknown'
+}
+
 export default function OrderTrackingForm() {
   const [searchParams] = useSearchParams()
+  const queryClient = useQueryClient()
   const trackingQuery = searchParams.toString()
   const [mode, setMode] = useState<'awb' | 'order'>('awb')
   const [error, setError] = useState<string>('')
@@ -120,8 +151,10 @@ export default function OrderTrackingForm() {
       )
     } else if (isSuccess) {
       setError('')
+      queryClient.invalidateQueries({ queryKey: ['b2cOrdersByUser'] })
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
     }
-  }, [trackingError, trackingErrorObj, isSuccess])
+  }, [trackingError, trackingErrorObj, isSuccess, queryClient])
 
   const canSubmit =
     mode === 'awb'
@@ -316,9 +349,9 @@ export default function OrderTrackingForm() {
                     Status
                   </Typography>
                   <Chip
-                    label={tracking.status || 'Unknown'}
+                    label={formatTrackingStatus(tracking.status)}
                     color={(() => {
-                      const normalized = (tracking.status || '').toLowerCase()
+                      const normalized = normalizeTrackingStatus(tracking.status)
                       if (normalized.includes('deliver')) return 'success'
                       if (normalized.includes('transit')) return 'info'
                       if (normalized.includes('cancel')) return 'error'

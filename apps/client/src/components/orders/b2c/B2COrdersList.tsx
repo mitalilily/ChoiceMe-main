@@ -876,7 +876,10 @@ const B2COrdersList = () => {
           <Typography sx={{ fontSize: 12.5, fontWeight: 700, maxWidth: 150 }} noWrap>
             {row.courier_partner || '-'}
           </Typography>
-          <StatusChip label={row.order_status} status={statusColorMap[row.order_status] || 'info'} />
+          <StatusChip
+            label={shippingStatusMap[row.order_status] || row.order_status || 'Unknown'}
+            status={statusColorMap[row.order_status] || 'info'}
+          />
         </Stack>
       ),
     },
