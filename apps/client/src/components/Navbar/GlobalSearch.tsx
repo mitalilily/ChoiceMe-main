@@ -69,7 +69,7 @@ const GlobalSearch = () => {
     // If result has AWB in metadata, navigate to tracking page
     const awb = result.metadata?.awb
     if (typeof awb === 'string' && awb && result.type === 'order') {
-      navigate(`/tracking?awb=${encodeURIComponent(awb)}`)
+      navigate(`/tools/order_tracking?awb=${encodeURIComponent(awb)}`)
     } else {
       navigate(result.link)
     }
@@ -84,7 +84,7 @@ const GlobalSearch = () => {
 
       // If it looks like an AWB number, navigate to tracking
       if (trimmedQuery.length >= 8 && /^[A-Z0-9]+$/.test(trimmedQuery.toUpperCase())) {
-        navigate(`/tracking?awb=${encodeURIComponent(trimmedQuery.toUpperCase())}`)
+        navigate(`/tools/order_tracking?awb=${encodeURIComponent(trimmedQuery.toUpperCase())}`)
       } else if (searchResults?.results && searchResults.results.length > 0) {
         // Navigate to first result
         handleResultClick(searchResults.results[0])
@@ -179,7 +179,7 @@ const GlobalSearch = () => {
                         trimmedQuery.length >= 8 &&
                         /^[A-Z0-9]+$/.test(trimmedQuery.toUpperCase())
                       ) {
-                        navigate(`/tracking?awb=${encodeURIComponent(trimmedQuery.toUpperCase())}`)
+                        navigate(`/tools/order_tracking?awb=${encodeURIComponent(trimmedQuery.toUpperCase())}`)
                       } else if (searchResults?.results && searchResults.results.length > 0) {
                         handleResultClick(searchResults.results[0])
                       } else {

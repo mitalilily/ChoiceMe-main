@@ -292,7 +292,7 @@ export const OrderExpandedRow = ({ row, type = 'b2c' }: OrderExpandedRowProps) =
             {awbValue ? (
               <Link
                 component={RouterLink}
-                to={`/tracking?awb=${encodeURIComponent(awbValue)}`}
+                to={`/tools/order_tracking?awb=${encodeURIComponent(awbValue)}`}
                 underline="hover"
                 sx={{ fontWeight: 800 }}
               >

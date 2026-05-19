@@ -81,7 +81,7 @@ const B2BOrdersList = ({
     return (
       <Link
         component={RouterLink}
-        to={`/tracking?awb=${encodeURIComponent(awb)}`}
+        to={`/tools/order_tracking?awb=${encodeURIComponent(awb)}`}
         underline="hover"
         onClick={(event) => event.stopPropagation()}
         sx={{ fontWeight: 800 }}

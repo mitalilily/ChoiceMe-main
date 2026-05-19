@@ -20,6 +20,7 @@ import {
 } from '@mui/material'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useSearchParams } from 'react-router-dom'
 import {
   FaBoxOpen,
   FaEnvelopeOpenText,
@@ -43,6 +44,8 @@ type FormValues = {
 }
 
 export default function OrderTrackingForm() {
+  const [searchParams] = useSearchParams()
+  const trackingQuery = searchParams.toString()
   const [mode, setMode] = useState<'awb' | 'order'>('awb')
   const [error, setError] = useState<string>('')
   const [queryParams, setQueryParams] = useState<{
@@ -66,6 +69,33 @@ export default function OrderTrackingForm() {
   })
 
   const formValues = watch()
+
+  useEffect(() => {
+    if (!trackingQuery) {
+      reset({ awb: '', orderNumber: '', contact: '' })
+      setQueryParams(null)
+      return
+    }
+
+    const routeParams = new URLSearchParams(trackingQuery)
+    const awb = routeParams.get('awb')?.trim()
+    const orderNumber =
+      routeParams.get('orderNumber')?.trim() || routeParams.get('order')?.trim()
+    const contact = routeParams.get('contact')?.trim()
+
+    if (awb) {
+      setMode('awb')
+      reset({ awb, orderNumber: '', contact: '' })
+      setQueryParams({ awb })
+      return
+    }
+
+    if (orderNumber && contact) {
+      setMode('order')
+      reset({ awb: '', orderNumber, contact })
+      setQueryParams({ orderNumber, contact })
+    }
+  }, [reset, trackingQuery])
 
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValues.contact)
   const isPhone = /^[0-9+\-\s()]{7,}$/.test(formValues.contact)
