@@ -182,6 +182,17 @@ const getCompactFreight = (courier: Courier) => {
 
 const getCompactCod = (courier: Courier) => toNumber(courier.localRates?.forward?.cod_charges)
 
+const getZoneChipLabel = (courier: Courier) => {
+  const zone = courier.approxZone as { code?: string | null; name?: string | null } | null
+  const code = String(zone?.code || '').trim()
+  const name = String(zone?.name || '').trim()
+
+  if (code && name) return `${code} - ${name}`
+  if (code || name) return code || name
+  if (courier.special_zone) return 'Special Zone'
+  return ''
+}
+
 export function RateCalculator({ publicView }: RateCalculatorProps) {
   const isPublic = Boolean(publicView)
   const { mutateAsync, isPending, isError, error } = useAvailableCouriersMutation()
@@ -709,6 +720,7 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
                         {availableCouriers.map((courier, index) => {
                           const displayName = getCompactCourierName(courier)
                           const mode = getCompactCourierMode(courier)
+                          const zoneLabel = getZoneChipLabel(courier)
                           const logo = getCourierLogo(courier, defaultLogo)
                           const isDelhivery =
                             displayName.toLowerCase().includes('delhivery') ||
@@ -756,9 +768,35 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
                                     />
                                   )}
                                 </Box>
-                                <Typography noWrap sx={{ fontSize: '0.82rem', fontWeight: 800, color: '#273044' }}>
-                                  {displayName}
-                                </Typography>
+                                <Stack spacing={0.35} sx={{ minWidth: 0 }}>
+                                  <Typography noWrap sx={{ fontSize: '0.82rem', fontWeight: 800, color: '#273044' }}>
+                                    {displayName}
+                                  </Typography>
+                                  {zoneLabel ? (
+                                    <Box
+                                      component="span"
+                                      title={`Pricing zone: ${zoneLabel}`}
+                                      sx={{
+                                        alignSelf: 'flex-start',
+                                        maxWidth: 126,
+                                        px: 0.65,
+                                        py: 0.2,
+                                        borderRadius: '999px',
+                                        bgcolor: alpha(ui.accent, 0.12),
+                                        color: ui.accentDark,
+                                        border: `1px solid ${alpha(ui.accent, 0.18)}`,
+                                        fontSize: '0.62rem',
+                                        fontWeight: 900,
+                                        lineHeight: 1.15,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      Zone {zoneLabel}
+                                    </Box>
+                                  ) : null}
+                                </Stack>
                               </Stack>
                               <Box sx={{ color: mode === 'air' ? ui.accentDark : '#68707E', display: 'flex' }}>
                                 {mode === 'air' ? <FaPlane size={18} /> : <FaTruck size={18} />}
