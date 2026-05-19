@@ -5295,6 +5295,8 @@ export const getB2COrdersByUserService = async (
     .limit(limit)
     .offset(offset)
 
+  await syncB2COrdersWithLiveTracking(ordersRaw)
+
   // Sanitize orders - remove internal platform fields (courier_cost)
   const { sanitizeOrdersForCustomer } = await import('../../utils/orderSanitizer')
   const orders = await sanitizeOrdersForCustomer(ordersRaw)
@@ -8275,6 +8277,30 @@ type ProviderNormalizedTracking = {
   shipment_info?: string | null
 }
 
+const TRACKING_SYNC_TERMINAL_STATUSES = new Set([
+  'delivered',
+  'cancelled',
+  'rto_delivered',
+  'manifest_failed',
+])
+
+const TRACKING_SYNC_INTERNAL_STATUSES = new Set([
+  'pending',
+  'booked',
+  'pickup_initiated',
+  'shipment_created',
+  'manifest_generated',
+  'in_transit',
+  'out_for_delivery',
+  'delivered',
+  'cancelled',
+  'ndr',
+  'rto',
+  'rto_in_transit',
+  'rto_delivered',
+  'cancellation_requested',
+])
+
 type OrderSummary = {
   id: string
   order_id: string | null
@@ -8297,6 +8323,16 @@ const sanitizeString = (value: unknown, fallback = ''): string => {
   const str = String(value).trim()
   return str || fallback
 }
+
+const normalizeStatusToken = (value: unknown) =>
+  sanitizeString(value)
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+
+const normalizeStatusText = (value: unknown) =>
+  sanitizeString(value)
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
 
 const toIsoString = (value: unknown, fallback?: string): string => {
   if (value) {
@@ -8393,6 +8429,237 @@ const mapDelhiveryTracking = (
     edd: eddString || undefined,
     shipment_info: shipmentInfo || undefined,
     courier_name: courierName,
+  }
+}
+
+const getTrackingProviderKey = (order: {
+  integration_type?: string | null
+  courier_partner?: string | null
+}) => {
+  const courierPartner = String(order.courier_partner || '').toLowerCase()
+  let providerKey = normalizeServiceProviderKey(order.integration_type)
+
+  if (courierPartner.includes('delivery one') || courierPartner.includes('deliveryone')) {
+    providerKey = 'deliveryone'
+  } else if (courierPartner.includes('delhivery')) {
+    providerKey = 'delhivery'
+  }
+
+  return providerKey || 'deliveryone'
+}
+
+const fetchLiveTrackingForOrder = async (
+  order: OrderSummary,
+): Promise<ProviderNormalizedTracking | null> => {
+  const providerKey = getTrackingProviderKey(order)
+
+  if (providerKey === 'delhivery') {
+    const delhiveryService = new DelhiveryService()
+    const raw = await delhiveryService.trackShipment(order.awb_number)
+    return mapDelhiveryTracking(raw, order)
+  }
+
+  if (providerKey === 'deliveryone') {
+    const deliveryOneService = new DeliveryOneService()
+    const raw = await deliveryOneService.trackShipment(order.awb_number)
+    return mapDelhiveryTracking(raw, order, 'Delivery One')
+  }
+
+  console.warn('[Tracking] Live courier tracking is not configured for this provider', {
+    awb: order.awb_number,
+    order_number: order.order_number,
+    providerKey,
+    courier_partner: order.courier_partner,
+  })
+
+  return null
+}
+
+const mapTrackingToOrderStatus = (
+  providerData: ProviderNormalizedTracking,
+  currentStatus?: string | null,
+) => {
+  const normalizedCurrent = normalizeStatusToken(currentStatus)
+  const normalizedProviderStatus = normalizeStatusToken(providerData.status)
+
+  if (TRACKING_SYNC_INTERNAL_STATUSES.has(normalizedProviderStatus)) {
+    return normalizedProviderStatus
+  }
+
+  const latestEvent = providerData.history?.[0]
+  const message = normalizeStatusText(providerData.status || latestEvent?.message)
+  const statusCode = normalizeStatusText(latestEvent?.status_code)
+  const shipmentInfo = normalizeStatusText(providerData.shipment_info)
+  const combined = [message, statusCode, shipmentInfo].filter(Boolean).join(' ')
+
+  if (!combined) return null
+
+  if (
+    combined.includes('seller cancelled') ||
+    combined.includes('seller canceled') ||
+    combined.includes('shipment has been cancelled') ||
+    combined.includes('shipment has been canceled') ||
+    combined.includes('cancelled') ||
+    combined.includes('canceled')
+  ) {
+    return 'cancelled'
+  }
+
+  if (combined.includes('ndr')) return 'ndr'
+
+  if (combined.includes('rto')) {
+    if (combined.includes('delivered') || combined.includes('dto')) return 'rto_delivered'
+    if (combined.includes('in transit') || combined.includes('dispatched')) return 'rto_in_transit'
+    return 'rto'
+  }
+
+  if (combined.includes('delivered') || combined === 'dl') return 'delivered'
+
+  if (
+    combined.includes('out for delivery') ||
+    combined.includes('ofd') ||
+    combined.includes('dispatched')
+  ) {
+    return 'out_for_delivery'
+  }
+
+  if (combined.includes('in transit') || combined.includes('in-transit')) return 'in_transit'
+
+  if (
+    combined.includes('not picked') ||
+    combined.includes('not received from client') ||
+    combined.includes('pickup scheduled') ||
+    combined.includes('scheduled')
+  ) {
+    return 'pickup_initiated'
+  }
+
+  if (
+    combined.includes('manifested') ||
+    combined.includes('manifest uploaded') ||
+    combined.includes('x uci')
+  ) {
+    return 'booked'
+  }
+
+  if (combined.includes('pending')) {
+    return normalizedCurrent === 'pending' ? 'pending' : 'in_transit'
+  }
+
+  return null
+}
+
+const shouldSyncB2CTrackingStatus = (order: any) => {
+  const awb = sanitizeString(order?.awb_number)
+  if (!awb) return false
+
+  const currentStatus = normalizeStatusToken(order?.order_status)
+  if (TRACKING_SYNC_TERMINAL_STATUSES.has(currentStatus)) return false
+
+  const providerKey = getTrackingProviderKey(order)
+  return providerKey === 'deliveryone' || providerKey === 'delhivery'
+}
+
+const persistB2CTrackingStatus = async (
+  order: OrderSummary,
+  providerData: ProviderNormalizedTracking,
+) => {
+  const nextStatus = mapTrackingToOrderStatus(providerData, order.order_status)
+  if (!nextStatus) return null
+
+  const currentStatus = normalizeStatusToken(order.order_status)
+  if (TRACKING_SYNC_TERMINAL_STATUSES.has(currentStatus) && currentStatus !== nextStatus) {
+    return null
+  }
+
+  if (
+    currentStatus === 'cancelled' &&
+    !['cancelled', 'rto', 'rto_in_transit', 'rto_delivered'].includes(nextStatus)
+  ) {
+    return null
+  }
+
+  if (
+    currentStatus === 'manifest_failed' &&
+    ['booked', 'pickup_initiated'].includes(nextStatus)
+  ) {
+    return null
+  }
+
+  const updateData: Record<string, any> = {}
+
+  if (currentStatus !== nextStatus) {
+    updateData.order_status = nextStatus
+  }
+
+  const nextEdd = sanitizeString(providerData.edd)
+  if (nextEdd && nextEdd !== sanitizeString(order.edd)) {
+    updateData.edd = nextEdd
+  }
+
+  const nextDeliveryMessage = sanitizeString(providerData.shipment_info)
+  if (nextDeliveryMessage && nextDeliveryMessage !== sanitizeString(order.delivery_message)) {
+    updateData.delivery_message = nextDeliveryMessage
+  }
+
+  if (!Object.keys(updateData).length) return null
+
+  updateData.updated_at = new Date()
+
+  await db.update(b2c_orders).set(updateData).where(eq(b2c_orders.id, order.id))
+
+  return {
+    order_status: updateData.order_status ?? order.order_status,
+    edd: updateData.edd ?? order.edd,
+    delivery_message: updateData.delivery_message ?? order.delivery_message,
+  }
+}
+
+const syncB2COrdersWithLiveTracking = async (orders: any[]) => {
+  const candidates = orders.filter(shouldSyncB2CTrackingStatus).slice(0, 25)
+  const concurrency = 3
+
+  for (let index = 0; index < candidates.length; index += concurrency) {
+    const chunk = candidates.slice(index, index + concurrency)
+    await Promise.all(
+      chunk.map(async (order) => {
+        const orderSummary: OrderSummary = {
+          id: order.id,
+          order_id: order.order_id ?? null,
+          order_number: order.order_number,
+          integration_type: order.integration_type ?? null,
+          courier_partner: order.courier_partner ?? null,
+          courier_id: order.courier_id ? Number(order.courier_id) : null,
+          awb_number: order.awb_number,
+          order_status: order.order_status ?? null,
+          edd: order.edd ?? null,
+          order_type: order.order_type ?? null,
+          shipment_id: order.shipment_id ?? null,
+          delivery_message: order.delivery_message ?? null,
+          created_at: order.created_at ?? null,
+          updated_at: order.updated_at ?? null,
+        }
+
+        try {
+          const providerData = await fetchLiveTrackingForOrder(orderSummary)
+          if (!providerData) return
+
+          const synced = await persistB2CTrackingStatus(orderSummary, providerData)
+          if (synced?.order_status) order.order_status = synced.order_status
+          if (synced?.edd) order.edd = synced.edd
+          if (synced?.delivery_message) order.delivery_message = synced.delivery_message
+        } catch (err: any) {
+          console.warn('[Tracking] B2C list status sync skipped', {
+            order_number: order.order_number,
+            awb: order.awb_number,
+            message:
+              err?.response?.data?.message ??
+              err?.message ??
+              'Failed to fetch live tracking information',
+          })
+        }
+      }),
+    )
   }
 }
 
@@ -8586,35 +8853,17 @@ export const trackByAwbService = async (awb: string): Promise<TrackingServiceRes
     throw new HttpError(404, `No order found for AWB: ${awb}`)
   }
 
-  const courierPartner = String(order.courier_partner || '').toLowerCase()
-  let providerKey = normalizeServiceProviderKey(order.integration_type)
-
-  if (courierPartner.includes('delivery one') || courierPartner.includes('deliveryone')) {
-    providerKey = 'deliveryone'
-  } else if (courierPartner.includes('delhivery')) {
-    providerKey = 'delhivery'
-  }
-
-  if (!providerKey) providerKey = 'deliveryone'
-
   let providerData = await buildLocalTrackingFallback(order)
+  const providerKey = getTrackingProviderKey(order)
 
   try {
-    if (providerKey === 'delhivery') {
-      const delhiveryService = new DelhiveryService()
-      const raw = await delhiveryService.trackShipment(awb)
-      providerData = mapDelhiveryTracking(raw, order)
-    } else if (providerKey === 'deliveryone') {
-      const deliveryOneService = new DeliveryOneService()
-      const raw = await deliveryOneService.trackShipment(awb)
-      providerData = mapDelhiveryTracking(raw, order, 'Delivery One')
-    } else {
-      console.warn('[Tracking] Live courier tracking is not configured for this provider', {
-        awb,
-        order_number: order.order_number,
-        providerKey,
-        courier_partner: order.courier_partner,
-      })
+    const liveProviderData = await fetchLiveTrackingForOrder(order)
+    if (liveProviderData) {
+      providerData = liveProviderData
+      const synced = await persistB2CTrackingStatus(order, providerData)
+      if (synced?.order_status) order.order_status = synced.order_status
+      if (synced?.edd) order.edd = synced.edd
+      if (synced?.delivery_message) order.delivery_message = synced.delivery_message
     }
   } catch (err: any) {
     console.warn('[Tracking] Falling back to local tracking data', {

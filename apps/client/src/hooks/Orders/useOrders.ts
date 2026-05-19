@@ -79,6 +79,40 @@ interface Filters {
   search?: string
 }
 
+const TRACKING_POLL_STATUSES = new Set([
+  'pending',
+  'booked',
+  'pickup_initiated',
+  'shipment_created',
+  'manifest_generated',
+  'in_transit',
+  'out_for_delivery',
+  'ndr',
+  'rto',
+  'rto_in_transit',
+  'cancellation_requested',
+])
+
+type B2CTrackingPollOrder = {
+  awb_number?: string | null
+  order_status?: string | null
+}
+
+const shouldPollB2CTracking = (data: unknown) => {
+  const payload = data as { orders?: B2CTrackingPollOrder[] } | undefined
+  const orders = Array.isArray(payload?.orders) ? payload.orders : []
+
+  return orders.some((order) => {
+    const awb = String(order.awb_number || '').trim()
+    const status = String(order.order_status || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_')
+
+    return Boolean(awb) && TRACKING_POLL_STATUSES.has(status)
+  })
+}
+
 export const useB2COrdersByUser = (
   page: number,
   limit: number,
@@ -89,6 +123,8 @@ export const useB2COrdersByUser = (
     queryKey: ['b2cOrdersByUser', page, limit, filters],
     queryFn: () => fetchB2COrdersByUser({ page, limit, ...filters }),
     enabled,
+    refetchInterval: (query) => (shouldPollB2CTracking(query.state.data) ? 30000 : false),
+    refetchIntervalInBackground: false,
   })
 }
 
