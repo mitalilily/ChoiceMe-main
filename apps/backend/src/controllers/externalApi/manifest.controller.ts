@@ -1,5 +1,5 @@
 import { Response } from 'express'
-import { eq, inArray } from 'drizzle-orm'
+import { inArray, or } from 'drizzle-orm'
 import { db } from '../../models/client'
 import { b2c_orders, b2b_orders } from '../../schema/schema'
 import { generateManifestService } from '../../models/services/shiprocket.service'
@@ -44,12 +44,7 @@ export const generateManifestController = async (req: any, res: Response) => {
         user_id: table.user_id,
       })
       .from(table)
-      .where(
-        inArray(
-          awbs ? table.awb_number : table.order_number,
-          identifiers,
-        ),
-      )
+      .where(or(inArray(table.awb_number, identifiers), inArray(table.order_number, identifiers)))
 
     if (orders.length === 0) {
       return res.status(404).json({
@@ -69,20 +64,23 @@ export const generateManifestController = async (req: any, res: Response) => {
       })
     }
 
-    // Extract AWB numbers for manifest generation
-    const awbNumbers = orders.map((o) => o.awb_number).filter(Boolean) as string[]
+    // Delivery One orders receive their AWB only when manifest succeeds, so fall back
+    // to order_number for deferred-manifest orders.
+    const manifestRefs = orders
+      .map((o) => (awbs ? o.awb_number || o.order_number : o.order_number || o.awb_number))
+      .filter(Boolean) as string[]
 
-    if (awbNumbers.length === 0) {
+    if (manifestRefs.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'Invalid orders',
-        message: 'No valid AWB numbers found for the specified orders',
+        message: 'No valid order identifiers found for the specified orders',
       })
     }
 
     // Generate manifest
     const { manifest_id, manifest_url, manifest_key, warnings } = await generateManifestService({
-      awbs: awbNumbers,
+      awbs: manifestRefs,
       type: type as 'b2c' | 'b2b',
       userId,
       pickup_date,
@@ -97,7 +95,7 @@ export const generateManifestController = async (req: any, res: Response) => {
         manifest_url,
         manifest_key,
         warnings,
-        order_count: awbNumbers.length,
+        order_count: manifestRefs.length,
         type,
       },
     })

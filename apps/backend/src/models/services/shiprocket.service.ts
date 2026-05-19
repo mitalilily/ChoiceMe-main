@@ -3483,7 +3483,7 @@ export const createB2CShipmentService = async (
       getDelhiveryShippingModeByCourierId(selectedDeliveryOneCourierId) ||
       selectedProviderShippingMode
   }
-  if (selectedProviderShippingMode && !params.shipping_mode) {
+  if (selectedProviderShippingMode) {
     params.shipping_mode = selectedProviderShippingMode
   }
 
@@ -4102,7 +4102,12 @@ export const createB2CShipmentService = async (
         })
       }
 
-      shipmentData = await deliveryOne.createShipment(params)
+      shipmentData = {
+        success: true,
+        deferred_manifest: true,
+        shipping_mode: selectedProviderShippingMode ?? params.shipping_mode ?? null,
+        packages: [],
+      }
       const rawDeliveryOnePackages = shipmentData?.packages
       const deliveryOnePackages: any[] =
         Array.isArray(rawDeliveryOnePackages)
@@ -4117,9 +4122,13 @@ export const createB2CShipmentService = async (
           String(pkg?.status || '').toLowerCase() !== 'fail',
       )
 
-      if (!shipmentSuccessPackage?.waybill) {
+      if (shipmentSuccessPackage?.waybill) {
         console.error('âŒ Invalid Delivery One shipment:', shipmentData)
-        throw new HttpError(500, 'Delivery One shipment creation failed')
+        console.log('[Delivery One] Shipment creation deferred until manifest', {
+          order_number: params.order_number,
+          courier_id: params.courier_id,
+          mode: selectedProviderShippingMode ?? params.shipping_mode,
+        })
       }
 
       providerCourierCost =
@@ -4142,11 +4151,11 @@ export const createB2CShipmentService = async (
           shipmentData?.shipment_id ??
           shipmentSuccessPackage?.waybill ??
           undefined,
-        awb_number: shipmentSuccessPackage.waybill,
+        awb_number: undefined,
         courier_name: 'Delivery One',
         courier_id: params.courier_id ? Number(params.courier_id) : null,
         label: undefined,
-        manifest: shipmentData?.upload_wbn ?? shipmentData?.manifest ?? undefined,
+        manifest: undefined,
         courier_cost: providerCourierCost,
         sort_code: providerSortCode,
       }
@@ -7005,6 +7014,138 @@ export const generateManifestService = async (params: {
           await assertManifestWalletBalance({ tx, orders: walletCheckOrders })
         }
 
+        const deliveryOneManifestService =
+          params.type === 'b2c' && integrationType === 'deliveryone'
+            ? new DeliveryOneService()
+            : null
+        const deliveryOneShipmentPendingIds = new Set<string>()
+        const normalizeDeliveryOneOrderItems = (value: any) => {
+          try {
+            const raw = typeof value === 'string' ? JSON.parse(value) : value
+            if (!Array.isArray(raw) || !raw.length) {
+              return [
+                {
+                  name: 'Product',
+                  sku: 'NA',
+                  qty: 1,
+                  price: 0,
+                  hsn: '',
+                  discount: 0,
+                  tax_rate: 0,
+                },
+              ]
+            }
+
+            return raw.map((item: any) => ({
+              name: item?.name ?? item?.productName ?? item?.box_name ?? 'Product',
+              sku: item?.sku ?? 'NA',
+              qty: Number(item?.qty ?? item?.quantity ?? 1) || 1,
+              price: Number(item?.price ?? 0) || 0,
+              hsn: item?.hsn ?? item?.hsnCode ?? '',
+              discount: Number(item?.discount ?? 0) || 0,
+              tax_rate: Number(item?.tax_rate ?? item?.taxRate ?? 0) || 0,
+            }))
+          } catch {
+            return [
+              {
+                name: 'Product',
+                sku: 'NA',
+                qty: 1,
+                price: 0,
+                hsn: '',
+                discount: 0,
+                tax_rate: 0,
+              },
+            ]
+          }
+        }
+
+        const getDeliveryOneSuccessfulPackage = (shipmentData: any) => {
+          const rawPackages = shipmentData?.packages
+          const packages: any[] = Array.isArray(rawPackages)
+            ? rawPackages
+            : rawPackages
+              ? [rawPackages]
+              : []
+
+          return packages.find(
+            (pkg) =>
+              pkg?.waybill &&
+              pkg?.serviceable !== false &&
+              String(pkg?.status || '').toLowerCase() !== 'fail',
+          )
+        }
+
+        const buildDeliveryOneManifestParams = (order: any): ShipmentParams => {
+          const pickupDetails = normalizePickupDetails(order.pickup_details) as any
+          const rtoDetails = normalizePickupDetails(order.rto_details) as any
+          const pickupWarehouseName = String(
+            pickupDetails?.warehouse_name || order.pickup_location_id || '',
+          ).trim()
+          const shippingMode =
+            getDelhiveryShippingModeByCourierId(normalizeCourierId(order.courier_id)) ||
+            order.shipping_mode ||
+            undefined
+
+          return {
+            order_number: order.order_number,
+            order_date: new Date(order.order_date || order.created_at || new Date()),
+            payment_type: String(order.order_type || '').toLowerCase() === 'cod' ? 'cod' : 'prepaid',
+            order_amount: Number(order.order_amount ?? 0),
+            package_weight: Number(order.weight ?? 0),
+            package_length: Number(order.length ?? 0),
+            package_breadth: Number(order.breadth ?? 0),
+            package_height: Number(order.height ?? 0),
+            courier_id: order.courier_id ? Number(order.courier_id) : undefined,
+            courier_partner: order.courier_partner ?? 'Delivery One',
+            shipping_mode: shippingMode,
+            integration_type: 'deliveryone',
+            invoice_number: order.invoice_number ?? undefined,
+            invoice_date: order.invoice_date ?? undefined,
+            invoice_amount: order.invoice_amount ?? undefined,
+            pickup_location_id: order.pickup_location_id ?? pickupWarehouseName,
+            is_rto_different: order.is_rto_different ? 'yes' : 'no',
+            company: {},
+            pickup: {
+              warehouse_name: pickupWarehouseName,
+              name: pickupDetails?.name || pickupWarehouseName || 'Pickup',
+              address: pickupDetails?.address || '',
+              address_2: pickupDetails?.address_2 || undefined,
+              city: pickupDetails?.city || '',
+              state: pickupDetails?.state || '',
+              pincode: pickupDetails?.pincode || '',
+              phone: pickupDetails?.phone || '',
+              gst_number: pickupDetails?.gst_number || '',
+            },
+            rto:
+              rtoDetails && Object.keys(rtoDetails).length
+                ? {
+                    warehouse_name:
+                      rtoDetails?.warehouse_name || rtoDetails?.name || pickupWarehouseName,
+                    name: rtoDetails?.name || rtoDetails?.warehouse_name || 'RTO',
+                    address: rtoDetails?.address || '',
+                    address_2: rtoDetails?.address_2 || undefined,
+                    city: rtoDetails?.city || '',
+                    state: rtoDetails?.state || '',
+                    country: rtoDetails?.country || 'India',
+                    pincode: rtoDetails?.pincode || '',
+                    phone: rtoDetails?.phone || '',
+                  }
+                : undefined,
+            consignee: {
+              name: order.buyer_name,
+              address: order.address,
+              city: order.city,
+              state: order.state,
+              pincode: order.pincode,
+              phone: order.buyer_phone,
+              email: order.buyer_email ?? '',
+            },
+            order_items: normalizeDeliveryOneOrderItems(order.products),
+            waybill: order.awb_number ?? undefined,
+          }
+        }
+
         for (const awb of params.awbs) {
           const ref = String(awb ?? '').trim()
           const matchedOrder = orders.find(
@@ -7024,8 +7165,24 @@ export const generateManifestService = async (params: {
           }
 
           if (!order) continue
+
+          if (deliveryOneManifestService && !String(order.awb_number || '').trim()) {
+            const fetchedWaybills = await deliveryOneManifestService.fetchWaybills(1)
+            const reservedWaybill = fetchedWaybills.waybills?.[0]
+            if (!reservedWaybill) {
+              throw new HttpError(
+                502,
+                `Delivery One did not return a waybill for order ${order.order_number}.`,
+              )
+            }
+
+            order.awb_number = reservedWaybill
+            deliveryOneShipmentPendingIds.add(String(order.id))
+          }
+
           localManifestOrdersById.set(String(order.id), order)
 
+          try {
           const [prefs] = await tx
             .select()
             .from(invoicePreferences)
@@ -7199,7 +7356,25 @@ export const generateManifestService = async (params: {
           )
 
           // 🖨️ Generate label if it doesn't exist and order has AWB
-          if (!order.label && order.awb_number) {
+          order.invoice_link = keyToStore
+          order.invoice_number = invoiceNumber
+          order.invoice_date = invoiceDateStored
+          order.invoice_amount = invoiceAmount
+          } catch (invoiceErr: any) {
+            const warning = `${order.order_number}: invoice could not be generated during manifest.`
+            deliveryOnePickupWarnings.push(warning)
+            console.warn('[Manifest] Delivery One invoice generation skipped', {
+              order_number: order.order_number,
+              message: invoiceErr?.message || invoiceErr,
+              status: invoiceErr?.response?.status || null,
+            })
+          }
+
+          if (
+            !deliveryOneShipmentPendingIds.has(String(order.id)) &&
+            !order.label &&
+            order.awb_number
+          ) {
             try {
               console.log(
                 `🖨️ Generating label for order ${order.order_number} during manifest (AWB: ${order.awb_number})`,
@@ -7312,7 +7487,7 @@ export const generateManifestService = async (params: {
               )
               // Don't throw - continue with manifest generation even if label fails
             }
-          } else if (!order.label) {
+          } else if (!order.label && !deliveryOneShipmentPendingIds.has(String(order.id))) {
             console.warn(
               `⚠️ Cannot generate label for order ${order.order_number}: AWB number is missing`,
             )
@@ -7464,6 +7639,9 @@ export const generateManifestService = async (params: {
               .update(table)
               .set({
                 manifest: manifestKey,
+                ...(deliveryOneShipmentPendingIds.has(String(order.id)) && order.awb_number
+                  ? { awb_number: order.awb_number }
+                  : {}),
                 order_status: 'pickup_initiated',
                 updated_at: new Date(),
               })
@@ -7474,6 +7652,156 @@ export const generateManifestService = async (params: {
         if (params.type === 'b2c') {
           for (const order of localManifestOrders) {
             await debitManifestSuccessChargeIfNeeded({ tx, order })
+          }
+        }
+
+        if (deliveryOneManifestService && deliveryOneShipmentPendingIds.size > 0) {
+          const pendingDeliveryOneOrders = localManifestOrders.filter((order) =>
+            deliveryOneShipmentPendingIds.has(String(order.id)),
+          )
+
+          for (const order of pendingDeliveryOneOrders) {
+            const deliveryOneShipmentParams = buildDeliveryOneManifestParams(order)
+            const deliveryOneShipmentData = await deliveryOneManifestService.createShipment(
+              deliveryOneShipmentParams,
+              order.awb_number,
+            )
+            const shipmentPackage = getDeliveryOneSuccessfulPackage(deliveryOneShipmentData)
+
+            if (!shipmentPackage?.waybill) {
+              throw new HttpError(
+                502,
+                `Delivery One shipment creation failed for order ${order.order_number}.`,
+              )
+            }
+
+            const deliveryOneAwb = shipmentPackage.waybill
+            const deliveryOneShipmentId =
+              deliveryOneShipmentData?.upload_wbn ??
+              deliveryOneShipmentData?.shipment_id ??
+              deliveryOneAwb
+            const deliveryOneSortCode =
+              shipmentPackage?.sort_code ??
+              shipmentPackage?.sortCode ??
+              shipmentPackage?.routing_code ??
+              shipmentPackage?.routingCode ??
+              null
+            const deliveryOneShippingMode =
+              deliveryOneShipmentData?.shipping_mode ??
+              shipmentPackage?.shipping_mode ??
+              shipmentPackage?.service_mode ??
+              shipmentPackage?.service_type ??
+              order.shipping_mode ??
+              null
+
+            await tx
+              .update(b2c_orders)
+              .set({
+                awb_number: deliveryOneAwb,
+                shipment_id: deliveryOneShipmentId,
+                courier_partner: 'Delivery One',
+                shipping_mode: deliveryOneShippingMode,
+                sort_code: deliveryOneSortCode,
+                manifest_error: null,
+                order_status: 'pickup_initiated',
+                updated_at: new Date(),
+              })
+              .where(eq(b2c_orders.id, order.id))
+
+            order.awb_number = deliveryOneAwb
+            order.shipment_id = deliveryOneShipmentId
+            order.courier_partner = 'Delivery One'
+            order.shipping_mode = deliveryOneShippingMode
+            order.sort_code = deliveryOneSortCode
+
+            try {
+              const labelKey = await generateLabelForOrder(order, order.user_id, tx)
+              const normalizedLabelKey =
+                labelKey && typeof labelKey === 'string'
+                  ? normalizeToR2Key(labelKey.trim())
+                  : null
+
+              if (normalizedLabelKey) {
+                await tx
+                  .update(b2c_orders)
+                  .set({
+                    label: normalizedLabelKey,
+                    updated_at: new Date(),
+                  })
+                  .where(eq(b2c_orders.id, order.id))
+                order.label = normalizedLabelKey
+              }
+            } catch (labelErr: any) {
+              deliveryOnePickupWarnings.push(
+                `${order.order_number}: label could not be generated after Delivery One booking.`,
+              )
+              console.warn('[Delivery One] Label generation skipped after booking', {
+                order_number: order.order_number,
+                message: labelErr?.message || labelErr,
+              })
+            }
+          }
+
+          const defaultNow = new Date()
+          const defaultPickupDate = scheduledPickupDate || defaultNow.toISOString().split('T')[0]
+          const defaultPickupTime =
+            scheduledPickupTime ||
+            new Date(defaultNow.getTime() + 60 * 60 * 1000).toTimeString().split(' ')[0]
+          const pickupGroups = new Map<
+            string,
+            { pickupDate: string; pickupTime: string; expectedPackageCount: number }
+          >()
+
+          for (const order of pendingDeliveryOneOrders) {
+            const pickupDetails = normalizePickupDetails(order.pickup_details) as any
+            const pickupLocation = String(
+              pickupDetails?.warehouse_name || order.pickup_location_id || '',
+            ).trim()
+
+            if (!pickupLocation) {
+              deliveryOnePickupWarnings.push(
+                `${order.order_number}: pickup request skipped because pickup warehouse name is missing.`,
+              )
+              continue
+            }
+
+            const existingGroup = pickupGroups.get(pickupLocation)
+            if (existingGroup) {
+              existingGroup.expectedPackageCount += 1
+            } else {
+              pickupGroups.set(pickupLocation, {
+                pickupDate: String(
+                  scheduledPickupDate || pickupDetails?.pickup_date || defaultPickupDate,
+                ).slice(0, 10),
+                pickupTime: String(
+                  scheduledPickupTime || pickupDetails?.pickup_time || defaultPickupTime,
+                ),
+                expectedPackageCount: 1,
+              })
+            }
+          }
+
+          for (const [pickupLocation, pickupGroup] of pickupGroups.entries()) {
+            try {
+              await deliveryOneManifestService.createPickupRequest({
+                pickup_date: pickupGroup.pickupDate,
+                pickup_time: pickupGroup.pickupTime,
+                pickup_location: pickupLocation,
+                expected_package_count: pickupGroup.expectedPackageCount,
+              })
+            } catch (pickupErr: any) {
+              const warning = `Delivery One pickup request failed for ${pickupLocation}: ${
+                pickupErr?.message || pickupErr
+              }`
+              deliveryOnePickupWarnings.push(warning)
+              console.warn('[Delivery One] Pickup request failed after manifest booking', {
+                pickupLocation,
+                pickupDate: pickupGroup.pickupDate,
+                pickupTime: pickupGroup.pickupTime,
+                expectedPackageCount: pickupGroup.expectedPackageCount,
+                message: pickupErr?.message || pickupErr,
+              })
+            }
           }
         }
 

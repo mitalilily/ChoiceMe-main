@@ -1632,10 +1632,26 @@ export class DeliveryOneService {
     const headers = await this.getHeaders()
 
     try {
-      const response = await axios.post(`${this.apiBase}/fm/request/new/`, payload, {
-        headers,
-        timeout: 30000,
-      })
+      let response
+      try {
+        response = await axios.post(`${this.apiBase}/fm/request/new/`, payload, {
+          headers,
+          timeout: 30000,
+        })
+      } catch (error: any) {
+        if (Number(error?.response?.status) !== 415) {
+          throw error
+        }
+
+        this.log('Pickup request JSON rejected with 415, retrying as form-encoded', {
+          pickupDate: payload.pickup_date,
+          pickupTime: payload.pickup_time,
+          pickupLocation: payload.pickup_location,
+          expectedPackageCount: payload.expected_package_count,
+          response: error?.response?.data || null,
+        })
+        response = await this.postFormEncoded('/fm/request/new/', payload)
+      }
       const raw = response.data
       const explicitFailure =
         raw?.error === true ||
@@ -2212,8 +2228,8 @@ export class DeliveryOneService {
     }
 
     const selectedShippingMode =
-      sanitizeString((params as any).shipping_mode) ||
       getDelhiveryShippingModeByCourierId(normalizeCourierId(params.courier_id)) ||
+      sanitizeString((params as any).shipping_mode) ||
       'Surface'
     const paymentType = sanitizeString(params.payment_type).toLowerCase()
     const paymentMode =
