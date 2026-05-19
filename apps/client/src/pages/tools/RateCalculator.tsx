@@ -12,7 +12,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { FaPlane, FaTruck } from 'react-icons/fa'
-import { TbCalculator, TbMapPins, TbScale } from 'react-icons/tb'
+import { TbScale } from 'react-icons/tb'
 import type { Courier } from '../../components/CourierRateCard'
 import PublicFooter from '../../components/public/PublicFooter'
 import PublicNavbar from '../../components/public/PublicNavbar'
@@ -183,14 +183,35 @@ const getCompactFreight = (courier: Courier) => {
 const getCompactCod = (courier: Courier) => toNumber(courier.localRates?.forward?.cod_charges)
 
 const getZoneChipLabel = (courier: Courier) => {
-  const zone = courier.approxZone as { code?: string | null; name?: string | null } | null
-  const code = String(zone?.code || '').trim()
-  const name = String(zone?.name || '').trim()
+  const courierWithZone = courier as Courier & {
+    zone?: string | { code?: string | null; name?: string | null } | null
+    zone_code?: string | null
+    zone_name?: string | null
+    pricing_zone?: string | null
+    pricingZone?: string | null
+    delivery_location?: string | null
+  }
+  const zone = (courier.approxZone || courierWithZone.zone) as
+    | string
+    | { code?: string | null; name?: string | null }
+    | null
+    | undefined
+  const pricingZone = String(courierWithZone.pricing_zone || courierWithZone.pricingZone || '').trim()
+  const deliveryLocation = String(courierWithZone.delivery_location || '').trim()
+
+  if (typeof zone === 'string') {
+    return zone.trim() || pricingZone || deliveryLocation || 'Not returned'
+  }
+
+  const code = String(zone?.code || courierWithZone.zone_code || '').trim()
+  const name = String(zone?.name || courierWithZone.zone_name || '').trim()
 
   if (code && name) return `${code} - ${name}`
   if (code || name) return code || name
+  if (pricingZone) return pricingZone
+  if (deliveryLocation) return deliveryLocation
   if (courier.special_zone) return 'Special Zone'
-  return ''
+  return 'Not returned'
 }
 
 export function RateCalculator({ publicView }: RateCalculatorProps) {
@@ -228,6 +249,18 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
     watch('deliveryState'),
     deliveryPincode,
   )
+  const routeZoneLabel = useMemo(() => {
+    if (!availableCouriers.length) return 'Calculate first'
+
+    const returnedZones = availableCouriers
+      .map(getZoneChipLabel)
+      .filter((label) => label && label !== 'Not returned')
+    const uniqueZones = Array.from(new Set(returnedZones))
+
+    if (uniqueZones.length === 1) return uniqueZones[0]
+    if (uniqueZones.length > 1) return 'Multiple zones'
+    return 'Not returned'
+  }, [availableCouriers])
 
   usePincodeLookup(pickupPincode, 'pickup', setValue, setError, clearErrors)
   usePincodeLookup(deliveryPincode, 'delivery', setValue, setError, clearErrors)
@@ -356,7 +389,6 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
         lineHeight: 1.25,
       }}
     >
-      <TbMapPins size={13} />
       <Box component="span">{label}</Box>
     </Box>
   )
@@ -387,21 +419,7 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
           color: ui.ink,
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={1.3} sx={{ mb: 2.15 }}>
-          <Box
-            sx={{
-              width: 50,
-              height: 50,
-              borderRadius: '13px',
-              background: `linear-gradient(180deg, ${brand.ink} 0%, #184579 100%)`,
-              color: '#FFFFFF',
-              display: 'grid',
-              placeItems: 'center',
-              boxShadow: `0 10px 22px ${alpha(brand.ink, 0.26)}`,
-            }}
-          >
-            <TbCalculator size={25} />
-          </Box>
+        <Stack sx={{ mb: 2.15 }}>
           <Box>
             <Typography sx={{ fontSize: '1.32rem', fontWeight: 900, color: ui.ink, lineHeight: 1.1 }}>
               Rate Calculator
@@ -636,25 +654,46 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
                     bgcolor: ui.softAccent,
                   }}
                 >
-                  <Stack direction="row" spacing={1.2} alignItems="flex-start">
-                    <Box
-                      sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: '10px',
-                        display: 'grid',
-                        placeItems: 'center',
-                        color: '#FFFFFF',
-                        background: `linear-gradient(180deg, ${ui.accent} 0%, ${ui.accentDark} 100%)`,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <TbMapPins size={22} />
-                    </Box>
+                  <Stack>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ mb: 1.3, fontSize: '0.9rem', fontWeight: 900, color: ui.ink }}>
-                        Route Information
-                      </Typography>
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={0.8}
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                        justifyContent="space-between"
+                        sx={{ mb: 1.3 }}
+                      >
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 900, color: ui.ink }}>
+                          Route Information
+                        </Typography>
+                        <Box
+                          title={`Pricing zone: ${routeZoneLabel}`}
+                          sx={{
+                            px: 0.9,
+                            py: 0.45,
+                            borderRadius: '999px',
+                            bgcolor:
+                              routeZoneLabel === 'Calculate first' || routeZoneLabel === 'Not returned'
+                                ? alpha(ui.muted, 0.1)
+                                : alpha(ui.accent, 0.16),
+                            color:
+                              routeZoneLabel === 'Calculate first' || routeZoneLabel === 'Not returned'
+                                ? ui.muted
+                                : ui.accentDark,
+                            border: `1px solid ${
+                              routeZoneLabel === 'Calculate first' || routeZoneLabel === 'Not returned'
+                                ? alpha(ui.muted, 0.18)
+                                : alpha(ui.accent, 0.22)
+                            }`,
+                            fontSize: '0.68rem',
+                            fontWeight: 900,
+                            lineHeight: 1.15,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Zone: {routeZoneLabel}
+                        </Box>
+                      </Stack>
                       <Grid container spacing={1}>
                         <Grid size={{ xs: 12, sm: 6 }}>
                           <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: ui.muted }}>
@@ -688,11 +727,12 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
                 </Typography>
 
                 <Box sx={{ overflowX: 'auto' }}>
-                  <Box sx={{ minWidth: 470 }}>
+                  <Box sx={{ minWidth: 590 }}>
                     <Box
                       sx={{
                         display: 'grid',
-                        gridTemplateColumns: 'minmax(150px, 1.7fr) 0.55fr 0.7fr 0.6fr 0.55fr',
+                        gridTemplateColumns:
+                          'minmax(138px, 1.45fr) 0.5fr 0.65fr 0.68fr 0.58fr 0.52fr',
                         px: 1,
                         pb: 1,
                         color: ui.muted,
@@ -704,6 +744,7 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
                       <Box>Courier</Box>
                       <Box>Mode</Box>
                       <Box>Weight</Box>
+                      <Box>Zone</Box>
                       <Box>Rate</Box>
                       <Box>COD</Box>
                     </Box>
@@ -733,7 +774,8 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
                               key={courier.id || `${displayName}-${index}`}
                               sx={{
                                 display: 'grid',
-                                gridTemplateColumns: 'minmax(150px, 1.7fr) 0.55fr 0.7fr 0.6fr 0.55fr',
+                                gridTemplateColumns:
+                                  'minmax(138px, 1.45fr) 0.5fr 0.65fr 0.68fr 0.58fr 0.52fr',
                                 alignItems: 'center',
                                 minHeight: 62,
                                 px: 1,
@@ -772,30 +814,6 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
                                   <Typography noWrap sx={{ fontSize: '0.82rem', fontWeight: 800, color: '#273044' }}>
                                     {displayName}
                                   </Typography>
-                                  {zoneLabel ? (
-                                    <Box
-                                      component="span"
-                                      title={`Pricing zone: ${zoneLabel}`}
-                                      sx={{
-                                        alignSelf: 'flex-start',
-                                        maxWidth: 126,
-                                        px: 0.65,
-                                        py: 0.2,
-                                        borderRadius: '999px',
-                                        bgcolor: alpha(ui.accent, 0.12),
-                                        color: ui.accentDark,
-                                        border: `1px solid ${alpha(ui.accent, 0.18)}`,
-                                        fontSize: '0.62rem',
-                                        fontWeight: 900,
-                                        lineHeight: 1.15,
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                      }}
-                                    >
-                                      Zone {zoneLabel}
-                                    </Box>
-                                  ) : null}
                                 </Stack>
                               </Stack>
                               <Box sx={{ color: mode === 'air' ? ui.accentDark : '#68707E', display: 'flex' }}>
@@ -804,6 +822,34 @@ export function RateCalculator({ publicView }: RateCalculatorProps) {
                               <Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: '#273044' }}>
                                 {formatWeightKg(courier.chargeable_weight)}
                               </Typography>
+                              <Box
+                                title={`Pricing zone: ${zoneLabel}`}
+                                sx={{
+                                  justifySelf: 'start',
+                                  maxWidth: 82,
+                                  px: 0.7,
+                                  py: 0.35,
+                                  borderRadius: '999px',
+                                  bgcolor:
+                                    zoneLabel === 'Not returned'
+                                      ? alpha(ui.muted, 0.1)
+                                      : alpha(ui.accent, 0.14),
+                                  color: zoneLabel === 'Not returned' ? ui.muted : ui.accentDark,
+                                  border: `1px solid ${
+                                    zoneLabel === 'Not returned'
+                                      ? alpha(ui.muted, 0.18)
+                                      : alpha(ui.accent, 0.2)
+                                  }`,
+                                  fontSize: '0.62rem',
+                                  fontWeight: 900,
+                                  lineHeight: 1.15,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {zoneLabel}
+                              </Box>
                               {renderMoney(freight)}
                               {renderMoney(cod, '#606570', true)}
                             </Box>
