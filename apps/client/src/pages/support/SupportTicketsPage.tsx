@@ -10,6 +10,7 @@ import { SupportTicketForm } from '../../components/support/SupportTicketForm'
 import SupportTicketList from '../../components/support/SupportTicketList'
 import TicketStatusSummaryCard from '../../components/support/TicketStatusSummaryCard'
 import { useMyTickets } from '../../hooks/User/useSupport'
+import { brandIdentity } from '../../theme/brand'
 
 const supportTicketFilterFields: FilterField[] = [
   {
@@ -143,7 +144,7 @@ export const SupportTicketsPage = () => {
       {!isLoading && (
         <Stack direction="row" justifyContent="flex-end">
           <Button
-            href="https://wa.me/919217553934?text=Hi%2C%20I%27m%20a%20seller%20and%20I%20need%20some%20assistance.%20Can%20you%20please%20help%3F"
+            href={`https://wa.me/91${brandIdentity.supportPhone}?text=Hi%2C%20I%27m%20a%20seller%20and%20I%20need%20some%20assistance.%20Can%20you%20please%20help%3F`}
             target="_blank"
             rel="noopener noreferrer"
             variant="outlined"

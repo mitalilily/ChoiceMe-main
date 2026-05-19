@@ -1,6 +1,6 @@
 import { Box, Button, Stack } from '@mui/material'
 import { alpha } from '@mui/material/styles'
-import { FiArrowUpRight } from 'react-icons/fi'
+import { FiArrowUpRight, FiPhone } from 'react-icons/fi'
 import { Link as RouterLink, useLocation } from 'react-router-dom'
 import BrandLogo from '../brand/BrandLogo'
 import BrandTopBar from '../brand/BrandTopBar'
@@ -85,6 +85,22 @@ export default function PublicNavbar({
         </Stack>
 
         <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            component="a"
+            href={`tel:${brandIdentity.supportPhone}`}
+            variant="text"
+            startIcon={<FiPhone size={15} />}
+            sx={{
+              display: { xs: 'none', lg: 'inline-flex' },
+              color: brand.ink,
+              fontWeight: 800,
+              '&:hover': {
+                backgroundColor: alpha(brand.ink, 0.06),
+              },
+            }}
+          >
+            {brandIdentity.supportPhone}
+          </Button>
           <Button
             component={RouterLink}
             to="/login"

@@ -2,6 +2,7 @@
 import { FiCreditCard, FiFileText, FiShield } from 'react-icons/fi'
 import TermsOfService from '../../components/terms/TermsOfService'
 import PageHeading from '../../components/UI/heading/PageHeading'
+import { brandIdentity } from '../../theme/brand'
 import { TERMS_REFUND_POLICY_LINE } from '../../utils/constants'
 import CompanyDetails from './CompanyDetails'
 
@@ -23,7 +24,8 @@ const PolicyPages = () => {
         </Box>
         <Typography paragraph>
           â€¢ You may cancel your account at any time by emailing us at{' '}
-          <Link href="mailto:ops@choicemee.com">ops@choicemee.com</Link>.
+          <Link href={`mailto:${brandIdentity.supportEmail}`}>{brandIdentity.supportEmail}</Link> or call{' '}
+          <Link href={`tel:${brandIdentity.supportPhone}`}>{brandIdentity.supportPhone}</Link>.
         </Typography>
         <Typography paragraph>
           â€¢ Once your account is cancelled, all of your data and content will be permanently deleted
@@ -171,7 +173,8 @@ const PolicyPages = () => {
           services).
           <br />
           To do so, please contact us at{' '}
-          <Link href="mailto:ops@choicemee.com">ops@choicemee.com</Link>.
+          <Link href={`mailto:${brandIdentity.supportEmail}`}>{brandIdentity.supportEmail}</Link> or call{' '}
+          <Link href={`tel:${brandIdentity.supportPhone}`}>{brandIdentity.supportPhone}</Link>.
         </Typography>
         <Typography paragraph>
           10. Third-Party Links
@@ -190,6 +193,9 @@ const PolicyPages = () => {
           12. Grievance Officer
           <br />
           If you have questions, complaints, or wish to exercise your privacy rights, reach out to:
+          <br />
+          <Link href={`mailto:${brandIdentity.supportEmail}`}>{brandIdentity.supportEmail}</Link> or call{' '}
+          <Link href={`tel:${brandIdentity.supportPhone}`}>{brandIdentity.supportPhone}</Link>.
         </Typography>
       </Box>
 

@@ -12,11 +12,12 @@
 import { FiClock, FiMail, FiMapPin, FiPhone } from 'react-icons/fi'
 import PageHeading from '../../components/UI/heading/PageHeading'
 import MapViewer from '../../components/UI/map/MapViewer'
+import { brandIdentity } from '../../theme/brand'
 
 const CompanyDetails = () => {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
-  const coords = { lat: 28.6279, lng: 79.8046 }
+  const coords = { lat: 34.209, lng: 74.3429 }
 
   return (
     <Stack mt={2} gap={5}>
@@ -47,12 +48,12 @@ const CompanyDetails = () => {
           }}
         >
           <Typography variant="h6" fontWeight="bold" color="secondary" gutterBottom>
-            ChoiceMee Logistics
+            {brandIdentity.name}
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
             <FiMapPin size={22} color={theme.palette.primary.main} />
-            <Typography fontSize="1rem">Chhatri Chauraha, Nai Basti, Pilibhit - 262001</Typography>
+            <Typography fontSize="1rem">{brandIdentity.supportAddress}</Typography>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -60,7 +61,7 @@ const CompanyDetails = () => {
             <Chip
               clickable
               component={Link}
-              href="mailto:ops@choicemee.com"
+              href={`mailto:${brandIdentity.supportEmail}`}
               label="Support Email"
               color="primary"
               variant="filled"
@@ -73,8 +74,8 @@ const CompanyDetails = () => {
             <Chip
               clickable
               component={Link}
-              href="tel:+919217553934"
-              label="+91 9217553934"
+              href={`tel:${brandIdentity.supportPhone}`}
+              label={brandIdentity.supportPhone}
               color="success"
               variant="filled"
               icon={<FiPhone size={16} />}

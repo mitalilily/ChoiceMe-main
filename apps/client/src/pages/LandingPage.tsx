@@ -10,7 +10,7 @@
   Typography,
 } from '@mui/material'
 import { motion } from 'framer-motion'
-import { FiArrowRight } from 'react-icons/fi'
+import { FiArrowRight, FiPhone } from 'react-icons/fi'
 import { TbBolt, TbCurrencyRupee, TbPlugConnected, TbRoute, TbTruckDelivery } from 'react-icons/tb'
 import { Link as RouterLink } from 'react-router-dom'
 import BrandSurface from '../components/brand/BrandSurface'
@@ -132,6 +132,7 @@ const fadeUp = {
 
 export default function LandingPage() {
   const { data: landingStats } = usePublicLandingStats()
+  const supportPhoneHref = `tel:${brandIdentity.supportPhone}`
 
   const liveValue = (value?: number, suffix = '') => {
     const safeValue = Number.isFinite(value) ? (value ?? 0) : 0
@@ -239,6 +240,32 @@ export default function LandingPage() {
                     >
                       Track Order
                     </Button>
+                  </Stack>
+
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={{ xs: 0.5, sm: 1 }}
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
+                    sx={{ color: brand.inkSoft }}
+                  >
+                    <Typography sx={{ fontSize: { xs: '0.82rem', sm: '0.94rem' }, fontWeight: 700 }}>
+                      Need shipping help?
+                    </Typography>
+                    <Box
+                      component="a"
+                      href={supportPhoneHref}
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 0.75,
+                        color: brand.ink,
+                        fontWeight: 900,
+                        fontSize: { xs: '0.94rem', sm: '1rem' },
+                      }}
+                    >
+                      <FiPhone size={16} />
+                      {brandIdentity.supportPhone}
+                    </Box>
                   </Stack>
 
                   <Box
@@ -635,7 +662,8 @@ export default function LandingPage() {
                     Start shipping smarter with {brandIdentity.name}
                   </Typography>
                   <Typography sx={{ mt: 1.4, color: '#EAF1FB', lineHeight: 1.8, maxWidth: 680 }}>
-                    Try the free rate calculator, compare couriers, track shipments live, or open the seller portal and move straight into the existing auth and dashboard flow.
+                    Try the free rate calculator, compare couriers, track shipments live, or open the seller portal and move straight into the existing auth and dashboard flow.{' '}
+                    For direct support, call {brandIdentity.supportPhone}.
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
@@ -645,6 +673,19 @@ export default function LandingPage() {
                     </Button>
                     <Button component={RouterLink} to="/login" variant="outlined" sx={{ borderColor: alpha('#FFFFFF', 0.32), color: '#FFFFFF', '&:hover': { borderColor: alpha('#FFFFFF', 0.58) } }}>
                       Open Portal
+                    </Button>
+                    <Button
+                      component="a"
+                      href={supportPhoneHref}
+                      variant="outlined"
+                      startIcon={<FiPhone size={17} />}
+                      sx={{
+                        borderColor: alpha('#FFFFFF', 0.32),
+                        color: '#FFFFFF',
+                        '&:hover': { borderColor: alpha('#FFFFFF', 0.58) },
+                      }}
+                    >
+                      {brandIdentity.supportPhone}
                     </Button>
                   </Stack>
                 </Grid>

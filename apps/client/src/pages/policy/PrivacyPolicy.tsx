@@ -1,5 +1,6 @@
 ﻿import { Box, Link, List, ListItem, ListItemText, Typography } from '@mui/material'
 import PageHeading from '../../components/UI/heading/PageHeading'
+import { brandIdentity } from '../../theme/brand'
 
 const PrivacyPolicy = () => {
   return (
@@ -53,7 +54,9 @@ const PrivacyPolicy = () => {
               <>
                 Your Privacy Rights: You may review, update, or correct your details, or withdraw
                 consent by contacting us at{' '}
-                <Link href="mailto:ops@choicemee.com">ops@choicemee.com</Link>.
+                <Link href={`mailto:${brandIdentity.supportEmail}`}>{brandIdentity.supportEmail}</Link>{' '}
+                or{' '}
+                <Link href={`tel:${brandIdentity.supportPhone}`}>{brandIdentity.supportPhone}</Link>.
               </>
             }
           />
@@ -73,12 +76,14 @@ const PrivacyPolicy = () => {
               <>
                 Grievance Officer: If you have queries or complaints, reach out to us at{' '}
                 <a
-                  href="mailto:ops@choicemee.com"
+                  href={`mailto:${brandIdentity.supportEmail}`}
                   style={{ color: '#0052CC', textDecoration: 'none' }}
                 >
-                  ops@choicemee.com
+                  {brandIdentity.supportEmail}
                 </a>
-                .
+                {' '}
+                or call{' '}
+                <Link href={`tel:${brandIdentity.supportPhone}`}>{brandIdentity.supportPhone}</Link>.
               </>
             }
           />

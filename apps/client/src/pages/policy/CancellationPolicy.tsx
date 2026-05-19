@@ -1,5 +1,6 @@
 ﻿import { Box, Link, List, ListItem, ListItemText, Typography } from '@mui/material'
 import PageHeading from '../../components/UI/heading/PageHeading'
+import { brandIdentity } from '../../theme/brand'
 import { TERMS_REFUND_POLICY_LINE } from '../../utils/constants'
 
 const CancellationPolicy = () => {
@@ -13,7 +14,9 @@ const CancellationPolicy = () => {
             primary={
               <>
                 You may cancel your account at any time by emailing us at{' '}
-                <Link href="mailto:ops@choicemee.com">ops@choicemee.com</Link>.
+                <Link href={`mailto:${brandIdentity.supportEmail}`}>{brandIdentity.supportEmail}</Link>{' '}
+                or calling{' '}
+                <Link href={`tel:${brandIdentity.supportPhone}`}>{brandIdentity.supportPhone}</Link>.
               </>
             }
           />
