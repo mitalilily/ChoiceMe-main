@@ -34,12 +34,6 @@ const getDeliveryOneModeByCourierId = (courierId) => {
 const getCourierDefaultMode = (courier) =>
   normalizeMode(courier?.mode || courier?.shipping_mode || courier?.service_type) ||
   getDeliveryOneModeByCourierId(courier?.id ?? courier?.courier_id)
-const getModeLabel = (mode) => {
-  const normalizedMode = normalizeMode(mode)
-  if (normalizedMode === 'air') return 'Air'
-  if (normalizedMode === 'surface') return 'Surface'
-  return ''
-}
 const makeCourierKey = (courierId, serviceProvider) =>
   `${courierId || ''}__${normalizeProvider(serviceProvider)}`
 
@@ -323,7 +317,9 @@ export const RateCardEditModal = ({
       mode: resolvedMode,
       previous_mode: data?.mode,
       courier_id: resolvedCourierId, // from form (create) or existing (edit)
-      courier_name: form.courier_name || data?.courier_name,
+      courier_name: selectedCourier
+        ? getCourierDisplayName(selectedCourier)
+        : form.courier_name || data?.courier_name,
       service_provider: serviceProviderValue, // Always send the service_provider
       previous_service_provider: data?.service_provider || data?.serviceProvider,
       rates,
@@ -439,7 +435,9 @@ export const RateCardEditModal = ({
     courierName: form.courier_name || data?.courier_name,
     courierKey: form.courier_key,
   })
-  const displayCourierName = form.courier_name || data?.courier_name || ''
+  const displayCourierName = selectedCourier
+    ? getCourierDisplayName(selectedCourier)
+    : form.courier_name || data?.courier_name || ''
   const displayServiceProvider =
     selectedCourier?.serviceProvider ||
     selectedCourier?.service_provider ||
@@ -517,7 +515,7 @@ export const RateCardEditModal = ({
                     courierKey,
                 )
                 const courierId = selectedCourier?.id?.toString() || ''
-                const courierName = selectedCourier?.name || ''
+                const courierName = selectedCourier ? getCourierDisplayName(selectedCourier) : ''
                 const courierMode = getCourierDefaultMode(selectedCourier)
                 handleChange('courier_key', courierKey)
                 handleChange('courier_id', courierId)
@@ -527,16 +525,12 @@ export const RateCardEditModal = ({
               }}
             >
               {availableCouriers.map((c) => {
-                const defaultMode = getCourierDefaultMode(c)
-                const modeLabel = getModeLabel(defaultMode)
-
                 return (
                   <option
                     key={makeCourierKey(c.id, c.serviceProvider || c.service_provider || '')}
                     value={makeCourierKey(c.id, c.serviceProvider || c.service_provider || '')}
                   >
-                    {getCourierDisplayName(c)}
-                    {modeLabel ? ` - ${modeLabel}` : ''}{' '}
+                    {getCourierDisplayName(c)}{' '}
                     {c.serviceProvider ? `(${getProviderDisplayName(c.serviceProvider)})` : ''}
                   </option>
                 )

@@ -135,7 +135,7 @@ const normalizeZoneLookupKey = (value: unknown) =>
     .trim()
     .toLowerCase()
 
-const getDeliveryOneModeFromCourierName = (value: unknown) => {
+const getDeliveryOneFilterScopeFromCourierName = (value: unknown) => {
   const normalized = String(value ?? '')
     .trim()
     .toLowerCase()
@@ -144,6 +144,9 @@ const getDeliveryOneModeFromCourierName = (value: unknown) => {
   if (!normalized) return ''
   if (normalized.includes('surface') || normalized.includes('ground')) return 'surface'
   if (normalized.includes('express') || normalized.includes('air')) return 'air'
+  if (['deliveryone', 'delivery1', 'delhiveryone', 'delhivery'].includes(normalized)) {
+    return 'all'
+  }
   return ''
 }
 
@@ -293,16 +296,20 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
 
   if (filters.courier_name?.length) {
     const courierNameConditions: any[] = [inArray(shippingRates.courier_name, filters.courier_name)]
-    const requestedDeliveryOneModes = new Set(
-      filters.courier_name.map(getDeliveryOneModeFromCourierName).filter(Boolean),
+    const requestedDeliveryOneScopes = new Set(
+      filters.courier_name.map(getDeliveryOneFilterScopeFromCourierName).filter(Boolean),
     )
 
-    if (requestedDeliveryOneModes.has('surface')) {
-      courierNameConditions.push(eq(shippingRates.courier_id, DELHIVERY_COURIER_IDS.SURFACE))
-    }
+    if (requestedDeliveryOneScopes.has('all')) {
+      courierNameConditions.push(inArray(shippingRates.courier_id, DELIVERY_ONE_ALLOWED_COURIER_IDS))
+    } else {
+      if (requestedDeliveryOneScopes.has('surface')) {
+        courierNameConditions.push(eq(shippingRates.courier_id, DELHIVERY_COURIER_IDS.SURFACE))
+      }
 
-    if (requestedDeliveryOneModes.has('air')) {
-      courierNameConditions.push(eq(shippingRates.courier_id, DELHIVERY_COURIER_IDS.EXPRESS))
+      if (requestedDeliveryOneScopes.has('air')) {
+        courierNameConditions.push(eq(shippingRates.courier_id, DELHIVERY_COURIER_IDS.EXPRESS))
+      }
     }
 
     conditions.push(or(...courierNameConditions)!)

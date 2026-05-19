@@ -34,6 +34,26 @@ import { PlansService } from 'services/plan.service'
 import { getCourierDisplayName } from 'utils/courierDisplay'
 
 const normalizeProvider = (value) => String(value || '').trim().toLowerCase()
+const getCourierFilterOptions = (courierList = []) => {
+  const optionsByKey = new Map()
+
+  courierList.forEach((courier) => {
+    const serviceProvider = normalizeProvider(
+      courier?.serviceProvider || courier?.service_provider || '',
+    )
+    const isDeliveryOne = serviceProvider === 'deliveryone'
+    const key = isDeliveryOne ? 'deliveryone' : courier?.name || courier?.id
+    const option = isDeliveryOne
+      ? { label: 'Delivery One', value: 'Delivery One' }
+      : { label: getCourierDisplayName(courier), value: courier?.name }
+
+    if (key && option.value && !optionsByKey.has(key)) {
+      optionsByKey.set(key, option)
+    }
+  })
+
+  return Array.from(optionsByKey.values())
+}
 
 const normalizeMode = (value) => {
   const raw = String(value || '').trim().toLowerCase()
@@ -289,7 +309,7 @@ export const RateCardContainer = ({ forceBusinessType = null, embedded = false }
           key: 'courier_name',
           label: 'Courier',
           type: 'multiselect',
-          options: courierList?.map((c) => ({ label: getCourierDisplayName(c), value: c?.name })) || [],
+          options: getCourierFilterOptions(courierList),
         },
         {
           key: 'mode',

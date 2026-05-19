@@ -68,6 +68,12 @@ type CourierOption = string | {
   shipping_mode?: string | null
 }
 
+const normalizeCourierProvider = (value?: string | null) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '')
+
 const getZoneLookupKeys = (zone: { id?: string; code?: string; name?: string }) =>
   [
     zone?.id,
@@ -255,18 +261,38 @@ const RateCard = () => {
   const { data, isLoading, isError } = useShippingRates({ ...filters, businessType: businessType })
 
   const rates: ShippingRate[] = data || []
-  const courierOptions =
-    (couriers as CourierOption[] | undefined)?.map((courier) => {
+  const courierOptions = Array.from(
+    ((couriers as CourierOption[] | undefined) || []).reduce((optionsByKey, courier) => {
+      const provider =
+        typeof courier === 'string'
+          ? normalizeCourierProvider(courier)
+          : normalizeCourierProvider(
+              courier.serviceProvider || courier.service_provider || courier.name,
+            )
+      const isDeliveryOne =
+        provider === 'deliveryone' ||
+        provider === 'delivery1' ||
+        provider === 'delhiveryone' ||
+        provider === 'delhivery'
       const value =
         typeof courier === 'string'
           ? courier
           : courier.name || courier.courier_name || courier.displayName || ''
+      const key = isDeliveryOne ? 'deliveryone' : value
 
-      return {
-        label: getCourierDisplayName(courier),
-        value,
+      if (key && value && !optionsByKey.has(key)) {
+        optionsByKey.set(
+          key,
+          isDeliveryOne ? { label: 'Delivery One', value: 'Delivery One' } : {
+            label: getCourierDisplayName(courier),
+            value,
+          },
+        )
       }
-    }).filter((option) => option.value) || []
+
+      return optionsByKey
+    }, new Map<string, { label: string; value: string }>()),
+  ).map(([, option]) => option)
 
   console.log('rates', rates)
 
