@@ -31,6 +31,7 @@ import { b2c_orders } from '../schema/b2cOrders'
 import { invoicePreferences } from '../schema/invoicePreferences'
 // import { shippingRate, shippingRateCard } from '../schema/shippingRateCard'
 import { sendWebhookEvent } from '../../services/webhookDelivery.service'
+import { tracking_events } from '../schema/trackingEvents'
 import { users } from '../schema/users'
 import { wallets, walletTransactions } from '../schema/wallet'
 import dayjs from 'dayjs'
@@ -8243,6 +8244,56 @@ const mapDelhiveryTracking = (
   }
 }
 
+const buildLocalTrackingFallback = async (
+  order: OrderSummary,
+): Promise<ProviderNormalizedTracking> => {
+  const localEvents = await db
+    .select({
+      status_code: tracking_events.status_code,
+      status_text: tracking_events.status_text,
+      location: tracking_events.location,
+      created_at: tracking_events.created_at,
+      courier: tracking_events.courier,
+    })
+    .from(tracking_events)
+    .where(
+      or(
+        eq(tracking_events.awb_number, order.awb_number),
+        eq(tracking_events.order_id, order.id),
+      ),
+    )
+    .orderBy(desc(tracking_events.created_at))
+    .limit(50)
+
+  const fallbackTime = toIsoString(order.updated_at ?? order.created_at ?? new Date())
+  const history: TrackingHistoryItem[] = []
+
+  for (const event of localEvents) {
+    pushHistoryEvent(
+      history,
+      {
+        statusCode: event.status_code ?? event.status_text ?? order.order_status,
+        message: event.status_text ?? event.status_code ?? order.order_status,
+        location: event.location,
+        time: event.created_at,
+      },
+      fallbackTime,
+    )
+  }
+
+  sortHistoryDescending(history)
+
+  return {
+    history,
+    status: sanitizeString(history[0]?.message ?? order.order_status, order.order_status ?? 'Order Placed'),
+    edd: order.edd ? sanitizeString(order.edd) : null,
+    courier_name: sanitizeString(
+      localEvents[0]?.courier ?? order.courier_partner ?? order.integration_type ?? 'Courier',
+    ),
+    shipment_info: sanitizeString(order.delivery_message ?? '', ''),
+  }
+}
+
 const buildTrackingResponse = (
   order: OrderSummary,
   providerData: ProviderNormalizedTracking,
@@ -8394,7 +8445,7 @@ export const trackByAwbService = async (awb: string): Promise<TrackingServiceRes
 
   if (!providerKey) providerKey = 'deliveryone'
 
-  let providerData: ProviderNormalizedTracking
+  let providerData = await buildLocalTrackingFallback(order)
 
   try {
     if (providerKey === 'delhivery') {
@@ -8406,14 +8457,22 @@ export const trackByAwbService = async (awb: string): Promise<TrackingServiceRes
       const raw = await deliveryOneService.trackShipment(awb)
       providerData = mapDelhiveryTracking(raw, order, 'Delivery One')
     } else {
-      throw new HttpError(400, 'Unsupported integration_type for tracking')
+      console.warn('[Tracking] Live courier tracking is not configured for this provider', {
+        awb,
+        order_number: order.order_number,
+        providerKey,
+        courier_partner: order.courier_partner,
+      })
     }
   } catch (err: any) {
-    if (err instanceof HttpError) throw err
-    const status = err?.status ?? err?.response?.status ?? 500
-    const message =
-      err?.response?.data?.message ?? err?.message ?? 'Failed to fetch tracking information'
-    throw new HttpError(status, message)
+    console.warn('[Tracking] Falling back to local tracking data', {
+      awb,
+      order_number: order.order_number,
+      providerKey,
+      status: err?.status ?? err?.response?.status ?? null,
+      message:
+        err?.response?.data?.message ?? err?.message ?? 'Failed to fetch live tracking information',
+    })
   }
 
   return buildTrackingResponse(order, providerData)

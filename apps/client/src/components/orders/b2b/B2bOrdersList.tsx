@@ -2,7 +2,7 @@ import { Button, Link, Stack, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import moment from 'moment'
-import { useLocation } from 'react-router-dom'
+import { Link as RouterLink, useLocation } from 'react-router-dom'
 import { useB2BOrdersByUser, useGenerateManifest } from '../../../hooks/Orders/useOrders'
 import type { B2BOrder } from '../../../types/generic.types'
 import StatusChip from '../../UI/chip/StatusChip'
@@ -74,6 +74,23 @@ const B2BOrdersList = ({
   const hasInvoiceGenerated = (row: B2BOrder) =>
     Boolean(String(row.invoice_url || row.invoice_key || row.invoice_link || '').trim())
 
+  const renderAwbLink = (value?: string | null) => {
+    const awb = String(value || '').trim()
+    if (!awb) return '-'
+
+    return (
+      <Link
+        component={RouterLink}
+        to={`/tracking?awb=${encodeURIComponent(awb)}`}
+        underline="hover"
+        onClick={(event) => event.stopPropagation()}
+        sx={{ fontWeight: 800 }}
+      >
+        {awb}
+      </Link>
+    )
+  }
+
   const columns: Column<B2BOrder>[] = [
     {
       label: 'Source',
@@ -86,7 +103,7 @@ const B2BOrdersList = ({
       ),
     },
     { label: 'Order #', id: 'order_number' },
-    { label: 'AWB', id: 'awb_number' },
+    { label: 'AWB', id: 'awb_number', render: (value) => renderAwbLink(value) },
     {
       label: 'Docs',
       id: 'id',

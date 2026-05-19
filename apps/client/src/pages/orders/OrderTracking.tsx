@@ -13,6 +13,7 @@ import {
   styled,
 } from '@mui/material'
 import { FaBoxOpen, FaBuilding, FaExclamationTriangle, FaShippingFast, FaStore, FaTruck } from 'react-icons/fa'
+import { useSearchParams } from 'react-router-dom'
 import BrandSurface from '../../components/brand/BrandSurface'
 import PublicFooter from '../../components/public/PublicFooter'
 import PublicNavbar from '../../components/public/PublicNavbar'
@@ -56,16 +57,18 @@ const TrackingConnector = styled(StepConnector)(() => ({
 }))
 
 export default function TrackingPage() {
-  const searchParams = new URLSearchParams(window.location.search)
-  const awb = searchParams.get('awb')
-  const order = searchParams.get('orderNumber')
-  const contact = searchParams.get('contact')
+  const [searchParams] = useSearchParams()
+  const awb = searchParams.get('awb')?.trim() || null
+  const order = searchParams.get('orderNumber')?.trim() || null
+  const contact = searchParams.get('contact')?.trim() || null
   const { data: trackingData, isLoading, error } = useTracking(awb, order, contact)
   const trackingMeta = trackingData as typeof trackingData & {
     consignee?: { name?: string; city?: string; pincode?: string }
     weight?: string | number
     dimensions?: string
   }
+  const displayAwb = trackingData?.awb_number || awb || 'N/A'
+  const displayOrderNumber = trackingData?.order_number || order || 'N/A'
 
   const currentStage =
     trackingData?.history?.findIndex(
@@ -170,11 +173,11 @@ export default function TrackingPage() {
                 <Stack spacing={1.2}>
                   <BrandSurface variant="glass" sx={{ p: 1.8, borderRadius: '24px' }}>
                     <Typography sx={{ color: brand.inkSoft, fontSize: '0.8rem', fontWeight: 700 }}>AWB</Typography>
-                    <Typography sx={{ mt: 0.5, color: brand.ink, fontWeight: 800 }}>{awb || 'N/A'}</Typography>
+                    <Typography sx={{ mt: 0.5, color: brand.ink, fontWeight: 800 }}>{displayAwb}</Typography>
                   </BrandSurface>
                   <BrandSurface variant="glass" sx={{ p: 1.8, borderRadius: '24px' }}>
                     <Typography sx={{ color: brand.inkSoft, fontSize: '0.8rem', fontWeight: 700 }}>Order Number</Typography>
-                    <Typography sx={{ mt: 0.5, color: brand.ink, fontWeight: 800 }}>{order || 'N/A'}</Typography>
+                    <Typography sx={{ mt: 0.5, color: brand.ink, fontWeight: 800 }}>{displayOrderNumber}</Typography>
                   </BrandSurface>
                   <BrandSurface variant="glass" sx={{ p: 1.8, borderRadius: '24px' }}>
                     <Typography sx={{ color: brand.inkSoft, fontSize: '0.8rem', fontWeight: 700 }}>Estimated Delivery</Typography>
