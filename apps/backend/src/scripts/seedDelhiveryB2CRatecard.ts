@@ -16,6 +16,7 @@ const TARGET_PROVIDER = String(process.env.B2C_RATECARD_PROVIDER || 'delhivery')
 const TARGET_COURIER_ID = Number(process.env.B2C_RATECARD_COURIER_ID || 99)
 const MODE = String(process.env.B2C_RATECARD_MODE || 'Surface').trim() || 'Surface'
 const TARGET_MODE_FILTER = MODE.toLowerCase()
+const IS_EXPRESS_MODE = ['air', 'express'].includes(TARGET_MODE_FILTER)
 const TARGET_COURIER_NAME =
   process.env.B2C_RATECARD_COURIER_NAME ||
   (TARGET_PROVIDER === 'deliveryone' ? `Delivery One ${MODE}` : `Delhivery ${MODE}`)
@@ -54,6 +55,7 @@ type PlanRateCard = {
   planName: 'Basic' | 'Premium'
   kashmir: RateSlab[]
   outsideKashmir: RateSlab[]
+  expressOutsideKashmir: RateSlab[]
 }
 
 const zoneSeeds: ZoneSeed[] = [
@@ -122,6 +124,14 @@ const planRateCards: PlanRateCard[] = [
       { weight_from: 3, weight_to: 4, rate: 320 },
       { weight_from: 4, weight_to: 5, rate: 380, extra_rate: 50, extra_weight_unit: 1 },
     ],
+    expressOutsideKashmir: [
+      { weight_from: 0.1, weight_to: 0.5, rate: 110 },
+      { weight_from: 0.5, weight_to: 1, rate: 160 },
+      { weight_from: 1, weight_to: 2, rate: 230 },
+      { weight_from: 2, weight_to: 3, rate: 300 },
+      { weight_from: 3, weight_to: 4, rate: 400 },
+      { weight_from: 4, weight_to: 5, rate: 500, extra_rate: 100, extra_weight_unit: 1 },
+    ],
   },
   {
     planName: 'Premium',
@@ -140,6 +150,14 @@ const planRateCards: PlanRateCard[] = [
       { weight_from: 2, weight_to: 3, rate: 250 },
       { weight_from: 3, weight_to: 4, rate: 300 },
       { weight_from: 4, weight_to: 5, rate: 360, extra_rate: 40, extra_weight_unit: 1 },
+    ],
+    expressOutsideKashmir: [
+      { weight_from: 0.1, weight_to: 0.5, rate: 110 },
+      { weight_from: 0.5, weight_to: 1, rate: 160 },
+      { weight_from: 1, weight_to: 2, rate: 230 },
+      { weight_from: 2, weight_to: 3, rate: 300 },
+      { weight_from: 3, weight_to: 4, rate: 400 },
+      { weight_from: 4, weight_to: 5, rate: 500, extra_rate: 100, extra_weight_unit: 1 },
     ],
   },
 ]
@@ -274,6 +292,48 @@ async function purgeExistingTargetRates(planIds: string[], zoneIds: string[]) {
   return rateIds.length
 }
 
+const isKashmirZone = (zone: { code: string; name: string }) =>
+  zone.code.trim().toUpperCase() === 'KASHMIR' || zone.name.trim().toUpperCase() === 'KASHMIR'
+
+async function purgeExpressKashmirRates(
+  planIds: string[],
+  zoneRows: { id: string; code: string; name: string }[],
+) {
+  if (!IS_EXPRESS_MODE || !planIds.length) return 0
+
+  const kashmirZoneIds = zoneRows.filter(isKashmirZone).map((zone) => zone.id)
+  if (!kashmirZoneIds.length) return 0
+
+  const existingRates = await db
+    .select({ id: shippingRates.id })
+    .from(shippingRates)
+    .where(
+      and(
+        eq(shippingRates.business_type, 'b2c'),
+        inArray(shippingRates.plan_id, planIds),
+        inArray(shippingRates.zone_id, kashmirZoneIds),
+        eq(shippingRates.courier_id, TARGET_COURIER_ID),
+        sql`(
+          lower(trim(coalesce(${shippingRates.service_provider}, ''))) = ${TARGET_PROVIDER}
+          or (
+            trim(coalesce(${shippingRates.service_provider}, '')) = ''
+            and lower(trim(${shippingRates.courier_name})) like ${TARGET_LEGACY_COURIER_NAME_PATTERN}
+          )
+        )`,
+        sql`lower(trim(${shippingRates.mode})) in ('express', 'air')`,
+      ),
+    )
+
+  const rateIds = existingRates.map((row) => row.id)
+  if (!rateIds.length) return 0
+
+  await db.delete(shippingRateCodSlabs).where(inArray(shippingRateCodSlabs.shipping_rate_id, rateIds))
+  await db.delete(shippingRateSlabs).where(inArray(shippingRateSlabs.shipping_rate_id, rateIds))
+  await db.delete(shippingRates).where(inArray(shippingRates.id, rateIds))
+
+  return rateIds.length
+}
+
 async function normalizeLegacyBlankProviderRows(planIds: string[], zoneIds: string[]) {
   if (!planIds.length || !zoneIds.length) return { normalized: 0, removedDuplicates: 0 }
 
@@ -376,14 +436,24 @@ async function seedRates(
 ) {
   let inserted = 0
   let skippedExisting = 0
+  let skippedKashmir = 0
 
   for (const planRateCard of planRateCards) {
     const plan = planMap.get(planRateCard.planName)
     if (!plan) throw new Error(`${planRateCard.planName} plan is missing`)
 
     for (const zone of zoneRows) {
-      const isKashmir = zone.code.trim().toUpperCase() === 'KASHMIR'
-      const slabs = isKashmir ? planRateCard.kashmir : planRateCard.outsideKashmir
+      const isKashmir = isKashmirZone(zone)
+      if (IS_EXPRESS_MODE && isKashmir) {
+        skippedKashmir += 2
+        continue
+      }
+
+      const slabs = IS_EXPRESS_MODE
+        ? planRateCard.expressOutsideKashmir
+        : isKashmir
+          ? planRateCard.kashmir
+          : planRateCard.outsideKashmir
       const baseRate = slabs[0].rate
 
       for (const type of ['forward', 'rto'] as const) {
@@ -437,7 +507,7 @@ async function seedRates(
     }
   }
 
-  return { inserted, skippedExisting }
+  return { inserted, skippedExisting, skippedKashmir }
 }
 
 async function main() {
@@ -448,16 +518,24 @@ async function main() {
     const planIds = Array.from(planMap.values()).map((plan) => plan.id)
     const zoneIds = zoneRows.map((zone) => zone.id)
     const legacyCleanup = await normalizeLegacyBlankProviderRows(planIds, zoneIds)
-    const removed = forceReseed ? await purgeExistingTargetRates(planIds, zoneIds) : 0
-    const { inserted, skippedExisting } = await seedRates(planMap, zoneRows)
+    const removedDisallowedKashmir = await purgeExpressKashmirRates(planIds, zoneRows)
+    const removed = forceReseed || IS_EXPRESS_MODE ? await purgeExistingTargetRates(planIds, zoneIds) : 0
+    const { inserted, skippedExisting, skippedKashmir } = await seedRates(planMap, zoneRows)
 
     console.log(
-      `Updated ${TARGET_COURIER_NAME} image rate card: removed ${removed} old rows, inserted ${inserted} missing Basic/Premium forward/RTO rows, skipped ${skippedExisting} existing manual rows.`,
+      `Updated ${TARGET_COURIER_NAME} image rate card: removed ${removed} old rows, inserted ${inserted} Basic/Premium forward/RTO rows, skipped ${skippedExisting} existing manual rows${
+        skippedKashmir ? `, skipped ${skippedKashmir} Kashmir Express slots` : ''
+      }.`,
     )
+    if (removedDisallowedKashmir) {
+      console.log(`Removed ${removedDisallowedKashmir} Kashmir Express row(s).`)
+    }
     console.log(
       `Legacy blank-provider cleanup: normalized ${legacyCleanup.normalized}, removed ${legacyCleanup.removedDuplicates} duplicates.`,
     )
-    if (!forceReseed) {
+    if (IS_EXPRESS_MODE) {
+      console.log('Kashmir Express rates were intentionally left empty.')
+    } else if (!forceReseed) {
       console.log(`Existing ${TARGET_COURIER_NAME} rows were preserved so manual admin edits are not overwritten.`)
     }
     if (TARGET_MODE_FILTER === 'surface') {
