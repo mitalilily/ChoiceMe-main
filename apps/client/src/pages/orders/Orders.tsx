@@ -32,7 +32,7 @@ export default function Orders() {
 
   const handleSelectOrderType = (type: 'b2c' | 'b2b') => {
     if (!isReady) {
-      navigate(firstIncompleteStep?.path || '/home')
+      navigate(firstIncompleteStep?.path || '/home', { flushSync: true })
       closePopover()
       return
     }
@@ -66,7 +66,11 @@ export default function Orders() {
         <Alert
           severity="warning"
           action={
-            <Button color="inherit" size="small" onClick={() => navigate(firstIncompleteStep?.path || '/home')}>
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => navigate(firstIncompleteStep?.path || '/home', { flushSync: true })}
+            >
               Continue Setup
             </Button>
           }
@@ -162,6 +166,21 @@ export default function Orders() {
                 key={tab.path}
                 component={NavLink}
                 to={tab.path}
+                onClick={(event) => {
+                  if (
+                    event.defaultPrevented ||
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.altKey ||
+                    event.ctrlKey ||
+                    event.shiftKey
+                  ) {
+                    return
+                  }
+
+                  event.preventDefault()
+                  navigate(tab.path, { flushSync: true })
+                }}
                 sx={{
                   borderRadius: 0,
                   px: 2.2,

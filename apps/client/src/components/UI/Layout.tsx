@@ -1,6 +1,6 @@
 import { Box, Container, Drawer, Stack, useMediaQuery, useTheme } from '@mui/material'
-import { Suspense, useEffect, useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useLocation, useOutlet } from 'react-router-dom'
 import { brandGradients } from '../../theme/brand'
 import { DRAWER_WIDTH } from '../../utils/constants'
 import Navbar from '../Navbar/Navbar'
@@ -11,7 +11,9 @@ import Sidebar, { COLLAPSED_WIDTH } from './Sidebar'
 export default function Layout() {
   const theme = useTheme()
   const location = useLocation()
+  const outlet = useOutlet()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+  const mainScrollRef = useRef<HTMLDivElement | null>(null)
   const [pinned, setPinned] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
@@ -27,7 +29,13 @@ export default function Layout() {
   useEffect(() => {
     setMobileOpen(false)
     setHovered(false)
-  }, [location.pathname, location.search])
+  }, [routeContentKey])
+
+  useEffect(() => {
+    mainScrollRef.current?.scrollTo({ top: 0, left: 0 })
+    document.body.style.removeProperty('overflow')
+    document.body.style.removeProperty('padding-right')
+  }, [routeContentKey])
 
   return (
     <Box
@@ -102,6 +110,7 @@ export default function Layout() {
 
           <Box
             component="main"
+            ref={mainScrollRef}
             sx={{
               flexGrow: 1,
               overflowY: 'auto',
@@ -127,7 +136,9 @@ export default function Layout() {
               }}
             >
               <Suspense fallback={<FullScreenLoader />}>
-                <Outlet key={routeContentKey} />
+                <Box key={routeContentKey} sx={{ display: 'contents' }}>
+                  {outlet}
+                </Box>
               </Suspense>
             </Container>
           </Box>

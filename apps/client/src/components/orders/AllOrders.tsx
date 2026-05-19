@@ -106,6 +106,13 @@ const AllOrders = () => {
   }
 
   useEffect(() => {
+    setManifestScheduleOpen(false)
+    setBulkFeedback(null)
+    setSelectedOrderIds([])
+    setSelectionResetToken((current) => current + 1)
+  }, [location.pathname, location.search, location.hash])
+
+  useEffect(() => {
     const status = searchParams.get('status') || undefined
     if (status && filters.status !== status) {
       setFilters((prev) => ({
@@ -728,7 +735,7 @@ const AllOrders = () => {
             <Button
               variant="contained"
               startIcon={<TbPlus size={16} />}
-              onClick={() => navigate('/orders/create')}
+              onClick={() => navigate('/orders/create', { flushSync: true })}
               sx={{
                 borderRadius: 1,
                 minHeight: 34,

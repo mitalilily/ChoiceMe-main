@@ -1,7 +1,8 @@
 import { Button, Link, Stack, Typography } from '@mui/material'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import moment from 'moment'
+import { useLocation } from 'react-router-dom'
 import { useB2BOrdersByUser, useGenerateManifest } from '../../../hooks/Orders/useOrders'
 import type { B2BOrder } from '../../../types/generic.types'
 import StatusChip from '../../UI/chip/StatusChip'
@@ -37,10 +38,16 @@ const B2BOrdersList = ({
   setRowsPerPage,
   filters,
 }: B2BOrdersListProps) => {
+  const location = useLocation()
   const { data, isLoading, isError } = useB2BOrdersByUser(page, rowsPerPage, filters)
   const { mutate: triggerManifest, isPending: isGeneratingManifest } = useGenerateManifest()
   const [manifestingAwb, setManifestingAwb] = useState<string | null>(null)
   const [manifestScheduleOrder, setManifestScheduleOrder] = useState<B2BOrder | null>(null)
+
+  useEffect(() => {
+    setManifestScheduleOrder(null)
+    setManifestingAwb(null)
+  }, [location.pathname, location.search, location.hash])
 
   const handleGenerateManifest = (order: B2BOrder, schedule: ManifestSchedulePayload) => {
     if (!order.awb_number) return
