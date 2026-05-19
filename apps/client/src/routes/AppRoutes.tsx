@@ -7,6 +7,7 @@ import RequireOnboard from '../components/auth/wrapper/RequireOnboard'
 import Layout from '../components/UI/Layout'
 import FullScreenLoader from '../components/UI/loader/FullScreenLoader'
 import NavigationLoader from '../components/UI/loader/NavigationLoader'
+import { useAuth } from '../context/auth/AuthContext'
 import Login from '../pages/auth/Login'
 import Signup from '../pages/auth/Signup'
 import ClientPreview from '../pages/preview/ClientPreview'
@@ -186,6 +187,19 @@ function RootRoute() {
   return <LandingPage />
 }
 
+function TrackingRoute() {
+  const { isAuthenticated, loading } = useAuth()
+  const location = useLocation()
+
+  if (loading) return <FullScreenLoader />
+
+  if (isAuthenticated) {
+    return <Navigate to={`/tools/order_tracking${location.search || ''}`} replace />
+  }
+
+  return <OrderTracking />
+}
+
 function RoutedApp() {
   const location = useLocation()
   const routeKey = [location.key, location.pathname, location.search, location.hash]
@@ -207,7 +221,7 @@ function RoutedApp() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/app" element={<AppEntry />} />
           <Route path="/preview" element={<ClientPreview />} />
-          <Route path="/tracking" element={<OrderTracking />} />
+          <Route path="/tracking" element={<TrackingRoute />} />
           <Route path="/rate-calculator" element={<RateCalculator publicView="rate" />} />
           <Route path="/weight-calculator" element={<RateCalculator publicView="weight" />} />
           <Route path="/terms-and-conditions" element={<TermsOfService />} />

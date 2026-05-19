@@ -26,6 +26,24 @@ const INK = '#171310'
 const CLAY = '#D97943'
 const SURFACE = '#FFFDF8'
 
+const getMetadataAwb = (metadata?: Record<string, unknown>) => {
+  const value = metadata?.awb ?? metadata?.awb_number ?? metadata?.awbNumber
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+const getClientTrackingPathFromLegacyLink = (link: string) => {
+  try {
+    const url = new URL(link, window.location.origin)
+    if (url.pathname === '/tracking') {
+      return `/tools/order_tracking${url.search || ''}`
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
 const GlobalSearch = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -66,10 +84,13 @@ const GlobalSearch = () => {
   }
 
   const handleResultClick = (result: GlobalSearchResult) => {
-    // If result has AWB in metadata, navigate to tracking page
-    const awb = result.metadata?.awb
-    if (typeof awb === 'string' && awb && result.type === 'order') {
+    const awb = getMetadataAwb(result.metadata)
+    const legacyTrackingPath = getClientTrackingPathFromLegacyLink(result.link)
+
+    if (result.type === 'order' && awb) {
       navigate(`/tools/order_tracking?awb=${encodeURIComponent(awb)}`)
+    } else if (legacyTrackingPath) {
+      navigate(legacyTrackingPath)
     } else {
       navigate(result.link)
     }
