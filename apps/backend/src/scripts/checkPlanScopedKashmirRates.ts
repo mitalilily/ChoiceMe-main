@@ -26,17 +26,25 @@ async function getRequiredPlans() {
   const planRows = await db.select({ id: plans.id, name: plans.name }).from(plans)
   const basic = planRows.find((plan) => plan.name?.toLowerCase() === 'basic')
   const premium = planRows.find((plan) => plan.name?.toLowerCase() === 'premium')
+  const aimsCartSpecial = planRows.find(
+    (plan) => plan.name?.toLowerCase() === 'aims cart special',
+  )
 
-  if (!basic || !premium) {
-    throw new Error('Basic and Premium plans must exist before running this check.')
+  if (!basic || !premium || !aimsCartSpecial) {
+    throw new Error('Basic, Premium, and Aims Cart Special plans must exist before running this check.')
   }
 
-  return { basic, premium } as { basic: PlanRow; premium: PlanRow }
+  return { basic, premium, aimsCartSpecial } as {
+    basic: PlanRow
+    premium: PlanRow
+    aimsCartSpecial: PlanRow
+  }
 }
 
 async function createPlanUser(plan: PlanRow) {
   const userId = randomUUID()
-  const email = `plan-rate-check-${plan.name.toLowerCase()}-${Date.now()}-${userId.slice(0, 8)}@example.test`
+  const planSlug = plan.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const email = `plan-rate-check-${planSlug}-${Date.now()}-${userId.slice(0, 8)}@example.test`
 
   await db.insert(users).values({
     id: userId,
@@ -176,13 +184,14 @@ async function assertCalculatorLocalFallback(userId: string) {
 }
 
 async function main() {
-  const { basic, premium } = await getRequiredPlans()
+  const { basic, premium, aimsCartSpecial } = await getRequiredPlans()
   const createdUserIds: string[] = []
 
   try {
     const basicUserId = await createPlanUser(basic)
     const premiumUserId = await createPlanUser(premium)
-    createdUserIds.push(basicUserId, premiumUserId)
+    const aimsCartSpecialUserId = await createPlanUser(aimsCartSpecial)
+    createdUserIds.push(basicUserId, premiumUserId, aimsCartSpecialUserId)
 
     const groups = [
       {
@@ -204,6 +213,15 @@ async function main() {
         expectedZoneCode: 'KASHMIR',
       },
       {
+        label: 'Aims Cart Special within Kashmir surface',
+        userId: aimsCartSpecialUserId,
+        originPincode: '193123',
+        destinationPincode: '190008',
+        mode: 'surface' as const,
+        expected: [60, 70, 115, 150, 190, 215, 245],
+        expectedZoneCode: 'KASHMIR',
+      },
+      {
         label: 'Basic outside Kashmir surface',
         userId: basicUserId,
         originPincode: '110001',
@@ -218,6 +236,14 @@ async function main() {
         destinationPincode: '400001',
         mode: 'surface' as const,
         expected: [85, 115, 180, 250, 300, 360, 400],
+      },
+      {
+        label: 'Aims Cart Special outside Kashmir surface',
+        userId: aimsCartSpecialUserId,
+        originPincode: '110001',
+        destinationPincode: '400001',
+        mode: 'surface' as const,
+        expected: [70, 95, 120, 170, 190, 230, 250],
       },
       {
         label: 'Basic Kashmir to outside surface',
@@ -326,6 +352,7 @@ async function main() {
     console.log('Plan-scoped image rate card check')
     console.log(`Basic plan (${basic.id})`)
     console.log(`Premium plan (${premium.id})`)
+    console.log(`Aims Cart Special plan (${aimsCartSpecial.id})`)
     for (const row of outputRows) {
       console.log(`  ${row}`)
     }

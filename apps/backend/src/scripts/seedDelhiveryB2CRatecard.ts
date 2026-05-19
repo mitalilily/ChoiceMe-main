@@ -52,10 +52,10 @@ type ZoneSeed = {
 }
 
 type PlanRateCard = {
-  planName: 'Basic' | 'Premium'
+  planName: string
   kashmir: RateSlab[]
   outsideKashmir: RateSlab[]
-  expressOutsideKashmir: RateSlab[]
+  expressOutsideKashmir?: RateSlab[]
 }
 
 const zoneSeeds: ZoneSeed[] = [
@@ -160,6 +160,25 @@ const planRateCards: PlanRateCard[] = [
       { weight_from: 4, weight_to: 5, rate: 500, extra_rate: 100, extra_weight_unit: 1 },
     ],
   },
+  {
+    planName: 'Aims Cart Special',
+    kashmir: [
+      { weight_from: 0, weight_to: 0.5, rate: 60 },
+      { weight_from: 0.5, weight_to: 1, rate: 70 },
+      { weight_from: 1, weight_to: 2, rate: 115 },
+      { weight_from: 2, weight_to: 3, rate: 150 },
+      { weight_from: 3, weight_to: 4, rate: 190 },
+      { weight_from: 4, weight_to: 5, rate: 215, extra_rate: 30, extra_weight_unit: 1 },
+    ],
+    outsideKashmir: [
+      { weight_from: 0, weight_to: 0.5, rate: 70 },
+      { weight_from: 0.5, weight_to: 1, rate: 95 },
+      { weight_from: 1, weight_to: 2, rate: 120 },
+      { weight_from: 2, weight_to: 3, rate: 170 },
+      { weight_from: 3, weight_to: 4, rate: 190 },
+      { weight_from: 4, weight_to: 5, rate: 230, extra_rate: 20, extra_weight_unit: 1 },
+    ],
+  },
 ]
 
 const codSlabs = [
@@ -173,7 +192,8 @@ const kg = (value: number) => value.toFixed(3)
 async function ensurePlans() {
   const planMap = new Map<string, { id: string; name: string }>()
 
-  for (const name of ['Basic', 'Premium'] as const) {
+  const planNames = Array.from(new Set(planRateCards.map((card) => card.planName)))
+  for (const name of planNames) {
     const [existing] = await db
       .select({ id: plans.id, name: plans.name })
       .from(plans)
@@ -437,6 +457,7 @@ async function seedRates(
   let inserted = 0
   let skippedExisting = 0
   let skippedKashmir = 0
+  let skippedExpressPlan = 0
 
   for (const planRateCard of planRateCards) {
     const plan = planMap.get(planRateCard.planName)
@@ -448,9 +469,13 @@ async function seedRates(
         skippedKashmir += 2
         continue
       }
+      if (IS_EXPRESS_MODE && !planRateCard.expressOutsideKashmir?.length) {
+        skippedExpressPlan += 2
+        continue
+      }
 
       const slabs = IS_EXPRESS_MODE
-        ? planRateCard.expressOutsideKashmir
+        ? planRateCard.expressOutsideKashmir!
         : isKashmir
           ? planRateCard.kashmir
           : planRateCard.outsideKashmir
@@ -507,7 +532,7 @@ async function seedRates(
     }
   }
 
-  return { inserted, skippedExisting, skippedKashmir }
+  return { inserted, skippedExisting, skippedKashmir, skippedExpressPlan }
 }
 
 async function main() {
@@ -520,11 +545,13 @@ async function main() {
     const legacyCleanup = await normalizeLegacyBlankProviderRows(planIds, zoneIds)
     const removedDisallowedKashmir = await purgeExpressKashmirRates(planIds, zoneRows)
     const removed = forceReseed || IS_EXPRESS_MODE ? await purgeExistingTargetRates(planIds, zoneIds) : 0
-    const { inserted, skippedExisting, skippedKashmir } = await seedRates(planMap, zoneRows)
+    const { inserted, skippedExisting, skippedKashmir, skippedExpressPlan } = await seedRates(planMap, zoneRows)
 
     console.log(
-      `Updated ${TARGET_COURIER_NAME} image rate card: removed ${removed} old rows, inserted ${inserted} Basic/Premium forward/RTO rows, skipped ${skippedExisting} existing manual rows${
+      `Updated ${TARGET_COURIER_NAME} image rate card: removed ${removed} old rows, inserted ${inserted} plan forward/RTO rows, skipped ${skippedExisting} existing manual rows${
         skippedKashmir ? `, skipped ${skippedKashmir} Kashmir Express slots` : ''
+      }${
+        skippedExpressPlan ? `, skipped ${skippedExpressPlan} plan slots without Express pricing` : ''
       }.`,
     )
     if (removedDisallowedKashmir) {
