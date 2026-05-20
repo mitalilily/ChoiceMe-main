@@ -100,6 +100,7 @@ export default function AuthShell({
             width: '100%',
             height: 'auto',
             boxSizing: 'border-box',
+            alignItems: { xs: 'flex-start', lg: 'center' },
             px: { xs: 1.4, sm: 2, md: 2.6, lg: 2.2 },
             py: { xs: 2, sm: 2.4, md: 2.8, lg: 2 },
           }}
