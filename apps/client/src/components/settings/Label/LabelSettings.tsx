@@ -57,11 +57,11 @@ const defaultValues: LabelSettingsForm = {
   },
   productInfo: {
     itemName: true,
-    productCost: true,
+    productCost: false,
     productQuantity: true,
-    skuCode: false,
-    dimension: false,
-    deadWeight: false,
+    skuCode: true,
+    dimension: true,
+    deadWeight: true,
     otherCharges: true,
   },
 }

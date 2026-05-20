@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Box, Divider, Paper, Stack, Typography } from '@mui/material'
+import { Box, Paper, Stack, Typography } from '@mui/material'
 import Barcode from 'react-barcode'
 import type { LabelPreferences } from '../../../api/labelPreference.api'
-
-const PLATFORM_BRAND_NAME = 'ChoiceMee Courier'
 
 const normalize = (value: unknown) => {
   if (value === undefined || value === null) return ''
@@ -12,29 +10,33 @@ const normalize = (value: unknown) => {
 
 const clampText = (value: unknown, max = 25) => {
   const text = normalize(value)
-  if (!text) return ''
+  if (!text) return '-'
   return text.length > max ? `${text.slice(0, max)}...` : text
 }
 
 const pickFirst = (...values: unknown[]) => values.map(normalize).find(Boolean) || ''
 
+const isEnabled = (value: unknown) => (value === undefined ? true : value === true)
+
 const buildDimensions = (order: any) => {
   const dimension = normalize(order.dimension) || normalize(order.dimensions)
-  if (dimension) return dimension
+  if (dimension) return dimension.replace(/x/g, ' x ')
   if (order.length && order.breadth && order.height) {
-    return `${order.length}x${order.breadth}x${order.height} cm`
+    return `${order.length} x ${order.breadth} x ${order.height}`
   }
   return ''
 }
 
 const buildWeight = (order: any) => {
   if (order.deadWeight) return normalize(order.deadWeight)
-  if (order.weight) return `${order.weight} g`
-  if (order.weightKg) return `${order.weightKg} kg`
+  if (order.weightKg) return `${order.weightKg} kgs`
+  if (order.weight) {
+    const raw = Number(order.weight)
+    const kg = Number.isFinite(raw) && raw > 20 ? raw / 1000 : raw
+    return `${kg} kgs`
+  }
   return ''
 }
-
-const isEnabled = (value: unknown) => (value === undefined ? true : value === true)
 
 type LabelPreviewProps = {
   values: any
@@ -47,326 +49,229 @@ export function LabelPreview({ values, order }: LabelPreviewProps) {
   const maxItems = Math.max(1, Number(values?.maxItems ?? 3))
 
   const awbNumber = pickFirst(order.awb, order.awbNumber, order.awb_number)
-  const courierName = normalize(order.courier || order.courier_partner || 'Courier').toUpperCase()
-  const paymentType = (normalize(order.paymentType) || normalize(order.payment_type) || 'Prepaid').toLowerCase()
-  const paymentBadge = paymentType === 'cod' ? 'COD' : 'PREPAID'
-
-  const orderId = pickFirst(order.orderId, order.order_number)
-  const invoiceNumber = pickFirst(order.invoiceNumber, order.invoice_number)
-  const customerPhone = pickFirst(order.phone, order.buyer_phone, order.customerPhone)
-  const orderValue = pickFirst(order.totalAmount, order.orderValue, order.order_amount, order.order_value)
-  const codValue = pickFirst(order.codValue, order.cod_amount, order.cod_value, order.codAmount)
-  const declaredValue = pickFirst(order.declaredValue, order.orderValue, order.declared_value)
+  const courierName = normalize(order.courier || order.courier_partner || 'Courier')
+  const paymentType = (normalize(order.paymentType) || normalize(order.payment_type) || 'prepaid').toLowerCase()
+  const paymentLabel = paymentType === 'cod' ? 'COD' : 'Prepaid'
+  const paymentInstruction =
+    paymentType === 'cod'
+      ? `Collect ${pickFirst(order.codValue, order.cod_amount, order.totalAmount, order.orderValue)}`
+      : 'No amount to be collected'
 
   const productEntries = Array.isArray(order.products) ? order.products.slice(0, maxItems) : []
+  const orderId = pickFirst(order.orderId, order.order_id, order.order_number)
+  const referenceOrder = pickFirst(order.referenceOrder, order.order_number, order.orderId)
+  const invoiceNumber = pickFirst(order.invoiceNumber, order.invoice_number)
+  const orderValue = pickFirst(order.totalAmount, order.orderValue, order.order_amount, order.declaredValue)
+  const customerPhone = pickFirst(order.phone, order.buyer_phone, order.customerPhone)
   const dimensionValue = buildDimensions(order)
   const weightValue = buildWeight(order)
 
+  const showLogo = isEnabled(values.shipperInfo?.brandLogo)
   const showSellerName = isEnabled(values.shipperInfo?.sellerBrandName)
-  const showShipperAddress = isEnabled(values.shipperInfo?.shipperAddress) && Boolean(order.shipper?.address)
-  const showShipperPhone = isEnabled(values.shipperInfo?.shipperPhone) && Boolean(order.shipper?.phone)
-  const showShipperGst = isEnabled(values.shipperInfo?.gstin) && Boolean(order.shipper?.gst)
-  const showReturnAddress = isEnabled(values.shipperInfo?.rtoAddress) && Boolean(order.shipper?.rtoAddress)
-
+  const showShipperPhone = isEnabled(values.shipperInfo?.shipperPhone)
+  const showShipperGst = isEnabled(values.shipperInfo?.gstin)
+  const showReturnAddress = isEnabled(values.shipperInfo?.rtoAddress)
   const showCustomerPhone = isEnabled(values.orderInfo?.customerPhone) && Boolean(customerPhone)
   const showOrderId = isEnabled(values.orderInfo?.orderId) && Boolean(orderId)
   const showInvoiceNumber = isEnabled(values.orderInfo?.invoiceNumber) && Boolean(invoiceNumber)
-  const showOrderDate = isEnabled(values.orderInfo?.orderDate) && Boolean(order.orderDate)
-  const showInvoiceDate = isEnabled(values.orderInfo?.invoiceDate) && Boolean(order.invoiceDate)
-  const showDeclaredValue = isEnabled(values.orderInfo?.declaredValue) && Boolean(declaredValue)
+  const showDeclaredValue = isEnabled(values.orderInfo?.declaredValue) && Boolean(orderValue)
   const showAwb = isEnabled(values.orderInfo?.awb) && Boolean(awbNumber)
-  const showCodBadge = isEnabled(values.orderInfo?.cod)
-  const showProductDescription = isEnabled(values.productInfo?.itemName) && productEntries.length > 0
-  const showOrderSummary = isEnabled(values.productInfo?.otherCharges) && Boolean(orderValue)
   const showDimensions = isEnabled(values.productInfo?.dimension) && Boolean(dimensionValue)
   const showWeight = isEnabled(values.productInfo?.deadWeight) && Boolean(weightValue)
   const showTerms = isEnabled(values.orderInfo?.terms)
-  const showPlatformBranding = true
 
-  const infoLineParts: string[] = []
-  if (showOrderId) infoLineParts.push(`Order ID: ${orderId}`)
-  if (showInvoiceNumber) infoLineParts.push(`Invoice: ${invoiceNumber}`)
-  if (showOrderDate) infoLineParts.push(`Order Dt: ${normalize(order.orderDate)}`)
-  if (showInvoiceDate) infoLineParts.push(`Inv Dt: ${normalize(order.invoiceDate)}`)
-  if (showDeclaredValue) infoLineParts.push(`Declared: ${declaredValue}`)
+  const productColumns = [
+    { key: 'name', label: 'Product Name', enabled: isEnabled(values.productInfo?.itemName), width: '48%' },
+    { key: 'sku', label: 'SKU', enabled: isEnabled(values.productInfo?.skuCode), width: '26%' },
+    { key: 'qty', label: 'Quantity', enabled: isEnabled(values.productInfo?.productQuantity), width: '26%' },
+    { key: 'amount', label: 'Amount', enabled: isEnabled(values.productInfo?.productCost), width: '26%' },
+  ].filter((column) => column.enabled)
 
-  const metrics: { label: string; value: string }[] = []
-  if (showDimensions) metrics.push({ label: 'Dimensions', value: dimensionValue })
-  if (showWeight) metrics.push({ label: 'Weight', value: weightValue })
+  if (productColumns.length === 0) {
+    productColumns.push({ key: 'name', label: 'Product Name', enabled: true, width: '100%' })
+  }
 
-  const barcodeForOrder = isEnabled(values.orderInfo?.orderId) && Boolean(orderId)
+  const productValue = (product: any, key: string) => {
+    if (key === 'sku') return normalize(product.sku ?? product.skuCode) || '-'
+    if (key === 'qty') return normalize(product.qty ?? product.quantity ?? 1)
+    if (key === 'amount') return normalize(product.price) || '-'
+    return clampText(product.name ?? product.productName, charsLimit)
+  }
+
+  const shipperName = pickFirst(order.shipper?.name, 'Client Store')
+  const shipperAddress = pickFirst(order.shipper?.rtoAddress, order.shipper?.address)
 
   return (
     <Paper
       sx={{
-        p: 2,
-        border: '2px solid #0f172a',
-        borderRadius: 2,
+        p: 1.25,
+        border: '1.5px solid #111',
+        borderRadius: 0,
         width: values.printer === 'thermal' ? '100mm' : '210mm',
         minHeight: values.printer === 'thermal' ? '150mm' : '297mm',
-        bgcolor: 'white',
-        color: '#0f172a',
+        bgcolor: '#fff',
+        color: '#111',
         mx: 'auto',
+        fontFamily: 'Arial, sans-serif',
       }}
-      elevation={1}
+      elevation={0}
     >
-      <Stack spacing={2}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-          <Stack spacing={0.75} flex={1}>
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <Stack spacing={0.25}>
-                {showSellerName && (
-                  <Typography variant="subtitle1" fontWeight="700">
-                    {PLATFORM_BRAND_NAME}
-                  </Typography>
-                )}
-                <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 0.5 }}>
-                  {courierName}
-                </Typography>
-              </Stack>
-            </Stack>
-            {showShipperAddress && (
-              <Typography variant="body2" color="text.secondary">
-                {order.shipper?.address}
-              </Typography>
-            )}
-            {showShipperPhone && (
-              <Typography variant="body2">
-                Phone: {order.shipper?.phone}
-              </Typography>
-            )}
-            {showShipperGst && (
-              <Typography variant="body2">{`GSTIN: ${order.shipper?.gst}`}</Typography>
-            )}
-          </Stack>
-
-          <Stack spacing={1} minWidth={160} alignItems="flex-end">
-            {showAwb && (
-              <Typography variant="body2" fontWeight="700" letterSpacing={0.4}>
-                AWB #{awbNumber}
-              </Typography>
-            )}
-            {showAwb &&
-              (order.barcodeUrl ? (
-                <Box
-                  component="img"
-                  src={order.barcodeUrl}
-                  alt="Shipment Barcode"
-                  sx={{ maxWidth: '100%', maxHeight: 90, objectFit: 'contain', border: '1px solid #cbd5f5', borderRadius: 1 }}
-                />
-              ) : (
-                <Box sx={{ width: 140 }}>
-                  <Barcode value={awbNumber} height={45} width={1.2} displayValue={false} />
-                </Box>
-              ))}
-            {showCodBadge && (
-              <Typography
-                variant="caption"
-                fontWeight="600"
-                sx={{
-                  px: 1.25,
-                  py: 0.5,
-                  borderRadius: 1,
-                  bgcolor: paymentType === 'cod' ? '#fee2e2' : '#dcfce7',
-                  color: paymentType === 'cod' ? '#b91c1c' : '#15803d',
-                }}
-              >
-                {paymentBadge}
-              </Typography>
-            )}
-          </Stack>
-        </Stack>
-
-        <Divider sx={{ borderStyle: 'dashed' }} />
-
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={2}
-          alignItems="stretch"
-        >
-          <Box sx={{ flex: 1, p: 1, border: '1px solid #e2e8f0', borderRadius: 1, minHeight: 140 }}>
-            <Typography variant="caption" color="text.secondary">
-              SHIP TO
-            </Typography>
-            <Typography variant="subtitle2" fontWeight="700">
-              {order.name}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              {order.address}
-            </Typography>
-            {showCustomerPhone && (
-              <Typography variant="body2">Phone: {customerPhone}</Typography>
-            )}
-          </Box>
-          <Box sx={{ flex: 1, p: 1, border: '1px solid #e2e8f0', borderRadius: 1, minHeight: 140 }}>
-            <Typography variant="caption" color="text.secondary">
-              SHIP FROM
-            </Typography>
-            {showSellerName && (
-              <Typography variant="subtitle2" fontWeight="700">
-                {PLATFORM_BRAND_NAME}
-              </Typography>
-            )}
-            {showShipperAddress && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                {order.shipper?.address}
-              </Typography>
-            )}
-            {showShipperPhone && (
-              <Typography variant="body2">Phone: {order.shipper?.phone}</Typography>
-            )}
-          </Box>
-        </Stack>
-
-        {infoLineParts.length > 0 && (
-          <Typography variant="body2" color="text.secondary">
-            {infoLineParts.join(' | ')}
-          </Typography>
-        )}
-
-        {metrics.length > 0 && (
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            {metrics.map((metric) => (
+      <Stack spacing={1.15}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Box sx={{ width: 76 }}>
+            {showLogo ? (
               <Box
-                key={metric.label}
                 sx={{
-                  px: 1.25,
-                  py: 0.4,
-                  borderRadius: 1,
-                  border: '1px solid #e2e8f0',
-                  fontSize: 11,
-                  fontWeight: 600,
+                  width: 58,
+                  height: 28,
+                  bgcolor: '#d8c7ad',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#9a3412',
+                  fontSize: 9,
+                  fontWeight: 800,
+                  fontStyle: 'italic',
+                  lineHeight: 1,
+                  textAlign: 'center',
                 }}
               >
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  {metric.label}
-                </Typography>
-                <Typography variant="subtitle2">{metric.value}</Typography>
+                Client
+                <br />
+                Logo
               </Box>
-            ))}
-          </Stack>
-        )}
+            ) : null}
+          </Box>
+          <Box sx={{ width: 148 }}>
+            <Typography sx={{ fontSize: 16, fontWeight: 800, lineHeight: 1.1 }}>Shipping Label</Typography>
+            {showOrderId && <Typography sx={{ fontSize: 10 }}>Order# : {orderId}</Typography>}
+            <Typography sx={{ fontSize: 7 }}>Generated on: Tue, 16 Dec 2025 11:54:40 IST</Typography>
+          </Box>
+        </Stack>
 
-        {showProductDescription && (
-          <Box sx={{ border: '1px solid #e2e8f0', borderRadius: 1, overflow: 'hidden' }}>
-            <Box component="table" width="100%" sx={{
-              borderCollapse: 'collapse',
-            }}>
-              <Box component="thead" sx={{ backgroundColor: '#f8fafc' }}>
-                <Box component="tr">
-                  <Box component="th" align="left" sx={{ p: 1, fontSize: 11 }}>
-                    Item
-                  </Box>
-                  {isEnabled(values.productInfo?.skuCode) && (
-                    <Box component="th" align="left" sx={{ p: 1, fontSize: 11 }}>
-                      SKU
-                    </Box>
-                  )}
-                  {isEnabled(values.productInfo?.productQuantity) && (
-                    <Box component="th" align="right" sx={{ p: 1, fontSize: 11 }}>
-                      Qty
-                    </Box>
-                  )}
-                  {isEnabled(values.productInfo?.productCost) && (
-                    <Box component="th" align="right" sx={{ p: 1, fontSize: 11 }}>
-                      Amount
-                    </Box>
-                  )}
-                </Box>
-              </Box>
-              <Box component="tbody">
-                {productEntries.map((product: any, index: number) => (
-                  <Box component="tr" key={`${product.name}-${index}`}>
-                    <Box component="td" sx={{ p: 1, fontSize: 11 }}>
-                      {clampText(product.name, charsLimit)}
-                    </Box>
-                    {isEnabled(values.productInfo?.skuCode) && (
-                      <Box component="td" sx={{ p: 1, fontSize: 11 }}>
-                        {normalize(product.sku)}
-                      </Box>
-                    )}
-                    {isEnabled(values.productInfo?.productQuantity) && (
-                      <Box component="td" align="right" sx={{ p: 1, fontSize: 11 }}>
-                        {normalize(product.qty ?? product.quantity)}
-                      </Box>
-                    )}
-                    {isEnabled(values.productInfo?.productCost) && (
-                      <Box component="td" align="right" sx={{ p: 1, fontSize: 11 }}>
-                        {normalize(product.price)}
-                      </Box>
-                    )}
-                  </Box>
-                ))}
-                {isEnabled(values.productInfo?.otherCharges) && order.otherCharges && (
-                  <Box component="tr">
-                    <Box component="td" colSpan={3} sx={{ p: 1, fontSize: 11, fontWeight: 600 }}>
-                      Other Charges
-                    </Box>
-                    <Box component="td" align="right" sx={{ p: 1, fontSize: 11 }}>
-                      {normalize(order.otherCharges)}
-                    </Box>
-                  </Box>
-                )}
-                <Box component="tr">
-                  <Box component="td" colSpan={3} sx={{ p: 1, fontSize: 11, fontWeight: 700 }}>
-                    Total
-                  </Box>
-                  <Box component="td" align="right" sx={{ p: 1, fontSize: 11, fontWeight: 700 }}>
-                    {normalize(order.totalAmount)}
-                  </Box>
-                </Box>
-              </Box>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: '68px 1fr',
+            border: '1.5px solid #111',
+            '& > div': { py: 1.05, textAlign: 'center', fontSize: 14, fontWeight: 800 },
+            '& > div:first-of-type': { borderRight: '1.5px solid #111' },
+          }}
+        >
+          <Box>{paymentLabel}</Box>
+          <Box>{paymentInstruction}</Box>
+        </Box>
+
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 800 }}>Courier: {courierName}</Typography>
+            {showDeclaredValue && (
+              <Typography sx={{ fontSize: 14, fontWeight: 800 }}>Order Value: {orderValue}</Typography>
+            )}
+            {showOrderId && <Typography sx={{ fontSize: 8 }}>Reference Order# : {referenceOrder}</Typography>}
+            {showInvoiceNumber && <Typography sx={{ fontSize: 8 }}>Invoice# : {invoiceNumber}</Typography>}
+            {showAwb && <Typography sx={{ fontSize: 8 }}>AWB# : {awbNumber}</Typography>}
+            {showDimensions && <Typography sx={{ fontSize: 8 }}>Dimensions: {dimensionValue} (L W H)</Typography>}
+            {showWeight && <Typography sx={{ fontSize: 8 }}>Weight: {weightValue}</Typography>}
+          </Box>
+          {showAwb && (
+            <Box sx={{ width: 108, overflow: 'hidden', pt: 0.25 }}>
+              <Barcode value={awbNumber} height={40} width={1.1} fontSize={12} margin={0} />
             </Box>
-          </Box>
-        )}
+          )}
+        </Stack>
 
-        {showOrderSummary && (
-          <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-            <Typography variant="body2" fontWeight="600">
-              Order Value: {orderValue}
-            </Typography>
-            {showCodBadge && paymentType === 'cod' && codValue && (
-              <Typography variant="body2" fontWeight="600">
-                Collectable: {codValue}
-              </Typography>
-            )}
-          </Stack>
-        )}
-
-        {showReturnAddress && (
-          <Box sx={{ border: '1px dashed #cbd5f5', borderRadius: 1, p: 1 }}>
-            <Typography variant="caption" color="text.secondary" gutterBottom>
-              RETURN TO (If undelivered)
-            </Typography>
-            <Typography variant="body2" fontWeight="600">
-              {order.shipper?.rtoAddress}
-            </Typography>
-            {showShipperPhone && (
-              <Typography variant="body2">Phone: {order.shipper?.phone}</Typography>
-            )}
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Box sx={{ maxWidth: 220 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 800 }}>To: {order.name}</Typography>
+            <Typography sx={{ fontSize: 14, lineHeight: 1.12 }}>{order.address}</Typography>
+            {showCustomerPhone && <Typography sx={{ fontSize: 9 }}>Contact: {customerPhone}</Typography>}
           </Box>
-        )}
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              mt: 1,
+              background:
+                'repeating-linear-gradient(90deg, #111 0 4px, transparent 4px 8px), repeating-linear-gradient(0deg, rgba(17,17,17,0.55) 0 4px, transparent 4px 8px)',
+            }}
+          />
+        </Stack>
+
+        <Box sx={{ width: 214, borderTop: '2px dashed #111' }} />
+
+        <Box>
+          {showSellerName && <Typography sx={{ fontSize: 13, fontWeight: 800 }}>From:{shipperName}</Typography>}
+          {showReturnAddress && (
+            <>
+              <Typography sx={{ fontSize: 10, fontWeight: 800 }}>Return to if undelivered:</Typography>
+              <Typography sx={{ fontSize: 9 }}>Store name {shipperName}</Typography>
+              <Typography sx={{ fontSize: 9, lineHeight: 1.15 }}>{shipperAddress}</Typography>
+            </>
+          )}
+          {showShipperPhone && order.shipper?.phone && (
+            <Typography sx={{ fontSize: 9 }}>Contact: {order.shipper.phone}</Typography>
+          )}
+          {showShipperGst && order.shipper?.gst && (
+            <Typography sx={{ fontSize: 9 }}>GSTIN: {order.shipper.gst}</Typography>
+          )}
+        </Box>
 
         {showTerms && (
-          <Typography variant="caption" color="text.secondary">
-            *Terms & Conditions apply. Please refer to your courier documentation for details.
-          </Typography>
-        )}
-
-        {barcodeForOrder && (
-          <Box textAlign="center">
-            <Typography variant="body2" gutterBottom>
-              Order ID#: {orderId}
-            </Typography>
-            <Barcode value={orderId} height={50} width={1.3} displayValue={false} />
+          <Box
+            sx={{
+              width: 58,
+              height: 58,
+              mx: 'auto',
+              borderRadius: '50%',
+              bgcolor: '#e21b1b',
+              color: '#fff',
+              display: 'grid',
+              placeItems: 'center',
+              textAlign: 'center',
+              fontSize: 8,
+              fontWeight: 900,
+              lineHeight: 1.08,
+            }}
+          >
+            NO EXCHANGE
+            <br />
+            NO RETURN
           </Box>
         )}
 
-        {showPlatformBranding && (
-          <Typography variant="caption" align="center" color="text.secondary" fontWeight="600">
-            Powered by {PLATFORM_BRAND_NAME}
-          </Typography>
-        )}
+        <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', mt: 0.5 }}>
+          <Box component="thead">
+            <Box component="tr" sx={{ borderTop: '1px solid #111', borderBottom: '2px solid #111' }}>
+              {productColumns.map((column) => (
+                <Box
+                  component="th"
+                  key={column.key}
+                  align={column.key === 'name' ? 'left' : 'center'}
+                  sx={{ width: column.width, py: 0.7, fontSize: 10 }}
+                >
+                  {column.label}
+                </Box>
+              ))}
+            </Box>
+          </Box>
+          <Box component="tbody">
+            {(productEntries.length ? productEntries : [{}]).map((product: any, index: number) => (
+              <Box component="tr" key={`${product.name || 'product'}-${index}`} sx={{ borderBottom: '1px solid #111' }}>
+                {productColumns.map((column) => (
+                  <Box
+                    component="td"
+                    key={column.key}
+                    align={column.key === 'name' ? 'left' : 'center'}
+                    sx={{ py: 0.35, fontSize: 9 }}
+                  >
+                    {productValue(product, column.key)}
+                  </Box>
+                ))}
+              </Box>
+            ))}
+          </Box>
+        </Box>
       </Stack>
     </Paper>
   )

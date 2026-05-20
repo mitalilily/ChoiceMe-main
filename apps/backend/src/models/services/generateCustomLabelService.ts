@@ -72,6 +72,21 @@ async function generateBarcodeBase64(text: string): Promise<string | null> {
   }
 }
 
+async function generateQrBase64(text: string): Promise<string | null> {
+  if (!text) return null
+  try {
+    const png = await bwipjs.toBuffer({
+      bcid: 'qrcode',
+      text,
+      scale: 4,
+    } as any)
+    return `data:image/png;base64,${Buffer.from(png).toString('base64')}`
+  } catch (err) {
+    console.warn('âš ï¸ QR generation failed:', err)
+    return null
+  }
+}
+
 const fonts = {
   Helvetica: {
     normal: 'Helvetica',
@@ -82,8 +97,7 @@ const fonts = {
 }
 
 const PLATFORM_BRAND_NAME = 'ChoiceMee Courier'
-const PLATFORM_LOGO_KEY = 'choiceme-logo.png'
-const ALLOW_MERCHANT_DOCUMENT_LOGOS = false
+const ALLOW_MERCHANT_DOCUMENT_LOGOS = true
 
 const compactStorageToken = (...values: Array<string | number | null | undefined>) => {
   const raw = values.find((value) => value !== null && value !== undefined && String(value).trim())
@@ -121,11 +135,11 @@ const DEFAULT_LABEL_SETTINGS = {
   },
   product_info: {
     itemName: true,
-    productCost: true,
+    productCost: false,
     productQuantity: true,
-    skuCode: false,
-    dimension: false,
-    deadWeight: false,
+    skuCode: true,
+    dimension: true,
+    deadWeight: true,
     otherCharges: true,
   },
   powered_by: PLATFORM_BRAND_NAME,
@@ -188,25 +202,6 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     } catch (err) {
       console.warn('⚠️ Failed to fetch company logo:', summarizeFetchError(err))
     }
-  }
-
-  // Always show ChoiceMee platform logo (Powered by ...)
-  let platformLogoBase64: string | null = null
-  try {
-    const logoUrl = await presignDownload(PLATFORM_LOGO_KEY)
-    const finalUrl = Array.isArray(logoUrl) ? logoUrl[0] : logoUrl
-    if (finalUrl) {
-      const logoResp = await axios.get(finalUrl, {
-        responseType: 'arraybuffer',
-      })
-      const buffer = Buffer.from(logoResp.data)
-      const dataUrl = await bufferToDataUrl(buffer)
-      if (dataUrl && isValidDataUrl(dataUrl)) {
-        platformLogoBase64 = dataUrl
-      }
-    }
-  } catch (err) {
-    console.warn('⚠️ Failed to fetch platform logo:', summarizeFetchError(err))
   }
 
   // Normalize fields
@@ -327,6 +322,10 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     showInvoiceBarcode && order.invoice_number
       ? await generateBarcodeBase64(order.invoice_number)
       : null
+  const qrPayload = [order.awb_number, order.order_id ?? order.order_number]
+    .filter((value) => value !== null && value !== undefined && String(value).trim())
+    .join('|')
+  const qrCode = qrPayload ? await generateQrBase64(qrPayload) : null
 
   const toAmount = (value: unknown) => {
     const n = Number(value ?? 0)
@@ -351,9 +350,6 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
   if (showBrandLogo && logoBase64 && isValidDataUrl(logoBase64)) {
     images.logo = logoBase64
   }
-  if (showPlatformBranding && platformLogoBase64 && isValidDataUrl(platformLogoBase64)) {
-    images.platformLogo = platformLogoBase64
-  }
   if (awbBarcode && isValidDataUrl(awbBarcode)) {
     images.awbBarcode = awbBarcode
   }
@@ -362,6 +358,9 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
   }
   if (invoiceBarcode && isValidDataUrl(invoiceBarcode)) {
     images.invoiceBarcode = invoiceBarcode
+  }
+  if (qrCode && isValidDataUrl(qrCode)) {
+    images.qrCode = qrCode
   }
 
   const chunk = products.slice(0, maxItems)
@@ -373,7 +372,13 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     return text.length > max ? `${text.slice(0, max)}...` : text
   }
 
-  const sellerBrandName = PLATFORM_BRAND_NAME
+  const companyInfo = (profileOfUser?.companyInfo || {}) as Record<string, any>
+  const sellerBrandName =
+    companyInfo.brandName ||
+    companyInfo.businessName ||
+    pickup.warehouse_name ||
+    pickup.name ||
+    PLATFORM_BRAND_NAME
   const normalizedSortCode = String(order?.sort_code ?? '').trim()
 
   const headerLeftStack: any[] = []
@@ -777,6 +782,317 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     })
     pageContent.push({ stack: footerStack, margin: [0, 1, 0, 0] })
   }
+
+  const normalizeText = (value: unknown, fallback = '-') => {
+    const text = String(value ?? '').trim()
+    return text || fallback
+  }
+  const compactAddressLine = (city?: unknown, state?: unknown, pincode?: unknown) => {
+    const place = [city, state].map((value) => String(value ?? '').trim()).filter(Boolean).join(', ')
+    const pin = String(pincode ?? '').trim()
+    if (place && pin) return `${place} - ${pin}`
+    return place || pin
+  }
+  const formatGeneratedAt = (value?: unknown) => {
+    const date = value ? new Date(value as any) : new Date()
+    const safeDate = Number.isNaN(date.getTime()) ? new Date() : date
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Kolkata',
+    })
+      .formatToParts(safeDate)
+      .reduce<Record<string, string>>((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value
+        return acc
+      }, {})
+
+    return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} ${parts.hour}:${parts.minute}:${parts.second} IST`
+  }
+  const formatWeight = (value: unknown) => {
+    const raw = Number(value ?? 0)
+    if (!Number.isFinite(raw) || raw <= 0) return ''
+    const kg = raw > 20 ? raw / 1000 : raw
+    return `${Number.isInteger(kg) ? kg.toFixed(0) : kg.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')} kgs`
+  }
+  const productValue = products.reduce((sum: number, p: any) => {
+    const qty = toAmount(p?.qty ?? p?.quantity ?? 1)
+    const price = toAmount(p?.price)
+    const discount = toAmount(p?.discount)
+    return sum + Math.max(0, price * qty - discount)
+  }, 0)
+  const orderValue = toAmount(order.order_amount) || toAmount(order.invoice_amount) || productValue
+  const collectableValue =
+    paymentType === 'cod' ? toAmount(order.cod_amount ?? order.order_amount) || orderValue : 0
+  const labelOrderNumber = normalizeText(order.order_id ?? order.id ?? order.order_number)
+  const referenceOrderNumber = normalizeText(order.order_number)
+  const courierName = normalizeText(order.courier_partner || order.integration_type || 'Courier', 'Courier')
+  const paymentLabel = paymentType === 'cod' ? 'COD' : 'Prepaid'
+  const paymentInstruction =
+    paymentType === 'cod'
+      ? `Collect ${formatCurrency(collectableValue)}`
+      : 'No amount to be collected'
+  const consigneeAddressLines = [
+    normalizeText(consignee.name),
+    ...[
+      consignee.address,
+      compactAddressLine(consignee.city, consignee.state, consignee.pincode),
+    ]
+      .map((value) => String(value ?? '').trim())
+      .filter(Boolean),
+  ]
+
+  const companyAddress = {
+    warehouse_name: sellerBrandName,
+    address: companyInfo.companyAddress,
+    city: companyInfo.city,
+    state: companyInfo.state,
+    pincode: companyInfo.pincode,
+    phone: companyInfo.companyContactNumber || companyInfo.contactNumber,
+    gst_number: companyInfo.companyGst,
+  }
+  const pickupAddress = {
+    warehouse_name: pickup.warehouse_name || pickup.name || sellerBrandName,
+    address: pickup.address || companyAddress.address,
+    city: pickup.city || companyAddress.city,
+    state: pickup.state || companyAddress.state,
+    pincode: pickup.pincode || companyAddress.pincode,
+    phone: pickup.phone || companyAddress.phone,
+    gst_number: pickup.gst_number || companyAddress.gst_number,
+  }
+  const returnAddress = showRto && (rto.address || rto.city || rto.pincode) ? rto : pickupAddress
+  const returnAddressLines = [
+    `From:${normalizeText(pickupAddress.warehouse_name)}`,
+    'Return to if undelivered:',
+    `Store name ${normalizeText(returnAddress.warehouse_name || sellerBrandName)}`,
+    returnAddress.address,
+    compactAddressLine(returnAddress.city, returnAddress.state, returnAddress.pincode),
+  ]
+    .map((value) => String(value ?? '').trim())
+    .filter(Boolean)
+  if (showShipperPhone && (returnAddress.phone || pickupAddress.phone)) {
+    returnAddressLines.push(`Contact: ${normalizeText(returnAddress.phone || pickupAddress.phone)}`)
+  }
+  if (showShipperGst && (returnAddress.gst_number || pickupAddress.gst_number)) {
+    returnAddressLines.push(`GSTIN: ${normalizeText(returnAddress.gst_number || pickupAddress.gst_number)}`)
+  }
+
+  const productColumns = [
+    { key: 'name', header: 'Product Name', width: '*', enabled: includeProductName },
+    { key: 'sku', header: 'SKU', width: 56, enabled: includeSku },
+    { key: 'qty', header: 'Quantity', width: 56, enabled: includeQty },
+    { key: 'price', header: 'Amount', width: 48, enabled: includeCost },
+  ].filter((column) => column.enabled)
+  if (productColumns.length === 0) {
+    productColumns.push({ key: 'name', header: 'Product Name', width: '*', enabled: true })
+  }
+  const productCell = (product: any, key: string) => {
+    if (key === 'sku') return trimText(product.sku ?? product.skuCode ?? '-', 18)
+    if (key === 'qty') return String(product.qty ?? product.quantity ?? 1)
+    if (key === 'price') return formatCurrency(product.price)
+    return trimText(product.name ?? product.productName ?? product.box_name ?? '-', charLimit)
+  }
+  const productBody =
+    chunk.length > 0
+      ? chunk.map((product: any) =>
+          productColumns.map((column) => ({
+            text: productCell(product, column.key),
+            fontSize: 7,
+            alignment: column.key === 'name' ? 'left' : 'center',
+          })),
+        )
+      : [
+          [
+            {
+              text: '-',
+              fontSize: 7,
+              colSpan: productColumns.length,
+            },
+            ...productColumns.slice(1).map(() => ({ text: '' })),
+          ],
+        ]
+  const noReturnBadgeSvg = `
+    <svg width="58" height="58" viewBox="0 0 58 58" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="29" cy="29" r="27" fill="#e21b1b"/>
+      <circle cx="29" cy="29" r="14" fill="none" stroke="#fff" stroke-width="5"/>
+      <line x1="19" y1="19" x2="39" y2="39" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+      <text x="29" y="14" text-anchor="middle" font-family="Arial" font-size="6.5" font-weight="700" fill="#fff" textLength="46" lengthAdjust="spacingAndGlyphs">NO EXCHANGE</text>
+      <text x="29" y="49" text-anchor="middle" font-family="Arial" font-size="6.5" font-weight="700" fill="#fff" textLength="40" lengthAdjust="spacingAndGlyphs">NO RETURN</text>
+    </svg>`
+
+  const referenceLabelContent: any[] = [
+    {
+      table: {
+        widths: [156, '*'],
+        body: [
+          [
+            {
+              stack:
+                showBrandLogo && images.logo
+                  ? [{ image: 'logo', fit: [56, 28], alignment: 'left' }]
+                  : showBrandName
+                    ? [{ text: trimText(sellerBrandName, 28), bold: true, fontSize: 9 }]
+                    : [{ text: '' }],
+              border: [false, false, false, false],
+            },
+            {
+              stack: [
+                { text: 'Shipping Label', bold: true, fontSize: 12, margin: [0, 0, 0, 2] },
+                ...(showOrderId ? [{ text: `Order# : ${labelOrderNumber}`, fontSize: 7 }] : []),
+                {
+                  text: `Generated on: ${formatGeneratedAt(order.label_generated_at ?? order.updated_at ?? new Date())}`,
+                  fontSize: 4.8,
+                  noWrap: true,
+                  margin: [0, 2, 0, 0],
+                },
+              ],
+              alignment: 'left',
+              border: [false, false, false, false],
+            },
+          ],
+        ],
+      },
+      layout: 'noBorders',
+      margin: [8, 2, 0, 16],
+    },
+    {
+      table: {
+        widths: [66, '*'],
+        body: [
+          [
+            { text: paymentLabel, bold: true, fontSize: 10, alignment: 'center' },
+            { text: paymentInstruction, bold: true, fontSize: 10, alignment: 'center' },
+          ],
+        ],
+      },
+      layout: {
+        hLineWidth: () => 1,
+        vLineWidth: () => 1,
+        hLineColor: () => '#000000',
+        vLineColor: () => '#000000',
+        paddingTop: () => 8,
+        paddingBottom: () => 8,
+      },
+      margin: [-6, 0, -6, 12],
+    },
+    {
+      table: {
+        widths: [160, '*'],
+        body: [
+          [
+            {
+              stack: [
+                { text: `Courier: ${courierName}`, bold: true, fontSize: 10 },
+                ...(showDeclaredValue
+                  ? [{ text: `Order Value: ${formatCurrency(orderValue)}`, bold: true, fontSize: 10 }]
+                  : []),
+                ...(showOrderId && referenceOrderNumber !== '-'
+                  ? [{ text: `Reference Order# : ${referenceOrderNumber}`, fontSize: 6 }]
+                  : []),
+                ...(showInvoiceNumber && order.invoice_number
+                  ? [{ text: `Invoice# : ${normalizeText(order.invoice_number)}`, fontSize: 6 }]
+                  : []),
+                ...(awbEnabled && order.awb_number
+                  ? [{ text: `AWB# : ${normalizeText(order.awb_number)}`, fontSize: 6 }]
+                  : []),
+                ...(includeDimension && dimensionLabel
+                  ? [{ text: `Dimensions: ${dimensionLabel.replace(/ cm$/i, '')} (L W H)`, fontSize: 6 }]
+                  : []),
+                ...(includeDeadWeight && formatWeight(order.weight ?? order.actual_weight)
+                  ? [{ text: `Weight: ${formatWeight(order.weight ?? order.actual_weight)}`, fontSize: 6 }]
+                  : []),
+                ...(showRtoRoutingCode && normalizedSortCode
+                  ? [{ text: `Sort Code: ${normalizedSortCode}`, fontSize: 6 }]
+                  : []),
+              ],
+              border: [false, false, false, false],
+            },
+            {
+              stack:
+                awbEnabled && images.awbBarcode
+                  ? [{ image: 'awbBarcode', width: 88, alignment: 'center', margin: [0, 0, 0, 0] }]
+                  : [{ text: '' }],
+              border: [false, false, false, false],
+            },
+          ],
+        ],
+      },
+      layout: 'noBorders',
+      margin: [0, 0, 0, 10],
+    },
+    {
+      table: {
+        widths: [202, '*'],
+        body: [
+          [
+            {
+              stack: [
+                { text: `To: ${consigneeAddressLines[0] || '-'}`, bold: true, fontSize: 10, margin: [0, 0, 0, 1] },
+                ...consigneeAddressLines.slice(1).map((line) => ({ text: trimText(line, 72), fontSize: 10 })),
+                ...(showCustomerPhone && consignee.phone
+                  ? [{ text: `Contact: ${trimText(consignee.phone, 20)}`, fontSize: 7, margin: [0, 1, 0, 0] }]
+                  : []),
+              ],
+              border: [false, false, false, false],
+            },
+            {
+              stack: images.qrCode ? [{ image: 'qrCode', width: 42, alignment: 'center' }] : [{ text: '' }],
+              border: [false, false, false, false],
+              margin: [0, 11, 0, 0],
+            },
+          ],
+        ],
+      },
+      layout: 'noBorders',
+      margin: [0, 0, 0, 4],
+    },
+    {
+      canvas: [{ type: 'line', x1: 0, y1: 0, x2: 198, y2: 0, lineWidth: 1, dash: { length: 3, space: 2 } }],
+      margin: [0, 0, 0, 5],
+    },
+    {
+      stack: returnAddressLines.map((line, index) => ({
+        text: trimText(line, index <= 1 ? 42 : 72),
+        bold: index === 0 || index === 1,
+        fontSize: index === 0 ? 9 : 7,
+      })),
+      margin: [0, 0, 0, 4],
+    },
+    ...(showTerms ? [{ svg: noReturnBadgeSvg, width: 58, alignment: 'center', margin: [0, 0, 0, 14] }] : []),
+    {
+      table: {
+        headerRows: 1,
+        widths: productColumns.map((column) => column.width),
+        body: [
+          productColumns.map((column) => ({
+            text: column.header,
+            bold: true,
+            fontSize: 7,
+            alignment: column.key === 'name' ? 'left' : 'center',
+          })),
+          ...productBody,
+        ],
+      },
+      layout: {
+        hLineWidth: (i: number, node: any) => (i === 0 || i === 1 || i === node.table.body.length ? 0.7 : 0.4),
+        vLineWidth: () => 0,
+        hLineColor: () => '#000000',
+        paddingLeft: () => 1,
+        paddingRight: () => 1,
+        paddingTop: () => 3,
+        paddingBottom: () => 3,
+      },
+      margin: [0, 0, 0, 0],
+    },
+  ]
+
+  pageContent.splice(0, pageContent.length, ...referenceLabelContent)
 
   // Push pageContent to pages array - CRITICAL: Without this, label will be empty!
   if (pageContent.length === 0) {

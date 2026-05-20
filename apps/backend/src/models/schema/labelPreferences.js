@@ -65,10 +65,10 @@ exports.labelPreferences = createTable('label_preferences', {
         templateObject_3 ||
           (templateObject_3 = __makeTemplateObject(
             [
-              '\'{\n        "itemName": true,\n        "productCost": true,\n        "productQuantity": true,\n        "skuCode": false,\n        "dimension": false,\n        "deadWeight": false,\n        "otherCharges": true\n      }\'::jsonb',
+              '\'{\n        "itemName": true,\n        "productCost": false,\n        "productQuantity": true,\n        "skuCode": true,\n        "dimension": true,\n        "deadWeight": true,\n        "otherCharges": true\n      }\'::jsonb',
             ],
             [
-              '\'{\n        "itemName": true,\n        "productCost": true,\n        "productQuantity": true,\n        "skuCode": false,\n        "dimension": false,\n        "deadWeight": false,\n        "otherCharges": true\n      }\'::jsonb',
+              '\'{\n        "itemName": true,\n        "productCost": false,\n        "productQuantity": true,\n        "skuCode": true,\n        "dimension": true,\n        "deadWeight": true,\n        "otherCharges": true\n      }\'::jsonb',
             ],
           )),
       ),

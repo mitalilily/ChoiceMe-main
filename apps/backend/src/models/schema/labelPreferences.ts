@@ -49,11 +49,11 @@ export const labelPreferences = createTable('label_preferences', {
     .default(
       sql`'{
         "itemName": true,
-        "productCost": true,
+        "productCost": false,
         "productQuantity": true,
-        "skuCode": false,
-        "dimension": false,
-        "deadWeight": false,
+        "skuCode": true,
+        "dimension": true,
+        "deadWeight": true,
         "otherCharges": true
       }'::jsonb`,
     )
