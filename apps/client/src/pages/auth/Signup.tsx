@@ -36,8 +36,8 @@ export default function Signup() {
             Create your account
           </Typography>
           <Typography sx={{ color: brand.inkSoft, lineHeight: 1.55, fontSize: '0.9rem' }}>
-            Enter your name, email, and password. We will send a verification code to your email
-            before opening onboarding.
+            Enter your name, phone, email, and password. We will send a verification code to your
+            email before opening onboarding.
           </Typography>
         </Stack>
 

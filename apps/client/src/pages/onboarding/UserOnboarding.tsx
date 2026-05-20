@@ -74,8 +74,8 @@ export default function UserOnboarding() {
           userData?.companyInfo?.contactPerson?.split(' ')?.slice(1).join(' ') ||
           prefill?.lastName ||
           '',
-        email: userData?.companyInfo?.contactEmail || userData?.email || '',
-        phone: userData?.companyInfo?.contactNumber || (userData as any)?.phone || '',
+        email: userData?.companyInfo?.contactEmail || userData?.email || prefill?.email || '',
+        phone: userData?.companyInfo?.contactNumber || (userData as any)?.phone || prefill?.phone || '',
         companyName: userData?.companyInfo?.businessName ?? '',
         pincode: userData?.companyInfo?.pincode ?? '',
         state: userData?.companyInfo?.state ?? '',

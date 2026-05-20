@@ -22,13 +22,15 @@ export const requestPasswordLoginApi = async (
   email: string,
   password?: string,
   flow: AuthFlow = "login",
-  name?: string
+  name?: string,
+  phone?: string
 ) => {
   const { data } = await axiosInstance.post("/auth/request-password-login", {
     email: email.trim().toLowerCase(),
     password,
     flow,
     ...(name?.trim() ? { name: name.trim() } : {}),
+    ...(phone?.trim() ? { phone: phone.trim() } : {}),
   });
   return data;
 };

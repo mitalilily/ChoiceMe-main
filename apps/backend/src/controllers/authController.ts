@@ -346,7 +346,7 @@ export const verifyOtp = async (req: Request, res: Response): Promise<any> => {
 }
 
 export const requestEmailVerification = async (req: Request, res: Response): Promise<any> => {
-  const { idToken, password, email, flow, name } = req.body
+  const { idToken, password, email, flow, name, phone } = req.body
   const authFlow = flow === 'signup' ? 'signup' : 'login'
 
   try {
@@ -376,6 +376,7 @@ export const requestEmailVerification = async (req: Request, res: Response): Pro
       googleId, // null for password logins
       authFlow,
       profileContactName,
+      typeof phone === 'string' ? phone : '',
     )
 
     const user = result.data?.user
@@ -414,8 +415,17 @@ export const requestEmailVerification = async (req: Request, res: Response): Pro
     console.error('Error in requestEmailVerification:', err)
     const message = err instanceof Error ? err.message : 'Invalid credentials or token'
     const isEmailConfigError = message.includes('Email service is not configured')
-    return res.status(isEmailConfigError ? 500 : 401).json({
-      error: isEmailConfigError ? message : 'Invalid credentials or token',
+    const isConflict =
+      message.toLowerCase().includes('duplicate key') ||
+      message.toLowerCase().includes('already has an account') ||
+      message.toLowerCase().includes('already linked')
+
+    return res.status(isEmailConfigError ? 500 : isConflict ? 409 : 401).json({
+      error: isEmailConfigError
+        ? message
+        : isConflict
+          ? 'This email or phone number already has an account. Please log in instead.'
+          : 'Invalid credentials or token',
     })
   }
 }
@@ -521,7 +531,6 @@ export const googleOAuthLogin = async (req: Request, res: Response): Promise<any
             email,
             googleId,
             firstName: name,
-            phone: '',
             emailVerified: true,
             onboardingStep: 0,
             onboardingComplete: false,

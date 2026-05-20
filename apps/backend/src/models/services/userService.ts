@@ -54,6 +54,31 @@ export type Tx = NodePgDatabase<typeof schema> // global pool client
 
 type UserUpdate = Partial<Omit<User, 'id'>> // We typically don't allow changing id or phone
 
+const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() ?? ''
+const normalizePhone = (phone?: string | null) => phone?.replace(/\D/g, '') ?? ''
+
+const findUserByPhoneIn = async (phone: string, tx: Tx = db) => {
+  const normalized = normalizePhone(phone)
+  if (!normalized) return null
+
+  return await tx.query.users.findFirst({
+    where: (users, { eq }) => eq(users.phone, normalized),
+  })
+}
+
+const findProfileByContactNumberIn = async (phone: string, tx: Tx = db) => {
+  const normalized = normalizePhone(phone)
+  if (!normalized) return null
+
+  const [profile] = await tx
+    .select({ userId: schema.userProfiles.userId })
+    .from(schema.userProfiles)
+    .where(sql`${schema.userProfiles.companyInfo}->>'contactNumber' = ${normalized}`)
+    .limit(1)
+
+  return profile ?? null
+}
+
 const EMPTY_COMPANY: CompanyInfo = {
   businessName: '',
   brandName: '',
@@ -88,13 +113,9 @@ const DEFAULT_PROFILE: Omit<typeof schema.userProfiles.$inferInsert, 'userId' | 
 }
 // âœ… Get user by phone
 
-export const findUserByPhone = async (phone: string) => {
+export const findUserByPhone = async (phone: string, tx: Tx = db) => {
   try {
-    const user = await db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.phone, phone),
-    })
-
-    return user
+    return await findUserByPhoneIn(phone, tx)
   } catch (error) {
     console.error('Database query error:', error)
     return null
@@ -395,10 +416,12 @@ export const handleEmailVerificationRequest = async (
   googleId: string | null,
   flow: AuthFlow = 'login',
   profileContactName = '',
+  phone = '',
 ): Promise<{ status: number; data: any }> => {
   return await db.transaction(async (tx) => {
-    const normalizedEmail = email.trim().toLowerCase()
+    const normalizedEmail = normalizeEmail(email)
     const normalizedContactName = profileContactName.trim().replace(/\s+/g, ' ')
+    const normalizedPhone = normalizePhone(phone)
     const token = generate8DigitsVerificationToken()
     const expiresAt = new Date(Date.now() + OTP_EXPIRY)
     let shouldSendEmail = false
@@ -406,12 +429,46 @@ export const handleEmailVerificationRequest = async (
 
     const user = await findUserByEmail(normalizedEmail, tx)
 
+    if (flow === 'signup') {
+      if (!normalizedPhone) {
+        return {
+          status: 400,
+          data: {
+            error: 'Phone number is required.',
+          },
+        }
+      }
+
+      if (!/^\d{10}$/.test(normalizedPhone)) {
+        return {
+          status: 400,
+          data: {
+            error: 'Enter a valid 10-digit phone number.',
+          },
+        }
+      }
+    }
+
     if (flow === 'signup' && user) {
       return {
         status: 409,
         data: {
           error: 'This email already has an account. Please log in instead.',
         },
+      }
+    }
+
+    if (flow === 'signup') {
+      const phoneUser = await findUserByPhoneIn(normalizedPhone, tx)
+      const phoneProfile = await findProfileByContactNumberIn(normalizedPhone, tx)
+
+      if (phoneUser || phoneProfile) {
+        return {
+          status: 409,
+          data: {
+            error: 'This phone number already has an account. Please log in instead.',
+          },
+        }
       }
     }
 
@@ -547,7 +604,7 @@ export const handleEmailVerificationRequest = async (
     if (googleId) {
       await createUserWithWallet({
         email: normalizedEmail,
-        phone: '',
+        phone: normalizedPhone,
         passwordHash: password ? await bcrypt.hash(password, 10) : null,
         googleId,
         emailVerified: true,
@@ -563,7 +620,7 @@ export const handleEmailVerificationRequest = async (
 
     await createUserWithWallet({
       email: normalizedEmail,
-      phone: '',
+      phone: normalizedPhone,
       passwordHash: await bcrypt.hash(password, 10),
       googleId: null,
       emailVerificationToken: token,
@@ -627,12 +684,19 @@ type CreateUserWithWalletData = Partial<IUser> & {
 
 export async function createUserWithWallet(data: CreateUserWithWalletData, txn: any = db) {
   const { profileContactName, ...userData } = data
+  const cleanUserData = { ...userData } as Partial<IUser>
+
+  cleanUserData.email = normalizeEmail(cleanUserData.email)
+  cleanUserData.phone = normalizePhone(cleanUserData.phone)
+
+  if (!cleanUserData.email) delete cleanUserData.email
+  if (!cleanUserData.phone) delete cleanUserData.phone
 
   return txn?.transaction(async (tx: any) => {
     // 1) insert user
     const [user] = await tx
       .insert(users)
-      .values(userData as IUser)
+      .values(cleanUserData as IUser)
       .returning()
 
     // 2) insert wallet
@@ -721,9 +785,9 @@ export async function createUserWithWallet(data: CreateUserWithWalletData, txn: 
     const companyInfo = {
       ...DEFAULT_PROFILE.companyInfo, // keeps required fields
       contactPerson: profileContactName ?? DEFAULT_PROFILE.companyInfo.contactPerson,
-      contactEmail: userData.email ?? '',
-      contactNumber: userData.phone ?? '',
-      profilePicture: userData?.profilePicture,
+      contactEmail: cleanUserData.email ?? '',
+      contactNumber: cleanUserData.phone ?? '',
+      profilePicture: cleanUserData?.profilePicture,
     }
 
     await tx.insert(schema.userProfiles).values({

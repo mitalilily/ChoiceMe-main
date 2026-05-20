@@ -2,7 +2,7 @@
 import { alpha } from '@mui/material/styles'
 import { useMemo, useState } from 'react'
 import { FiArrowRight, FiMail, FiUser } from 'react-icons/fi'
-import { MdPassword } from 'react-icons/md'
+import { MdPassword, MdPhone } from 'react-icons/md'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/auth/AuthContext'
 import { useRequestPasswordLogin, useVerifyEmailOtp } from '../../hooks/useRequestPasswordLogin'
@@ -70,6 +70,7 @@ export default function CredentialAuthForm({
   const [step, setStep] = useState<'form' | 'verify'>('form')
   const [name, setName] = useState('')
   const [email, setEmail] = useState(sessionStorage.getItem('activeEmail') ?? '')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [termsChecked, setTermsChecked] = useState(false)
@@ -98,6 +99,13 @@ export default function CredentialAuthForm({
     return ''
   }, [password])
 
+  const phoneError = useMemo(() => {
+    if (mode !== 'signup') return ''
+    if (!phone.trim()) return 'Phone number is required.'
+    if (!/^\d{10}$/.test(phone.replace(/\D/g, ''))) return 'Enter a valid 10-digit phone number.'
+    return ''
+  }, [mode, phone])
+
   const nameError = useMemo(() => {
     if (mode !== 'signup') return ''
     if (!name.trim()) return 'Name is required.'
@@ -107,8 +115,8 @@ export default function CredentialAuthForm({
   const handleRequest = (event?: React.FormEvent) => {
     event?.preventDefault()
 
-    if (nameError || emailError || passwordError) {
-      setError(nameError || emailError || passwordError)
+    if (nameError || emailError || phoneError || passwordError) {
+      setError(nameError || emailError || phoneError || passwordError)
       return
     }
 
@@ -127,6 +135,7 @@ export default function CredentialAuthForm({
         password,
         flow: authFlow,
         name: mode === 'signup' ? name.trim() : undefined,
+        phone: mode === 'signup' ? phone.replace(/\D/g, '') : undefined,
       },
       {
         onSuccess: (response: AuthResponse) => {
@@ -134,7 +143,13 @@ export default function CredentialAuthForm({
           setInlineCode(verificationCode)
 
           if (response?.token && response?.refreshToken) {
-            if (mode === 'signup') setOnboardingPrefill(name)
+            if (mode === 'signup') {
+              setOnboardingPrefill({
+                fullName: name,
+                email: email.trim().toLowerCase(),
+                phone,
+              })
+            }
             sessionStorage.setItem('activeEmail', email.trim().toLowerCase())
             setUserId(response?.user?.id ?? '')
             setTokens(response.token, response.refreshToken)
@@ -143,7 +158,13 @@ export default function CredentialAuthForm({
           }
 
           if (verificationCode || response?.message?.includes('Verification')) {
-            if (mode === 'signup') setOnboardingPrefill(name)
+            if (mode === 'signup') {
+              setOnboardingPrefill({
+                fullName: name,
+                email: email.trim().toLowerCase(),
+                phone,
+              })
+            }
             setStep('verify')
             setCode('')
             toast.open({
@@ -271,6 +292,26 @@ export default function CredentialAuthForm({
             authVariant={compactLogin ? 'reference' : undefined}
           />
 
+          {mode === 'signup' ? (
+            <CustomInput
+              label="Phone Number"
+              name="phone"
+              type="tel"
+              value={phone}
+              onChange={(event) => {
+                setPhone(event.target.value.replace(/\D/g, '').slice(0, 10))
+                setError('')
+              }}
+              helperText={phone ? phoneError : ''}
+              error={Boolean(phone) && Boolean(phoneError)}
+              prefix={<MdPhone color={brand.ink} size={16} />}
+              inputMode="numeric"
+              maxLength={10}
+              required
+              authVariant={compactLogin ? 'reference' : undefined}
+            />
+          ) : null}
+
           <CustomInput
             label="Password"
             name="password"
@@ -323,7 +364,7 @@ export default function CredentialAuthForm({
             text={compactLogin ? 'Log In' : mode === 'signup' ? 'Create account' : 'Continue with password'}
             loading={requesting}
             loadingText={compactLogin ? 'Logging in...' : mode === 'signup' ? 'Creating...' : 'Checking...'}
-            disabled={Boolean(nameError || emailError || passwordError) || !termsChecked}
+            disabled={Boolean(nameError || emailError || phoneError || passwordError) || !termsChecked}
             styles={compactLogin ? loginButtonStyles : { width: '100%' }}
             textColor={compactLogin ? '#FFFFFF' : undefined}
             endIconNode={compactLogin ? <FiArrowRight size={22} /> : undefined}
