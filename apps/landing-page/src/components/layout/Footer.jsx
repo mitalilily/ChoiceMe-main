@@ -12,7 +12,7 @@ import { Link as RouterLink } from "react-router-dom";
 import BrandLogo from "../brand/BrandLogo";
 import { brand, brandIdentity } from "../../theme/brand";
 
-const platformBaseUrl = (import.meta.env.VITE_PLATFORM_URL || "https://app.camplar.in").replace(/\/+$/, "");
+const platformBaseUrl = (import.meta.env.VITE_PLATFORM_URL || "https://app.choicemee.in").replace(/\/+$/, "");
 
 const platformLinks = [
   { label: "Portal Login", to: "/login" },
