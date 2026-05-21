@@ -58,6 +58,12 @@ function isCourierWarehouseMissingError(rawError: any, err?: any) {
   )
 }
 
+function isCourierWarehouseAlreadyExistsError(rawError: any, err?: any) {
+  const text = getCourierErrorText(rawError, err).toLowerCase()
+
+  return text.includes('already exists') && (text.includes('warehouse') || text.includes('client'))
+}
+
 type CourierAddressLike = {
   addressLine1?: string | number | null
   addressLine2?: string | number | null
@@ -422,10 +428,10 @@ export async function updatePickupAddressService(
           if (!delhiveryResp || delhiveryResp.success === false) {
             console.error('❌ Failed to update warehouse in Delhivery:', delhiveryResp)
             console.warn('Delhivery warehouse update failed; pickup address update was saved locally.')
-            return pickup
+            // Continue with Delivery One sync even if Delhivery update is rejected.
+          } else {
+            console.log(`✅ Warehouse updated in Delhivery: ${updatedPickup?.addressNickname}`)
           }
-
-          console.log(`✅ Warehouse updated in Delhivery: ${updatedPickup?.addressNickname}`)
         } else {
           console.log('ℹ️ No pickup address change detected — skipped Delhivery update.')
         }
@@ -446,6 +452,99 @@ export async function updatePickupAddressService(
             getCourierErrorText(rawError, err) || err?.message || err,
           )
         }
+      }
+
+      try {
+        if (updatedPickup) {
+          const originalWarehouseName =
+            originalPickup?.addressNickname ??
+            originalPickup?.contactName ??
+            updatedPickup?.addressNickname ??
+            updatedPickup?.contactName ??
+            'Default Warehouse'
+          const currentWarehouseName =
+            updatedPickup?.addressNickname ??
+            updatedPickup?.contactName ??
+            originalWarehouseName
+          const pickupAddressText = buildCourierAddress(updatedPickup) || updatedPickup?.addressLine1
+          const deliveryOne = new DeliveryOneService()
+          let currentWarehouseRegistered = false
+
+          const createCurrentDeliveryOneWarehouse = async (reason: string) => {
+            if (currentWarehouseRegistered) return
+            try {
+              await deliveryOne.createWarehouse({
+                name: currentWarehouseName,
+                registered_name: 'ChoiceMee',
+                phone: updatedPickup?.contactPhone,
+                email: updatedPickup?.contactEmail ?? '',
+                address: pickupAddressText,
+                city: updatedPickup?.city,
+                pin: updatedPickup?.pincode?.toString(),
+                country: updatedPickup?.country ?? 'India',
+                return_address: pickupAddressText,
+                return_city: updatedPickup?.city,
+                return_pin: updatedPickup?.pincode?.toString(),
+                return_state: updatedPickup?.state,
+                return_country: 'India',
+              })
+              currentWarehouseRegistered = true
+              console.log(`Delivery One warehouse registered after pickup update: ${currentWarehouseName}`)
+            } catch (createErr: any) {
+              const rawCreateError = createErr?.response?.data ?? createErr
+              if (isCourierWarehouseAlreadyExistsError(rawCreateError, createErr)) {
+                currentWarehouseRegistered = true
+                console.log(`Delivery One warehouse already exists after pickup update: ${currentWarehouseName}`)
+                return
+              }
+              console.warn(
+                `Skipping Delivery One warehouse registration (${reason}). Pickup address update was saved locally:`,
+                getCourierErrorText(rawCreateError, createErr) || createErr?.message || createErr,
+              )
+            }
+          }
+
+          try {
+            await deliveryOne.updateWarehouse({
+              name: originalWarehouseName,
+              address: pickupAddressText,
+              pin: updatedPickup?.pincode?.toString(),
+              phone: updatedPickup?.contactPhone,
+            })
+            console.log(`Delivery One warehouse updated: ${originalWarehouseName}`)
+          } catch (err: any) {
+            const rawError = err?.response?.data ?? err
+            if (isCourierAuthOrConfigError(rawError, err)) {
+              console.warn(
+                'Skipping Delivery One warehouse update because credentials are invalid or missing. Pickup address update was saved locally.',
+              )
+            } else if (isCourierWarehouseMissingError(rawError, err)) {
+              console.warn(
+                'Delivery One warehouse is missing in the courier panel. Registering the current pickup warehouse.',
+              )
+              await createCurrentDeliveryOneWarehouse('warehouse missing in courier panel')
+            } else {
+              console.warn(
+                'Skipping Delivery One warehouse update because the courier API rejected it. Pickup address update was saved locally:',
+                getCourierErrorText(rawError, err) || err?.message || err,
+              )
+            }
+          }
+
+          if (
+            String(currentWarehouseName).trim().toLowerCase() !==
+            String(originalWarehouseName).trim().toLowerCase()
+          ) {
+            await createCurrentDeliveryOneWarehouse('pickup nickname changed')
+          }
+        } else {
+          console.log('No pickup address change detected - skipped Delivery One update.')
+        }
+      } catch (err: any) {
+        console.warn(
+          'Skipping Delivery One warehouse sync because the courier API rejected it. Pickup address update was saved locally:',
+          err?.response?.data || err?.message || err,
+        )
       }
 
       return pickup

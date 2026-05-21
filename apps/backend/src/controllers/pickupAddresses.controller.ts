@@ -8,7 +8,17 @@ import {
 } from '../models/services/pickupAddresses.service'
 import { addresses, pickupAddresses } from '../schema/schema'
 
+function preventPickupAddressCache(req: any, res: Response) {
+  delete req.headers['if-none-match']
+  delete req.headers['if-modified-since']
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  res.setHeader('Surrogate-Control', 'no-store')
+}
+
 export async function createPickupAddressHandler(req: any, res: Response): Promise<any> {
+  preventPickupAddressCache(req, res)
   try {
     const userId = req.user?.sub
     if (!userId) return res.status(401).json({ message: 'Unauthorized' })
@@ -57,6 +67,7 @@ export async function createPickupAddressHandler(req: any, res: Response): Promi
  * PATCH /api/pickup-addresses/:id
  */
 export async function updatePickupAddressHandler(req: any, res: Response): Promise<any> {
+  preventPickupAddressCache(req, res)
   try {
     const userId = req.user?.sub
     const addressId = req.params.id
@@ -86,6 +97,7 @@ export async function updatePickupAddressHandler(req: any, res: Response): Promi
 }
 
 export async function getPickupAddressesHandler(req: any, res: Response): Promise<any> {
+  preventPickupAddressCache(req, res)
   try {
     const userId = req.user?.sub
     if (!userId) return res.status(401).json({ message: 'Unauthorized' })

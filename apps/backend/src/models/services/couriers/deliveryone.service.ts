@@ -2383,6 +2383,71 @@ export class DeliveryOneService {
       },
     }
 
+    const getWarehouseErrorText = (error: any) =>
+      [
+        error?.message,
+        error?.details,
+        error?.response?.data,
+        typeof error === 'string' ? error : '',
+      ]
+        .map((value) => {
+          if (!value) return ''
+          if (typeof value === 'string') return value
+          try {
+            return JSON.stringify(value)
+          } catch {
+            return String(value)
+          }
+        })
+        .join(' ')
+        .toLowerCase()
+
+    const isMissingWarehouseError = (error: any) => {
+      const text = getWarehouseErrorText(error)
+      return (
+        text.includes('clientwarehouse matching query does not exist') ||
+        text.includes('clientwarehouse does not exist') ||
+        text.includes('client warehouse does not exist') ||
+        text.includes('warehouse does not exist') ||
+        text.includes('warehouse does not exists') ||
+        text.includes('warehouse not found')
+      )
+    }
+
+    const isDuplicateWarehouseError = (error: any) => {
+      const text = getWarehouseErrorText(error)
+      return text.includes('already exists') && (text.includes('warehouse') || text.includes('client'))
+    }
+
+    const buildWarehouseRepairPayload = () => {
+      const pickupPin =
+        sanitizePincode(pickup.pincode ?? params.pickup_pincode ?? params.source_pincode ?? params.origin) ||
+        sanitizePincode((params as any).pickup_pin)
+      const returnSource = returnAddress || pickup
+      const returnAddressText = [returnSource?.address, returnSource?.address_2]
+        .map((part) => sanitizeString(part))
+        .filter(Boolean)
+        .join(', ')
+      const warehouseAddress = pickupAddress || sanitizeString(pickup.address) || pickupLocationName
+
+      return {
+        name: pickupLocationName,
+        registered_name: sellerName || 'ChoiceMee',
+        phone: pickupPhone,
+        email: sanitizeString((pickup as any).email || (pickup as any).contact_email),
+        address: warehouseAddress,
+        city: sanitizeString(pickup.city),
+        pin: pickupPin,
+        country: sanitizeString(pickup.country || params.country) || 'India',
+        return_address: returnAddressText || warehouseAddress,
+        return_city: sanitizeString(returnSource?.city || pickup.city),
+        return_pin:
+          sanitizePincode(returnSource?.pincode || pickup.pincode || pickupPin) || pickupPin,
+        return_state: sanitizeString(returnSource?.state || pickup.state),
+        return_country: sanitizeString(returnSource?.country || pickup.country || params.country) || 'India',
+      }
+    }
+
     this.log('Create shipment payload summary', {
       order: orderNumber,
       paymentMode,
@@ -2394,7 +2459,7 @@ export class DeliveryOneService {
       hasWaybills: waybills.length,
     })
 
-    try {
+    const submitShipment = async (attempt: 'initial' | 'warehouse-retry' = 'initial') => {
       const response = await this.postFormEncoded('/api/cmu/create.json', payload)
       const responseData = response.data
       const rawPackages = responseData?.packages
@@ -2454,6 +2519,7 @@ export class DeliveryOneService {
 
         this.log('Create shipment rejected', {
           order: orderNumber,
+          attempt,
           status: response.status,
           failureReason,
           response: responseData,
@@ -2463,12 +2529,55 @@ export class DeliveryOneService {
 
       this.log('Create shipment succeeded', {
         order: orderNumber,
+        attempt,
         status: response.status,
         packages: successfulPackages.length,
         awb: successfulPackages[0]?.waybill,
       })
 
       return responseData
+    }
+
+    try {
+      try {
+        return await submitShipment()
+      } catch (error: any) {
+        if (!(error instanceof DelhiveryManifestError) || !isMissingWarehouseError(error)) {
+          throw error
+        }
+
+        const warehousePayload = buildWarehouseRepairPayload()
+        this.log('Create shipment failed because pickup warehouse is missing; registering and retrying once', {
+          order: orderNumber,
+          pickupLocation: pickupLocationName,
+          pin: warehousePayload.pin,
+        })
+
+        try {
+          await this.createWarehouse(warehousePayload)
+          this.log('Pickup warehouse registered before shipment retry', {
+            order: orderNumber,
+            pickupLocation: pickupLocationName,
+          })
+        } catch (warehouseError: any) {
+          if (isDuplicateWarehouseError(warehouseError)) {
+            this.log('Pickup warehouse already exists before shipment retry', {
+              order: orderNumber,
+              pickupLocation: pickupLocationName,
+            })
+          } else {
+            this.log('Pickup warehouse repair failed before shipment retry', {
+              order: orderNumber,
+              pickupLocation: pickupLocationName,
+              message: warehouseError?.message || warehouseError,
+              response: warehouseError?.response?.data || null,
+            })
+            throw warehouseError
+          }
+        }
+
+        return await submitShipment('warehouse-retry')
+      }
     } catch (error: any) {
       if (error instanceof DelhiveryManifestError || error instanceof HttpError) {
         throw error
