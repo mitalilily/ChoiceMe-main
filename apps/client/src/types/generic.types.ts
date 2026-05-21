@@ -163,6 +163,8 @@ export interface B2COrder {
 
   // Order status
   order_status: string
+  pickup_status?: string | null
+  pickup_error?: string | null
 
   // Courier info
   courier_partner?: string | null

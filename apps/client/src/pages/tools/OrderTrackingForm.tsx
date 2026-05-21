@@ -49,7 +49,7 @@ const trackingStatusLabelMap: Record<string, string> = {
   booked: 'Booked',
   manifest_generated: 'Manifest Generated',
   shipment_created: 'Shipment Created',
-  pickup_initiated: 'Pending Pickup',
+  pickup_initiated: 'Scheduled for Pickup',
   in_transit: 'In Transit',
   out_for_delivery: 'Out For Delivery',
   delivered: 'Delivered',

@@ -598,6 +598,15 @@ const getTomorrowPickupDate = () => {
   return nextDay.toISOString().split('T')[0]
 }
 
+const DEFAULT_AUTO_PICKUP_TIME = '11:00:00'
+
+const normalizePickupTimeForCourier = (value?: string | null) => {
+  const normalized = String(value || '').trim()
+  if (/^\d{2}:\d{2}:\d{2}$/.test(normalized)) return normalized
+  if (/^\d{2}:\d{2}$/.test(normalized)) return `${normalized}:00`
+  return DEFAULT_AUTO_PICKUP_TIME
+}
+
 const normalizePickupDateForRetry = (pickupDateRaw: unknown, isManifestRetry: boolean) => {
   const fallbackDate = isManifestRetry ? getTomorrowPickupDate() : getDefaultPickupDate()
   const normalizedInput = String(pickupDateRaw || '').trim().slice(0, 10)
@@ -4834,6 +4843,51 @@ export const createB2CShipmentService = async (
       return { order: newOrder, shipment: shipmentData }
     })
 
+    if (
+      integrationType === 'deliveryone' &&
+      !isReverseShipment &&
+      result?.order?.id &&
+      shipmentMeta.awb_number
+    ) {
+      try {
+        const manifestResult = await generateManifestService({
+          awbs: [params.order_number],
+          type: 'b2c',
+          userId,
+          pickup_date: params.pickup_date || params.pickup?.pickup_date || getTomorrowPickupDate(),
+          pickup_time: normalizePickupTimeForCourier(params.pickup_time || params.pickup?.pickup_time),
+        })
+        ;(result as any).manifest = manifestResult
+        console.log('[Delivery One] Auto manifest and pickup scheduling completed after order creation', {
+          order_number: params.order_number,
+          order_id: result.order.id,
+          manifest_id: manifestResult.manifest_id,
+          warnings: manifestResult.warnings || [],
+        })
+      } catch (autoManifestErr: any) {
+        const manifestErrorMessage = getUserFacingManifestError(
+          autoManifestErr,
+          'Delivery One automatic manifest and pickup scheduling failed.',
+        )
+        console.error('[Delivery One] Auto manifest and pickup scheduling failed after order creation', {
+          order_number: params.order_number,
+          order_id: result.order.id,
+          message: manifestErrorMessage,
+        })
+        await db
+          .update(b2c_orders)
+          .set({
+            order_status: 'manifest_failed',
+            manifest_error: truncateColumnValue(manifestErrorMessage),
+            pickup_status: 'failed',
+            pickup_error: truncateColumnValue(manifestErrorMessage),
+            updated_at: new Date(),
+          })
+          .where(eq(b2c_orders.id, result.order.id))
+        ;(result as any).manifest_warning = manifestErrorMessage
+      }
+    }
+
     rollbackActions.length = 0
     return result
   } catch (error) {
@@ -7689,11 +7743,8 @@ export const generateManifestService = async (params: {
           const deliveryOneOrders = orderIds.length
             ? await tx.select().from(b2c_orders).where(inArray(b2c_orders.id, orderIds))
             : []
-          const defaultNow = new Date()
-          const defaultPickupDate = scheduledPickupDate || defaultNow.toISOString().split('T')[0]
-          const defaultPickupTime =
-            scheduledPickupTime ||
-            new Date(defaultNow.getTime() + 60 * 60 * 1000).toTimeString().split(' ')[0]
+          const defaultPickupDate = scheduledPickupDate || getTomorrowPickupDate()
+          const defaultPickupTime = normalizePickupTimeForCourier(scheduledPickupTime)
           const pickupGroups = new Map<
             string,
             {
@@ -7728,7 +7779,7 @@ export const generateManifestService = async (params: {
                 pickupDate: String(
                   scheduledPickupDate || pickupDetails?.pickup_date || defaultPickupDate,
                 ).slice(0, 10),
-                pickupTime: String(
+                pickupTime: normalizePickupTimeForCourier(
                   scheduledPickupTime || pickupDetails?.pickup_time || defaultPickupTime,
                 ),
                 expectedPackageCount: 1,
@@ -7755,7 +7806,7 @@ export const generateManifestService = async (params: {
               await tx
                 .update(b2c_orders)
                 .set({
-                  pickup_status: 'requested',
+                  pickup_status: 'scheduled',
                   pickup_error: null,
                   updated_at: new Date(),
                 })
@@ -7955,11 +8006,8 @@ export const generateManifestService = async (params: {
             }
           }
 
-          const defaultNow = new Date()
-          const defaultPickupDate = scheduledPickupDate || defaultNow.toISOString().split('T')[0]
-          const defaultPickupTime =
-            scheduledPickupTime ||
-            new Date(defaultNow.getTime() + 60 * 60 * 1000).toTimeString().split(' ')[0]
+          const defaultPickupDate = scheduledPickupDate || getTomorrowPickupDate()
+          const defaultPickupTime = normalizePickupTimeForCourier(scheduledPickupTime)
           const pickupGroups = new Map<
             string,
             {
@@ -7992,7 +8040,7 @@ export const generateManifestService = async (params: {
                 pickupDate: String(
                   scheduledPickupDate || pickupDetails?.pickup_date || defaultPickupDate,
                 ).slice(0, 10),
-                pickupTime: String(
+                pickupTime: normalizePickupTimeForCourier(
                   scheduledPickupTime || pickupDetails?.pickup_time || defaultPickupTime,
                 ),
                 expectedPackageCount: 1,
@@ -8012,7 +8060,7 @@ export const generateManifestService = async (params: {
               await tx
                 .update(b2c_orders)
                 .set({
-                  pickup_status: 'requested',
+                  pickup_status: 'scheduled',
                   pickup_error: null,
                   updated_at: new Date(),
                 })
@@ -8116,7 +8164,7 @@ export const retryFailedManifestService = async (
     throw new HttpError(400, 'Only orders with manifest_failed status can be retried.')
   }
 
-  if (order.awb_number) {
+  if (order.awb_number && provider !== 'deliveryone') {
     throw new HttpError(
       400,
       'This order already has an AWB. Use the normal manifest flow instead of retrying it as failed.',
@@ -8143,9 +8191,11 @@ export const retryFailedManifestService = async (
 
   try {
     const manifestResult = await generateManifestService({
-      awbs: [order.order_number],
+      awbs: [provider === 'deliveryone' ? order.awb_number || order.order_number : order.order_number],
       type: 'b2c',
       userId,
+      pickup_date: getTomorrowPickupDate(),
+      pickup_time: DEFAULT_AUTO_PICKUP_TIME,
     })
 
     await db

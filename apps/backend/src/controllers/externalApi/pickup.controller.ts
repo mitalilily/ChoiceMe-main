@@ -495,10 +495,10 @@ export const requestPickupController = async (req: any, res: Response) => {
       })
     }
 
-    const now = new Date()
-    const defaultPickupDate = now.toISOString().split('T')[0]
-    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000)
-    const defaultPickupTime = oneHourLater.toTimeString().split(' ')[0]
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const defaultPickupDate = tomorrow.toISOString().split('T')[0]
+    const defaultPickupTime = '11:00:00'
 
     const providerService =
       provider === 'deliveryone' ? new DeliveryOneService() : new DelhiveryService()
@@ -515,6 +515,8 @@ export const requestPickupController = async (req: any, res: Response) => {
         .update(b2c_orders)
         .set({
           order_status: 'pickup_initiated',
+          pickup_status: 'scheduled',
+          pickup_error: null,
           updated_at: new Date(),
         })
         .where(inArray(b2c_orders.id, orderIds))

@@ -3,6 +3,7 @@ export type B2COrderActionShape = {
   order_number?: string | null
   awb_number?: string | null
   order_status?: string | null
+  pickup_status?: string | null
   integration_type?: string | null
   courier_partner?: string | null
   manifest?: string | null
@@ -17,7 +18,7 @@ const B2C_CANCELLABLE_STATUSES = new Set([
   'manifest_generated',
 ])
 const B2C_CANCELLABLE_PROVIDERS = new Set(['deliveryone'])
-const B2C_MANIFESTABLE_STATUSES = new Set(['pending', 'shipment_created'])
+const B2C_MANIFESTABLE_STATUSES = new Set(['pending', 'booked', 'shipment_created'])
 const B2C_CANCELLED_STATUSES = new Set(['cancelled', 'canceled', 'cancellation_requested'])
 
 export const BULK_MANIFEST_LIMIT = 5

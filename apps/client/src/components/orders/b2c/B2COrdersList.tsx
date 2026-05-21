@@ -118,7 +118,7 @@ const shippingStatusMap: Record<string, string> = {
   pending: 'Pending',
   booked: 'Booked',
   manifest_failed: 'Manifest Failed',
-  pickup_initiated: 'Pending Pickup',
+  pickup_initiated: 'Scheduled for Pickup',
   shipment_created: 'Shipment Created',
   in_transit: 'In Transit',
   out_for_delivery: 'Out For Delivery',
