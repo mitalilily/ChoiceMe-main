@@ -8656,7 +8656,7 @@ const mapTrackingToOrderStatus = (
     }
 
     if (providerStatusType === 'ud') {
-      if (providerStatusText.includes('manifested')) return 'booked'
+      if (providerStatusText.includes('manifested')) return 'pickup_initiated'
       if (
         providerStatusText.includes('not picked') ||
         providerStatusText.includes('not received')
@@ -8742,7 +8742,7 @@ const mapTrackingToOrderStatus = (
     combined.includes('manifest uploaded') ||
     combined.includes('x uci')
   ) {
-    return 'booked'
+    return 'pickup_initiated'
   }
 
   if (combined.includes('pending')) {
