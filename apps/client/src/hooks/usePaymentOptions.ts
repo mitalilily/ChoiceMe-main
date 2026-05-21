@@ -5,8 +5,10 @@ export const usePaymentOptions = () => {
   return useQuery<PaymentOptions>({
     queryKey: ['paymentOptions'],
     queryFn: () => paymentOptionsService.getPaymentOptions(),
-    staleTime: 5 * 60 * 1000, // 5 minutes - payment options don't change frequently
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    gcTime: 30 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
     retry: 3,
   })
 }

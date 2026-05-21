@@ -36,12 +36,11 @@ const AddMoneyDialog: React.FC<AddMoneyDialogProps> = ({ open, setOpen }) => {
   const { user } = useAuth()
   const [amount, setAmount] = useState<number>(500)
   const recharge = useRechargeWallet()
-  const { data: paymentOptions } = usePaymentOptions()
+  const { data: paymentOptions, refetch: refetchPaymentOptions } = usePaymentOptions()
   const { data: profile } = useUserProfile(true)
 
   const minWalletRecharge = paymentOptions?.minWalletRecharge ?? 0
   const effectiveAmount = amount || 0
-  const isBelowMin = minWalletRecharge > 0 && effectiveAmount < minWalletRecharge
   const kycStatus = profile?.domesticKyc?.status
   const isKycBlocked = kycStatus !== 'verified'
 
@@ -57,9 +56,15 @@ const AddMoneyDialog: React.FC<AddMoneyDialogProps> = ({ open, setOpen }) => {
       return
     }
 
-    if (isBelowMin) {
+    const latestPaymentOptions = await refetchPaymentOptions()
+    const latestMinWalletRecharge =
+      latestPaymentOptions.data?.minWalletRecharge ?? minWalletRecharge ?? 0
+    const isBelowLatestMin =
+      latestMinWalletRecharge > 0 && effectiveAmount < latestMinWalletRecharge
+
+    if (isBelowLatestMin) {
       toast.open({
-        message: `Minimum wallet recharge amount is ₹${minWalletRecharge.toLocaleString('en-IN')}`,
+        message: `Minimum wallet recharge amount is ₹${latestMinWalletRecharge.toLocaleString('en-IN')}`,
         severity: 'warning',
       })
       return

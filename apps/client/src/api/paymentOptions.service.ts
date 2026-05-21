@@ -8,8 +8,13 @@ export interface PaymentOptions {
 
 export const paymentOptionsService = {
   getPaymentOptions: async (): Promise<PaymentOptions> => {
-    const response = await axiosInstance.get<PaymentOptions>('/payment-options')
+    const response = await axiosInstance.get<PaymentOptions>('/payment-options', {
+      headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+      params: { _t: Date.now() },
+    })
     return response.data
   },
 }
-

@@ -8,6 +8,10 @@ import { getPaymentOptions, updatePaymentOptions } from '../models/services/paym
 export async function getPaymentOptionsController(req: Request, res: Response) {
   try {
     const settings = await getPaymentOptions()
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+    res.set('Surrogate-Control', 'no-store')
 
     return res.json({
       codEnabled: settings.codEnabled,
@@ -57,6 +61,10 @@ export async function updatePaymentOptionsController(req: Request, res: Response
     }
 
     const settings = await updatePaymentOptions(updates)
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+    res.set('Surrogate-Control', 'no-store')
 
     return res.json({
       success: true,
@@ -71,4 +79,3 @@ export async function updatePaymentOptionsController(req: Request, res: Response
     return res.status(500).json({ error: error.message || 'Failed to update payment options' })
   }
 }
-
