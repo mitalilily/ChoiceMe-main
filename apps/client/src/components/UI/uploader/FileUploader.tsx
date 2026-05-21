@@ -58,11 +58,20 @@ interface FileUploaderProps {
 }
 
 const getUploadErrorMessage = (err: unknown) => {
-  const responseMessage = (err as { response?: { data?: { message?: unknown } } })?.response
-    ?.data?.message
+  const response = (err as { response?: { status?: number; data?: { message?: unknown } } })
+    ?.response
+  const responseMessage = response?.data?.message
 
   if (typeof responseMessage === 'string' && responseMessage.trim()) {
     return responseMessage
+  }
+
+  if (response?.status === 413) {
+    return 'File is too large. Please upload a smaller file.'
+  }
+
+  if (err instanceof Error && err.message) {
+    return err.message
   }
 
   return 'Upload failed. Please try again.'

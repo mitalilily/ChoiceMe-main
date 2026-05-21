@@ -195,6 +195,7 @@ server {
 server {
   listen 80;
   server_name $API_DOMAIN;
+  client_max_body_size 64m;
   location / {
     proxy_pass http://127.0.0.1:$BACKEND_PORT;
     proxy_http_version 1.1;
