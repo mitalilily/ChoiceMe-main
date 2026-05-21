@@ -14,6 +14,7 @@ dotenv.config({ path: path.join(backendRoot, `.env.${env}`) })
 dotenv.config({ path: path.join(backendRoot, '.env') })
 
 type RazorpayMode = 'test' | 'live'
+export type RazorpayRuntimeMode = RazorpayMode
 
 const configuredMode = process.env.RAZORPAY_MODE
 export const razorpayMode: RazorpayMode =
@@ -105,16 +106,18 @@ export function verifyRazorpayPaymentSignature({
   )
 }
 
-export function isValidSig(body: string | Buffer, sig?: string) {
+export function isValidSig(body: string | Buffer, sig?: string, mode: RazorpayMode = razorpayMode) {
   if (!sig) return false
 
+  const webhookSecret =
+    mode === 'live'
+      ? process.env.RAZORPAY_WEBHOOK_SECRET_PROD || ''
+      : process.env.RAZORPAY_WEBHOOK_SECRET || ''
+
+  if (!webhookSecret) return false
+
   const expected = crypto
-    .createHmac(
-      'sha256',
-      razorpayMode === 'live'
-        ? process.env.RAZORPAY_WEBHOOK_SECRET_PROD || ''
-        : process.env.RAZORPAY_WEBHOOK_SECRET || '',
-    )
+    .createHmac('sha256', webhookSecret)
     .update(body)
     .digest('hex')
 

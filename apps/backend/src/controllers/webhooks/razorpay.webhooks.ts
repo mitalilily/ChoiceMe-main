@@ -1,9 +1,13 @@
 import { Request, Response } from 'express'
 import { markBankRejected, markBankVerified } from '../../models/services/bankAccount.service'
 import { confirmFailure, confirmSuccess } from '../../models/services/walletTopupService'
-import { isValidSig } from '../../utils/razorpay'
+import { isValidSig, razorpayMode, RazorpayRuntimeMode } from '../../utils/razorpay'
 
-export const razorpayWebhook = async (req: Request, res: Response): Promise<any> => {
+const handleRazorpayWebhook = async (
+  req: Request,
+  res: Response,
+  mode: RazorpayRuntimeMode = razorpayMode,
+): Promise<any> => {
   const timestamp = new Date().toISOString()
   const rawBody = Buffer.isBuffer(req.body)
     ? req.body
@@ -20,13 +24,14 @@ export const razorpayWebhook = async (req: Request, res: Response): Promise<any>
   console.log('='.repeat(80))
   console.log(`📦 [${timestamp}] Razorpay Webhook Received`)
   console.log(`   Event: ${event || 'unknown'}`)
+  console.log(`   Mode: ${mode}`)
   console.log(`   IP: ${req.ip || req.socket.remoteAddress || 'unknown'}`)
   console.log(`   Signature Present: ${!!sig}`)
   console.log(`   Headers:`, JSON.stringify(req.headers, null, 2))
   console.log(`   Full Payload:`, JSON.stringify(payload, null, 2))
   console.log('='.repeat(80))
 
-  if (!isValidSig(rawBody, sig)) {
+  if (!isValidSig(rawBody, sig, mode)) {
     console.error(`❌ Razorpay webhook rejected: Invalid signature`)
     return res.status(400).send('Invalid signature')
   }
@@ -96,3 +101,11 @@ export const razorpayWebhook = async (req: Request, res: Response): Promise<any>
     res.status(500).json({ error: 'Internal webhook handler error' })
   }
 }
+
+export const razorpayWebhook = (req: Request, res: Response) => handleRazorpayWebhook(req, res)
+
+export const razorpayTestWebhook = (req: Request, res: Response) =>
+  handleRazorpayWebhook(req, res, 'test')
+
+export const razorpayLiveWebhook = (req: Request, res: Response) =>
+  handleRazorpayWebhook(req, res, 'live')

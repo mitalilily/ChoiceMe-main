@@ -72,6 +72,12 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
+      - key: RAZORPAY_KEY_ID_PROD
+        sync: false
+      - key: RAZORPAY_KEY_SECRET_PROD
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET_PROD
+        sync: false
       - key: R2_ENDPOINT
         sync: false
       - key: R2_ACCESS_KEY_ID
