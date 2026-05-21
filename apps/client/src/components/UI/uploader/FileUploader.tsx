@@ -26,7 +26,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useDropzone, type Accept } from 'react-dropzone'
 import { IoCloudUploadOutline } from 'react-icons/io5'
 import { MdClose, MdEdit } from 'react-icons/md' // ← new
-import { uploadFileToStorage } from '../../../api/upload.api'
+import { uploadFileToStorage, type UploadStrategy } from '../../../api/upload.api'
 import { toast } from '../Toast'
 import styles from './uploader.module.css'
 
@@ -55,6 +55,7 @@ interface FileUploaderProps {
   label?: string
   fullWidth?: boolean
   required?: boolean
+  uploadStrategy?: UploadStrategy
 }
 
 const getUploadErrorMessage = (err: unknown) => {
@@ -165,6 +166,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   required = false,
   showPlaceholderImgByDefault = false,
   loadingPreview = false,
+  uploadStrategy = 'auto',
 }) => {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
@@ -242,6 +244,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           const data = await uploadFileToStorage({
             file,
             folderKey,
+            uploadStrategy,
             onUploadProgress: (nextProgress) => setProgress(nextProgress),
           })
 
@@ -279,7 +282,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         resetUploadState()
       }
     },
-    [maxSizeMb, folderKey, multiple, onUploaded, resetUploadState],
+    [maxSizeMb, folderKey, multiple, onUploaded, resetUploadState, uploadStrategy],
   )
   const removeFile = (index: number) => {
     setPreviewFiles((prev) => {

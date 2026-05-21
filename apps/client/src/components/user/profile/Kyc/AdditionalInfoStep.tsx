@@ -257,6 +257,7 @@ export default function AdditionalDetailsStep({
                         showAccept={Boolean(filePlaceholder(field)) === false}
                         accept={allowedMimeTypes[field]}
                         maxSizeMb={20}
+                        uploadStrategy="proxy"
                         variant="button"
                         label={getFieldLabel(field)}
                         placeholder={filePlaceholder(field) as string}
