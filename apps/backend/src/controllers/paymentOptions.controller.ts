@@ -1,6 +1,15 @@
 import { Request, Response } from 'express'
 import { getPaymentOptions, updatePaymentOptions } from '../models/services/paymentOptions.service'
 
+function setNoStoreHeaders(req: Request, res: Response) {
+  delete req.headers['if-none-match']
+  delete req.headers['if-modified-since']
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.set('Pragma', 'no-cache')
+  res.set('Expires', '0')
+  res.set('Surrogate-Control', 'no-store')
+}
+
 /**
  * Get payment options settings (public endpoint)
  * GET /api/payment-options
@@ -8,10 +17,7 @@ import { getPaymentOptions, updatePaymentOptions } from '../models/services/paym
 export async function getPaymentOptionsController(req: Request, res: Response) {
   try {
     const settings = await getPaymentOptions()
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-    res.set('Pragma', 'no-cache')
-    res.set('Expires', '0')
-    res.set('Surrogate-Control', 'no-store')
+    setNoStoreHeaders(req, res)
 
     return res.json({
       codEnabled: settings.codEnabled,
@@ -61,10 +67,7 @@ export async function updatePaymentOptionsController(req: Request, res: Response
     }
 
     const settings = await updatePaymentOptions(updates)
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-    res.set('Pragma', 'no-cache')
-    res.set('Expires', '0')
-    res.set('Surrogate-Control', 'no-store')
+    setNoStoreHeaders(req, res)
 
     return res.json({
       success: true,
