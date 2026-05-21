@@ -9,7 +9,7 @@ import {
   sendWeeklyWeightReconciliationEmails,
 } from './weightReconciliationEmails'
 import { pollEkartTracking } from './ekartTracking'
-import { pollDelhiveryTracking } from './delhiveryTracking'
+import { pollDeliveryOneTracking } from './deliveryOneTracking'
 
 if (isRazorpayConfigured) {
   cron.schedule('*/20 * * * *', async () => {
@@ -58,12 +58,12 @@ cron.schedule('*/15 * * * *', async () => {
 })
 
 cron.schedule('*/3 * * * *', async () => {
-  console.log('[Cron] Delhivery tracking poll')
+  console.log('[Cron] Delivery One tracking poll')
   try {
-    const stats = await pollDelhiveryTracking()
-    console.log('[Cron] Delhivery tracking poll finished', stats)
+    const stats = await pollDeliveryOneTracking()
+    console.log('[Cron] Delivery One tracking poll finished', stats)
   } catch (err) {
-    console.error('[Cron] Delhivery tracking poll failed:', err)
+    console.error('[Cron] Delivery One tracking poll failed:', err)
   }
 })
 

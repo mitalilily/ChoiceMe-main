@@ -5,12 +5,13 @@ import { syncB2COrderTrackingById } from '../models/services/shiprocket.service'
 
 const terminalStatuses = ['delivered', 'cancelled', 'rto_delivered', 'manifest_failed']
 
-const isDelhiveryOrder = or(
-  eq(b2c_orders.integration_type, 'delhivery'),
-  sql`lower(coalesce(${b2c_orders.courier_partner}, '')) like ${'%delhivery%'}`,
+const isDeliveryOneOrder = or(
+  eq(b2c_orders.integration_type, 'deliveryone'),
+  sql`lower(coalesce(${b2c_orders.courier_partner}, '')) like ${'%delivery one%'}`,
+  sql`lower(coalesce(${b2c_orders.courier_partner}, '')) like ${'%deliveryone%'}`,
 )!
 
-export async function pollDelhiveryTracking(batchSize = 50) {
+export async function pollDeliveryOneTracking(batchSize = 50) {
   const pending = await db
     .select({
       id: b2c_orders.id,
@@ -20,7 +21,7 @@ export async function pollDelhiveryTracking(batchSize = 50) {
     .from(b2c_orders)
     .where(
       and(
-        isDelhiveryOrder,
+        isDeliveryOneOrder,
         sql`length(trim(coalesce(${b2c_orders.awb_number}, ''))) > 0`,
         or(notInArray(b2c_orders.order_status, terminalStatuses), isNull(b2c_orders.order_status)),
       ),
@@ -41,14 +42,14 @@ export async function pollDelhiveryTracking(batchSize = 50) {
       chunk.map(async (order) => {
         try {
           const result = await syncB2COrderTrackingById(order.id, {
-            provider: 'delhivery',
+            provider: 'deliveryone',
             emitEvents: true,
           })
           stats.synced += 1
           if (result.changed) stats.changed += 1
         } catch (err: any) {
           stats.failed += 1
-          console.error('[Cron] Delhivery tracking sync failed', {
+          console.error('[Cron] Delivery One tracking sync failed', {
             order_id: order.id,
             order_number: order.order_number,
             awb_number: order.awb_number,

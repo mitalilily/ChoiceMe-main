@@ -746,9 +746,12 @@ const B2COrdersList = () => {
     return Number(row.final_courier_charge ?? row.courier_charge ?? fallback)
   }
 
-  const isDelhiveryTrackingOrder = (row: B2COrder) => {
+  const isDeliveryOneTrackingOrder = (row: B2COrder) => {
     const provider = `${row.integration_type || ''} ${row.courier_partner || ''}`.toLowerCase()
-    return Boolean(String(row.awb_number || '').trim()) && provider.includes('delhivery')
+    return (
+      Boolean(String(row.awb_number || '').trim()) &&
+      (provider.includes('deliveryone') || provider.includes('delivery one'))
+    )
   }
 
   const formatCompactDate = (value?: string | null) =>
@@ -936,7 +939,7 @@ const B2COrdersList = () => {
       render: (_, row) => {
         const actions: ReactNode[] = []
         const orderStatus = String(row.order_status || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
-        const canSyncTracking = isDelhiveryTrackingOrder(row)
+        const canSyncTracking = isDeliveryOneTrackingOrder(row)
         const isTrackingSyncing = syncingTrackingOrderId === String(row.id)
 
         if (canSyncTracking) {

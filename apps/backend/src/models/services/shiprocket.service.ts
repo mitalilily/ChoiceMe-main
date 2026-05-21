@@ -180,6 +180,23 @@ const getExpectedWalletDebitFromOrder = (order: {
     : freightCharges + otherCharges
 }
 
+const getExpectedWalletDebitFromChargeParts = ({
+  paymentType,
+  freightCharges,
+  otherCharges,
+  codCharges,
+}: {
+  paymentType?: string | null
+  freightCharges?: number | string | null
+  otherCharges?: number | string | null
+  codCharges?: number | string | null
+}) => {
+  const freight = Number(freightCharges ?? 0)
+  const other = Number(otherCharges ?? 0)
+  const cod = Number(codCharges ?? 0)
+  return String(paymentType || '').toLowerCase() === 'cod' ? freight + other + cod : freight + other
+}
+
 const getWalletDebitReasonFromOrder = (orderType: string | null | undefined) =>
   String(orderType || '').toLowerCase() === 'cod'
     ? 'B2C COD Service Charges'
@@ -3951,6 +3968,26 @@ export const createB2CShipmentService = async (
       }
     }
 
+    if (integrationType === 'deliveryone' && !isReverseShipment) {
+      const expectedWalletDebit = getExpectedWalletDebitFromChargeParts({
+        paymentType: params.payment_type,
+        freightCharges,
+        otherCharges,
+        codCharges,
+      })
+      const userWallet = await walletOfUser(userId)
+      const walletBalance = Number(userWallet?.balance ?? 0)
+
+      if (expectedWalletDebit > 0 && walletBalance < expectedWalletDebit) {
+        throw new HttpError(
+          400,
+          `Insufficient wallet balance to create Delivery One shipment. Required INR ${expectedWalletDebit.toFixed(
+            2,
+          )}, available INR ${walletBalance.toFixed(2)}.`,
+        )
+      }
+    }
+
     let manifestFailure: DelhiveryManifestError | null = null
     let shipmentSuccessPackage: any = null
     let providerCourierCost: number | null = null
@@ -4107,12 +4144,7 @@ export const createB2CShipmentService = async (
         })
       }
 
-      shipmentData = {
-        success: true,
-        deferred_manifest: true,
-        shipping_mode: selectedProviderShippingMode ?? params.shipping_mode ?? null,
-        packages: [],
-      }
+      shipmentData = await deliveryOne.createShipment(params)
       const rawDeliveryOnePackages = shipmentData?.packages
       const deliveryOnePackages: any[] =
         Array.isArray(rawDeliveryOnePackages)
@@ -4127,13 +4159,12 @@ export const createB2CShipmentService = async (
           String(pkg?.status || '').toLowerCase() !== 'fail',
       )
 
-      if (shipmentSuccessPackage?.waybill) {
-        console.error('âŒ Invalid Delivery One shipment:', shipmentData)
-        console.log('[Delivery One] Shipment creation deferred until manifest', {
-          order_number: params.order_number,
-          courier_id: params.courier_id,
-          mode: selectedProviderShippingMode ?? params.shipping_mode,
-        })
+      if (!shipmentSuccessPackage?.waybill) {
+        console.error('Invalid Delivery One shipment:', shipmentData)
+        throw new HttpError(
+          502,
+          `Delivery One shipment creation failed for order ${params.order_number}.`,
+        )
       }
 
       providerCourierCost =
@@ -4156,7 +4187,7 @@ export const createB2CShipmentService = async (
           shipmentData?.shipment_id ??
           shipmentSuccessPackage?.waybill ??
           undefined,
-        awb_number: undefined,
+        awb_number: shipmentSuccessPackage?.waybill ?? shipmentData?.awb_number ?? undefined,
         courier_name: 'Delivery One',
         courier_id: params.courier_id ? Number(params.courier_id) : null,
         label: undefined,
@@ -4578,7 +4609,10 @@ export const createB2CShipmentService = async (
       }
 
       // 3️⃣ CREATE LOCAL ORDER ENTRY (no seller insurance for B2C – platform liability only)
-      const orderStatus = 'pending'
+      const orderStatus =
+        integrationType === 'deliveryone' && !isReverseShipment && shipmentMeta.awb_number
+          ? 'shipment_created'
+          : 'pending'
       const manifestErrorMessage = null
 
       const newOrder = await createB2COrder({
@@ -4615,8 +4649,8 @@ export const createB2CShipmentService = async (
       }
 
       // 4️⃣ WALLET TRANSACTION
-      // Forward B2C orders are charged only after a successful manifest.
-      const shouldDeferWalletDebit = !isReverseShipment
+      // Delivery One forward orders are charged at booking; other forward couriers are charged after manifest.
+      const shouldDeferWalletDebit = !isReverseShipment && integrationType !== 'deliveryone'
       const finalWalletDebit = walletDebit ?? 0
       if (shouldDeferWalletDebit) {
         console.log('ℹ️ Deferring wallet debit until manifest success for B2C order', {
@@ -7662,7 +7696,12 @@ export const generateManifestService = async (params: {
             new Date(defaultNow.getTime() + 60 * 60 * 1000).toTimeString().split(' ')[0]
           const pickupGroups = new Map<
             string,
-            { pickupDate: string; pickupTime: string; expectedPackageCount: number }
+            {
+              pickupDate: string
+              pickupTime: string
+              expectedPackageCount: number
+              orderIds: string[]
+            }
           >()
 
           for (const order of deliveryOneOrders) {
@@ -7683,6 +7722,7 @@ export const generateManifestService = async (params: {
             const existingGroup = pickupGroups.get(pickupLocation)
             if (existingGroup) {
               existingGroup.expectedPackageCount += 1
+              existingGroup.orderIds.push(order.id)
             } else {
               pickupGroups.set(pickupLocation, {
                 pickupDate: String(
@@ -7692,6 +7732,7 @@ export const generateManifestService = async (params: {
                   scheduledPickupTime || pickupDetails?.pickup_time || defaultPickupTime,
                 ),
                 expectedPackageCount: 1,
+                orderIds: [order.id],
               })
             }
           }
@@ -7711,6 +7752,14 @@ export const generateManifestService = async (params: {
                 pickupTime: pickupGroup.pickupTime,
                 expectedPackageCount: pickupGroup.expectedPackageCount,
               })
+              await tx
+                .update(b2c_orders)
+                .set({
+                  pickup_status: 'requested',
+                  pickup_error: null,
+                  updated_at: new Date(),
+                })
+                .where(inArray(b2c_orders.id, pickupGroup.orderIds))
             } catch (pickupErr: any) {
               const warning = `Delivery One pickup request failed for ${pickupLocation}: ${
                 pickupErr?.message || pickupErr
@@ -7723,6 +7772,14 @@ export const generateManifestService = async (params: {
                 expectedPackageCount: pickupGroup.expectedPackageCount,
                 message: pickupErr?.message || pickupErr,
               })
+              await tx
+                .update(b2c_orders)
+                .set({
+                  pickup_status: 'failed',
+                  pickup_error: truncateColumnValue(warning),
+                  updated_at: new Date(),
+                })
+                .where(inArray(b2c_orders.id, pickupGroup.orderIds))
             }
           }
         }
@@ -7905,7 +7962,12 @@ export const generateManifestService = async (params: {
             new Date(defaultNow.getTime() + 60 * 60 * 1000).toTimeString().split(' ')[0]
           const pickupGroups = new Map<
             string,
-            { pickupDate: string; pickupTime: string; expectedPackageCount: number }
+            {
+              pickupDate: string
+              pickupTime: string
+              expectedPackageCount: number
+              orderIds: string[]
+            }
           >()
 
           for (const order of pendingDeliveryOneOrders) {
@@ -7924,6 +7986,7 @@ export const generateManifestService = async (params: {
             const existingGroup = pickupGroups.get(pickupLocation)
             if (existingGroup) {
               existingGroup.expectedPackageCount += 1
+              existingGroup.orderIds.push(order.id)
             } else {
               pickupGroups.set(pickupLocation, {
                 pickupDate: String(
@@ -7933,6 +7996,7 @@ export const generateManifestService = async (params: {
                   scheduledPickupTime || pickupDetails?.pickup_time || defaultPickupTime,
                 ),
                 expectedPackageCount: 1,
+                orderIds: [order.id],
               })
             }
           }
@@ -7945,6 +8009,14 @@ export const generateManifestService = async (params: {
                 pickup_location: pickupLocation,
                 expected_package_count: pickupGroup.expectedPackageCount,
               })
+              await tx
+                .update(b2c_orders)
+                .set({
+                  pickup_status: 'requested',
+                  pickup_error: null,
+                  updated_at: new Date(),
+                })
+                .where(inArray(b2c_orders.id, pickupGroup.orderIds))
             } catch (pickupErr: any) {
               const warning = `Delivery One pickup request failed for ${pickupLocation}: ${
                 pickupErr?.message || pickupErr
@@ -7957,6 +8029,14 @@ export const generateManifestService = async (params: {
                 expectedPackageCount: pickupGroup.expectedPackageCount,
                 message: pickupErr?.message || pickupErr,
               })
+              await tx
+                .update(b2c_orders)
+                .set({
+                  pickup_status: 'failed',
+                  pickup_error: truncateColumnValue(warning),
+                  updated_at: new Date(),
+                })
+                .where(inArray(b2c_orders.id, pickupGroup.orderIds))
             }
           }
         }
@@ -8371,10 +8451,10 @@ const sortHistoryDescending = (history: TrackingHistoryItem[]) => {
   history.sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime())
 }
 
-const mapDelhiveryTracking = (
+const mapDeliveryOneTracking = (
   raw: any,
   order: OrderSummary,
-  courierName = 'Delhivery',
+  courierName = 'Delivery One',
 ): ProviderNormalizedTracking => {
   const history: TrackingHistoryItem[] = []
   const shipmentWrapper = Array.isArray(raw?.ShipmentData)
@@ -8463,16 +8543,10 @@ const fetchLiveTrackingForOrder = async (
 ): Promise<ProviderNormalizedTracking | null> => {
   const providerKey = getTrackingProviderKey(order)
 
-  if (providerKey === 'delhivery') {
-    const delhiveryService = new DelhiveryService()
-    const raw = await delhiveryService.trackShipment(order.awb_number)
-    return mapDelhiveryTracking(raw, order)
-  }
-
   if (providerKey === 'deliveryone') {
     const deliveryOneService = new DeliveryOneService()
     const raw = await deliveryOneService.trackShipment(order.awb_number)
-    return mapDelhiveryTracking(raw, order, 'Delivery One')
+    return mapDeliveryOneTracking(raw, order)
   }
 
   console.warn('[Tracking] Live courier tracking is not configured for this provider', {
@@ -8625,7 +8699,7 @@ const shouldSyncB2CTrackingStatus = (order: any) => {
   if (TRACKING_SYNC_TERMINAL_STATUSES.has(currentStatus)) return false
 
   const providerKey = getTrackingProviderKey(order)
-  return providerKey === 'deliveryone' || providerKey === 'delhivery'
+  return providerKey === 'deliveryone'
 }
 
 const toB2COrderSummary = (order: any): OrderSummary => ({
@@ -8710,7 +8784,7 @@ const persistB2CTrackingStatus = async (
       orderId: order.id,
       userId: order.user_id,
       awbNumber: order.awb_number,
-      courier: providerData.courier_name ?? order.courier_partner ?? 'Delhivery',
+      courier: providerData.courier_name ?? order.courier_partner ?? 'Delivery One',
       statusCode: nextStatus,
       statusText: providerData.status ?? latestEvent?.message ?? nextStatus,
       location: latestEvent?.location ?? '',
@@ -8722,7 +8796,7 @@ const persistB2CTrackingStatus = async (
       awb_number: order.awb_number,
       status: nextStatus,
       raw_status: providerData.status ?? latestEvent?.message ?? nextStatus,
-      courier_partner: providerData.courier_name ?? order.courier_partner ?? 'Delhivery',
+      courier_partner: providerData.courier_name ?? order.courier_partner ?? 'Delivery One',
     })
   }
 
@@ -8789,7 +8863,7 @@ export const syncB2COrderTrackingById = async (
   const providerKey = getTrackingProviderKey(order)
 
   if (options.provider && providerKey !== options.provider) {
-    throw new HttpError(400, 'Tracking sync is available for Delhivery orders only.')
+    throw new HttpError(400, 'Tracking sync is available for Delivery One orders only.')
   }
 
   if (!sanitizeString(order.awb_number)) {
