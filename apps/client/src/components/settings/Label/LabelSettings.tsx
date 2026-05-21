@@ -30,7 +30,6 @@ export type LabelSettingsForm = {
   maxItems: number
   printer: 'thermal' | 'inkjet'
 }
-
 const defaultValues: LabelSettingsForm = {
   printer: 'thermal',
   charLimit: 25,
@@ -42,6 +41,8 @@ const defaultValues: LabelSettingsForm = {
     invoiceDate: false,
     orderBarcode: true,
     invoiceBarcode: true,
+    customerPhone: true,
+    rtoRoutingCode: true,
     declaredValue: true,
     cod: true,
     awb: true,
@@ -66,6 +67,34 @@ const defaultValues: LabelSettingsForm = {
   },
 }
 
+const orderInfoOptions = [
+  { key: 'orderId', label: 'Order Number' },
+  { key: 'invoiceNumber', label: 'Invoice Number' },
+  { key: 'customerPhone', label: 'Customer Phone' },
+  { key: 'rtoRoutingCode', label: 'Sort Code' },
+  { key: 'declaredValue', label: 'Order Value' },
+  { key: 'cod', label: 'Payment Collection Banner' },
+  { key: 'awb', label: 'AWB Number and Barcode' },
+]
+
+const shipperInfoOptions = [
+  { key: 'sellerBrandName', label: 'Seller / Brand Name' },
+  { key: 'brandLogo', label: 'Brand Logo' },
+  { key: 'shipperAddress', label: 'Pickup / Return Address' },
+  { key: 'rtoAddress', label: 'Use RTO Address When Available' },
+  { key: 'shipperPhone', label: 'Shipper Phone' },
+  { key: 'gstin', label: 'GSTIN' },
+]
+
+const productInfoOptions = [
+  { key: 'itemName', label: 'Product Name' },
+  { key: 'skuCode', label: 'SKU' },
+  { key: 'productQuantity', label: 'Quantity' },
+  { key: 'productCost', label: 'Amount' },
+  { key: 'dimension', label: 'Package Dimensions' },
+  { key: 'deadWeight', label: 'Package Weight' },
+]
+
 const mockOrder = {
   name: 'Venkatesh Puri',
   address: '111/222, XYZ, Ram Nagar, Paharganj, South Delhi, Delhi, India. 110093.',
@@ -77,9 +106,12 @@ const mockOrder = {
   orderDate: '23 Mar, 2024',
   invoiceDate: '22 Mar, 2024',
   awb: '143263813003739',
-  codValue: '₹1350',
-  declaredValue: '₹1350',
-  courier: 'Bluedart',
+  codValue: 'Rs. 1350',
+  declaredValue: 'Rs. 1350',
+  courier: 'Delhivery Surface',
+  integration_type: 'deliveryone',
+  courierId: 99,
+  shipping_mode: 'Surface',
   shipper: {
     name: 'ChoiceMee Courier',
     phone: '011 4715 2407',
@@ -90,14 +122,14 @@ const mockOrder = {
       'XX/YY, ABC Apartments, Pitampura, Opp. Metro Pillar 36, New Delhi, Delhi, India. 110034',
   },
   products: [
-    { name: 'Navy Blue T-shirt', sku: '695095207050', qty: 2, price: '₹450' },
-    { name: 'Mechanical Keyboard', sku: 'KEY456', qty: 1, price: '₹2499' },
-    { name: 'HD Webcam', sku: 'CAM789', qty: 1, price: '₹1999' },
+    { name: 'Navy Blue T-shirt', sku: '695095207050', qty: 2, price: 'Rs. 450' },
+    { name: 'Mechanical Keyboard', sku: 'KEY456', qty: 1, price: 'Rs. 2499' },
+    { name: 'HD Webcam', sku: 'CAM789', qty: 1, price: 'Rs. 1999' },
   ],
   dimension: '35x34x11',
   deadWeight: '0.73 KG',
-  otherCharges: '₹550',
-  totalAmount: '₹1900',
+  otherCharges: 'Rs. 550',
+  totalAmount: 'Rs. 1900',
 }
 
 export default function LabelSettingsPage() {
@@ -139,12 +171,12 @@ export default function LabelSettingsPage() {
                       control={control}
                       render={({ field }) => (
                         <FormGroup>
-                          {Object.entries(field.value).map(([key, checked]) => (
+                          {orderInfoOptions.map(({ key, label }) => (
                             <FormControlLabel
                               key={key}
                               control={
                                 <Checkbox
-                                  checked={checked}
+                                  checked={field.value?.[key] ?? true}
                                   onChange={(e) =>
                                     field.onChange({
                                       ...field.value,
@@ -153,7 +185,7 @@ export default function LabelSettingsPage() {
                                   }
                                 />
                               }
-                              label={key.replace(/([A-Z])/g, ' $1')}
+                              label={label}
                             />
                           ))}
                         </FormGroup>
@@ -173,12 +205,12 @@ export default function LabelSettingsPage() {
                       control={control}
                       render={({ field }) => (
                         <FormGroup>
-                          {Object.entries(field.value).map(([key, checked]) => (
+                          {shipperInfoOptions.map(({ key, label }) => (
                             <FormControlLabel
                               key={key}
                               control={
                                 <Checkbox
-                                  checked={checked}
+                                  checked={field.value?.[key] ?? true}
                                   onChange={(e) =>
                                     field.onChange({
                                       ...field.value,
@@ -187,7 +219,7 @@ export default function LabelSettingsPage() {
                                   }
                                 />
                               }
-                              label={key.replace(/([A-Z])/g, ' $1')}
+                              label={label}
                             />
                           ))}
                         </FormGroup>
@@ -207,12 +239,12 @@ export default function LabelSettingsPage() {
                       control={control}
                       render={({ field }) => (
                         <FormGroup>
-                          {Object.entries(field.value).map(([key, checked]) => (
+                          {productInfoOptions.map(({ key, label }) => (
                             <FormControlLabel
                               key={key}
                               control={
                                 <Checkbox
-                                  checked={checked}
+                                  checked={field.value?.[key] ?? true}
                                   onChange={(e) =>
                                     field.onChange({
                                       ...field.value,
@@ -221,7 +253,7 @@ export default function LabelSettingsPage() {
                                   }
                                 />
                               }
-                              label={key.replace(/([A-Z])/g, ' $1')}
+                              label={label}
                             />
                           ))}
                         </FormGroup>

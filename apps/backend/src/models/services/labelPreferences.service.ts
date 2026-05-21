@@ -15,6 +15,8 @@ export const DEFAULT_PREFERENCES = {
     invoiceDate: false,
     orderBarcode: true,
     invoiceBarcode: true,
+    customerPhone: true,
+    rtoRoutingCode: true,
     declaredValue: true,
     cod: true,
     awb: true,

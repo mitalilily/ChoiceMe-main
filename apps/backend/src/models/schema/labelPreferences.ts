@@ -23,6 +23,7 @@ export const labelPreferences = createTable('label_preferences', {
         "invoiceDate": false,
         "orderBarcode": true,
         "invoiceBarcode": true,
+        "customerPhone": true,
         "rtoRoutingCode": true,
         "declaredValue": true,
         "cod": true,

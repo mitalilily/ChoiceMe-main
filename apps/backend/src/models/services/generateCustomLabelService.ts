@@ -7,6 +7,11 @@ import PdfPrinter from 'pdfmake'
 import { db } from '../client'
 import { labelPreferences } from '../schema/labelPreferences'
 import { userProfiles } from '../schema/userProfile'
+import {
+  getDelhiveryCourierDisplayName,
+  normalizeDelhiveryShippingMode,
+} from '../../utils/delhiveryCourier'
+import { normalizeServiceProviderKey } from '../../utils/courierProviders'
 import { presignDownload, presignUpload } from './upload.service'
 
 const summarizeFetchError = (err: any) => {
@@ -119,6 +124,7 @@ const DEFAULT_LABEL_SETTINGS = {
     invoiceDate: false,
     orderBarcode: true,
     invoiceBarcode: true,
+    customerPhone: true,
     rtoRoutingCode: true,
     declaredValue: true,
     cod: true,
@@ -162,6 +168,27 @@ function mergeSettings(prefs: any) {
     },
     powered_by: PLATFORM_BRAND_NAME,
   }
+}
+
+const getCourierDisplayNameForLabel = (order: any) => {
+  const rawCourier = String(order?.courier_partner || order?.courier_name || '').trim()
+  const provider = normalizeServiceProviderKey(
+    order?.integration_type || order?.service_provider || order?.provider || rawCourier,
+  )
+  const mode = normalizeDelhiveryShippingMode(order?.shipping_mode || order?.mode || rawCourier)
+  const courierId = order?.courier_id ?? order?.courierId
+  const normalizedCourier = rawCourier.toLowerCase().replace(/[\s_-]+/g, '')
+  const isDelhivery =
+    provider === 'deliveryone' ||
+    provider === 'delhivery' ||
+    ['99', '100'].includes(String(courierId ?? '').trim()) ||
+    normalizedCourier.includes('deliveryone') ||
+    normalizedCourier.includes('delhivery')
+
+  if (!isDelhivery) return rawCourier || 'Courier'
+  if (mode === 'Express') return 'Delhivery Express'
+  if (mode === 'Surface') return 'Delhivery Surface'
+  return getDelhiveryCourierDisplayName(courierId || rawCourier)
 }
 
 export async function generateLabelForOrder(order: any, userId: string, tx: any = db) {
@@ -245,7 +272,6 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
   const showRtoRoutingCode = isEnabled(settings.order_info?.rtoRoutingCode)
   const showDeclaredValue = isEnabled(settings.order_info?.declaredValue)
   const showCodBanner = isEnabled(settings.order_info?.cod)
-  const showTerms = isEnabled(settings.order_info?.terms)
   const showCustomerPhone = isEnabled(settings.order_info?.customerPhone)
   const showBrandName = isEnabled(settings.shipper_info?.sellerBrandName)
   const showShipperAddress = isEnabled(settings.shipper_info?.shipperAddress)
@@ -758,16 +784,6 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     })
   }
 
-  if (showTerms) {
-    pageContent.push({
-      text: 'T&C: Inspect shipment before accepting. Report issues immediately to support.',
-      fontSize: 6,
-      color: '#64748b',
-      italics: true,
-      margin: [0, 1, 0, 2],
-    })
-  }
-
   if (showPlatformBranding) {
     const footerStack: any[] = []
     if (images.platformLogo) {
@@ -832,7 +848,7 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     paymentType === 'cod' ? toAmount(order.cod_amount ?? order.order_amount) || orderValue : 0
   const labelOrderNumber = normalizeText(order.order_id ?? order.id ?? order.order_number)
   const referenceOrderNumber = normalizeText(order.order_number)
-  const courierName = normalizeText(order.courier_partner || order.integration_type || 'Courier', 'Courier')
+  const courierName = getCourierDisplayNameForLabel(order)
   const paymentLabel = paymentType === 'cod' ? 'COD' : 'Prepaid'
   const paymentInstruction =
     paymentType === 'cod'
@@ -868,11 +884,13 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
   }
   const returnAddress = showRto && (rto.address || rto.city || rto.pincode) ? rto : pickupAddress
   const returnAddressLines = [
-    `From:${normalizeText(pickupAddress.warehouse_name)}`,
-    'Return to if undelivered:',
-    `Store name ${normalizeText(returnAddress.warehouse_name || sellerBrandName)}`,
-    returnAddress.address,
-    compactAddressLine(returnAddress.city, returnAddress.state, returnAddress.pincode),
+    showBrandName ? `From:${normalizeText(pickupAddress.warehouse_name)}` : '',
+    showShipperAddress ? (showRto ? 'Return to if undelivered:' : 'Pickup address:') : '',
+    showBrandName && showShipperAddress
+      ? `Store name ${normalizeText(returnAddress.warehouse_name || sellerBrandName)}`
+      : '',
+    showShipperAddress ? returnAddress.address : '',
+    showShipperAddress ? compactAddressLine(returnAddress.city, returnAddress.state, returnAddress.pincode) : '',
   ]
     .map((value) => String(value ?? '').trim())
     .filter(Boolean)
@@ -889,9 +907,6 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     { key: 'qty', header: 'Quantity', width: 56, enabled: includeQty },
     { key: 'price', header: 'Amount', width: 48, enabled: includeCost },
   ].filter((column) => column.enabled)
-  if (productColumns.length === 0) {
-    productColumns.push({ key: 'name', header: 'Product Name', width: '*', enabled: true })
-  }
   const productCell = (product: any, key: string) => {
     if (key === 'sku') return trimText(product.sku ?? product.skuCode ?? '-', 18)
     if (key === 'qty') return String(product.qty ?? product.quantity ?? 1)
@@ -917,15 +932,6 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
             ...productColumns.slice(1).map(() => ({ text: '' })),
           ],
         ]
-  const noReturnBadgeSvg = `
-    <svg width="58" height="58" viewBox="0 0 58 58" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="29" cy="29" r="27" fill="#e21b1b"/>
-      <circle cx="29" cy="29" r="14" fill="none" stroke="#fff" stroke-width="5"/>
-      <line x1="19" y1="19" x2="39" y2="39" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
-      <text x="29" y="14" text-anchor="middle" font-family="Arial" font-size="6.5" font-weight="700" fill="#fff" textLength="46" lengthAdjust="spacingAndGlyphs">NO EXCHANGE</text>
-      <text x="29" y="49" text-anchor="middle" font-family="Arial" font-size="6.5" font-weight="700" fill="#fff" textLength="40" lengthAdjust="spacingAndGlyphs">NO RETURN</text>
-    </svg>`
-
   const referenceLabelContent: any[] = [
     {
       table: {
@@ -961,26 +967,30 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
       layout: 'noBorders',
       margin: [8, 2, 0, 16],
     },
-    {
-      table: {
-        widths: [66, '*'],
-        body: [
-          [
-            { text: paymentLabel, bold: true, fontSize: 10, alignment: 'center' },
-            { text: paymentInstruction, bold: true, fontSize: 10, alignment: 'center' },
-          ],
-        ],
-      },
-      layout: {
-        hLineWidth: () => 1,
-        vLineWidth: () => 1,
-        hLineColor: () => '#000000',
-        vLineColor: () => '#000000',
-        paddingTop: () => 8,
-        paddingBottom: () => 8,
-      },
-      margin: [-6, 0, -6, 12],
-    },
+    ...(showCodBanner
+      ? [
+          {
+            table: {
+              widths: [66, '*'],
+              body: [
+                [
+                  { text: paymentLabel, bold: true, fontSize: 10, alignment: 'center' },
+                  { text: paymentInstruction, bold: true, fontSize: 10, alignment: 'center' },
+                ],
+              ],
+            },
+            layout: {
+              hLineWidth: () => 1,
+              vLineWidth: () => 1,
+              hLineColor: () => '#000000',
+              vLineColor: () => '#000000',
+              paddingTop: () => 8,
+              paddingBottom: () => 8,
+            },
+            margin: [-6, 0, -6, 12],
+          },
+        ]
+      : []),
     {
       table: {
         widths: [160, '*'],
@@ -1056,40 +1066,48 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
       canvas: [{ type: 'line', x1: 0, y1: 0, x2: 198, y2: 0, lineWidth: 1, dash: { length: 3, space: 2 } }],
       margin: [0, 0, 0, 5],
     },
-    {
-      stack: returnAddressLines.map((line, index) => ({
-        text: trimText(line, index <= 1 ? 42 : 72),
-        bold: index === 0 || index === 1,
-        fontSize: index === 0 ? 9 : 7,
-      })),
-      margin: [0, 0, 0, 4],
-    },
-    ...(showTerms ? [{ svg: noReturnBadgeSvg, width: 58, alignment: 'center', margin: [0, 0, 0, 14] }] : []),
-    {
-      table: {
-        headerRows: 1,
-        widths: productColumns.map((column) => column.width),
-        body: [
-          productColumns.map((column) => ({
-            text: column.header,
-            bold: true,
-            fontSize: 7,
-            alignment: column.key === 'name' ? 'left' : 'center',
-          })),
-          ...productBody,
-        ],
-      },
-      layout: {
-        hLineWidth: (i: number, node: any) => (i === 0 || i === 1 || i === node.table.body.length ? 0.7 : 0.4),
-        vLineWidth: () => 0,
-        hLineColor: () => '#000000',
-        paddingLeft: () => 1,
-        paddingRight: () => 1,
-        paddingTop: () => 3,
-        paddingBottom: () => 3,
-      },
-      margin: [0, 0, 0, 0],
-    },
+    ...(returnAddressLines.length > 0
+      ? [
+          {
+            stack: returnAddressLines.map((line, index) => ({
+              text: trimText(line, index <= 1 ? 42 : 72),
+              bold: index === 0 || index === 1,
+              fontSize: index === 0 ? 9 : 7,
+            })),
+            margin: [0, 0, 0, 4],
+          },
+        ]
+      : []),
+    ...(productColumns.length > 0
+      ? [
+          {
+            table: {
+              headerRows: 1,
+              widths: productColumns.map((column) => column.width),
+              body: [
+                productColumns.map((column) => ({
+                  text: column.header,
+                  bold: true,
+                  fontSize: 7,
+                  alignment: column.key === 'name' ? 'left' : 'center',
+                })),
+                ...productBody,
+              ],
+            },
+            layout: {
+              hLineWidth: (i: number, node: any) =>
+                i === 0 || i === 1 || i === node.table.body.length ? 0.7 : 0.4,
+              vLineWidth: () => 0,
+              hLineColor: () => '#000000',
+              paddingLeft: () => 1,
+              paddingRight: () => 1,
+              paddingTop: () => 3,
+              paddingBottom: () => 3,
+            },
+            margin: [0, 0, 0, 0],
+          },
+        ]
+      : []),
   ]
 
   pageContent.splice(0, pageContent.length, ...referenceLabelContent)
