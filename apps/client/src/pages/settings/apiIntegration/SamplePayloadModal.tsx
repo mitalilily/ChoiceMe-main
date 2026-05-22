@@ -34,7 +34,7 @@ const SAMPLE_PAYLOADS: Record<string, WebhookPayload> = {
       awb_number: 'AWB123456789',
       status: 'booked',
       courier_partner: 'Delhivery Surface',
-      integration_type: 'delhivery',
+      integration_type: 'deliveryone',
       payment_type: 'prepaid',
       created_at: '2024-01-15T10:30:00.000Z',
     },

@@ -252,7 +252,7 @@ const run = async () => {
           paymentMode: 'COD',
           invoiceValue: 2500,
           courierId: 7,
-          serviceProvider: 'delhivery',
+          serviceProvider: 'deliveryone',
           pieceCount: 2,
           deliveryTime: 'before 11:00',
           planId: 'plan-1',
@@ -266,7 +266,7 @@ const run = async () => {
       assert.equal(calcCall?.originPincode, '400001')
       assert.equal(calcCall?.destinationPincode, '560001')
       assert.equal(calcCall?.courierScope?.courierId, 7)
-      assert.equal(calcCall?.courierScope?.serviceProvider, 'delhivery')
+      assert.equal(calcCall?.courierScope?.serviceProvider, 'deliveryone')
     }
 
     console.log('PASS: rate calculator API smoke checks passed')

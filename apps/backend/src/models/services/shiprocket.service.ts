@@ -3093,7 +3093,7 @@ export interface InsertB2COrderParams {
   giftWrap?: number
   discount?: number
   status?: string
-  integration_type: 'delhivery' | 'ekart' | string
+  integration_type: 'deliveryone' | 'delhivery' | 'ekart' | string
   is_external_api?: boolean // true if created via external API, false if created locally
   volumetricWeight?: number
   chargedWeight?: number
@@ -3471,14 +3471,14 @@ export const createB2CShipmentService = async (
     }
   }
 
-  // If still no integration_type (and no courier_id was provided to derive it), default to Delhivery.
+  // If still no integration_type (and no courier_id was provided to derive it), default to DeliveryOne.
   // Note: This fallback is only for backward compatibility when neither integration_type nor courier_id is provided
   // When courier_id is provided without integration_type, an error is thrown above if it cannot be determined
   if (!params.integration_type) {
     console.warn(
-      `⚠️ integration_type not provided and courier_id not available, defaulting to 'delhivery'`,
+      `⚠️ integration_type not provided and courier_id not available, defaulting to 'deliveryone'`,
     )
-    params.integration_type = 'delhivery'
+    params.integration_type = 'deliveryone'
   }
 
   if (String(params.integration_type || '').toLowerCase() === 'delhivery') {
@@ -5638,14 +5638,14 @@ export const generateManifestService = async (params: {
                   orders.map((order) =>
                     String(
                       (order as (typeof orders)[0] & { integration_type?: string })
-                        ?.integration_type ?? 'delhivery',
+                        ?.integration_type ?? 'deliveryone',
                     )
                       .trim()
-                      .toLowerCase() || 'delhivery',
+                      .toLowerCase() || 'deliveryone',
                   ),
                 ),
               )
-            : ['delhivery']
+            : ['deliveryone']
 
         if (params.type === 'b2c' && integrationTypes.length > 1) {
           throw new HttpError(
@@ -5654,7 +5654,7 @@ export const generateManifestService = async (params: {
           )
         }
 
-        const integrationType = integrationTypes[0] || 'delhivery'
+        const integrationType = integrationTypes[0] || 'deliveryone'
 
         if (integrationType === 'xpressbees' || integrationType === 'ekart') {
           if (params.type !== 'b2c') {
@@ -6564,7 +6564,7 @@ export const generateManifestService = async (params: {
               package_breadth: Number(order.breadth ?? 0),
               package_height: Number(order.height ?? 0),
               courier_id: order.courier_id ?? undefined,
-              integration_type: 'delhivery',
+              integration_type: 'deliveryone',
               invoice_number: order.invoice_number ?? undefined,
               invoice_date: order.invoice_date ?? undefined,
               is_rto_different: order.is_rto_different ? 'yes' : 'no',
@@ -8642,11 +8642,11 @@ const getTrackingProviderKey = (order: {
     if (courierPartner.includes('deliveryone') || courierPartner.includes('delhiveryone')) {
       providerKey = 'deliveryone'
     } else if (courierPartner.includes('delhivery')) {
-      providerKey = 'delhivery'
+      providerKey = 'deliveryone'
     }
   }
 
-  return providerKey || 'delhivery'
+  return providerKey || 'deliveryone'
 }
 
 const fetchLiveTrackingForOrder = async (
@@ -9288,7 +9288,7 @@ const findOrderByAwb = async (awb: string): Promise<OrderSummary | null> => {
       id: b2b.id,
       order_id: b2b.order_id,
       order_number: b2b.order_number,
-      integration_type: 'delhivery',
+      integration_type: 'deliveryone',
       courier_partner: b2b.courier_partner,
       courier_id: b2b.courier_id ? Number(b2b.courier_id) : null,
       awb_number: b2b.awb_number ?? awb,

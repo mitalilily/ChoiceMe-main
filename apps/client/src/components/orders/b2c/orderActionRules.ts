@@ -38,7 +38,9 @@ const getB2CActionProvider = (order: B2COrderActionShape) => {
     combinedProvider.includes('deliveryone') ||
     combinedProvider.includes('delivery_one') ||
     combinedProvider.includes('delhiveryone') ||
-    combinedProvider.includes('delhivery_one')
+    combinedProvider.includes('delhivery_one') ||
+    combinedProvider.includes('delhivery_surface') ||
+    combinedProvider.includes('delhivery_express')
   ) {
     return 'deliveryone'
   }
@@ -57,7 +59,7 @@ export const getB2CManifestIdentifier = (order: B2COrderActionShape) =>
   order.order_number || order.awb_number || null
 
 export const getB2CManifestProvider = (order: B2COrderActionShape) => {
-  return getB2CActionProvider(order) || 'delhivery'
+  return getB2CActionProvider(order) || 'deliveryone'
 }
 
 export const isB2CCancelledStatus = (status: unknown) => {

@@ -352,7 +352,7 @@ const AllOrders = () => {
   }
 
   const selectedDelhiveryOrders = selectedOrders.filter(
-    (order) => order.type === 'b2c' && getB2CManifestProvider(order) === 'delhivery',
+    (order) => order.type === 'b2c' && getB2CManifestProvider(order) === 'deliveryone',
   )
   const showManifestShipmentCount = selectedDelhiveryOrders.length > 0
   const defaultManifestShipmentCount = Math.max(

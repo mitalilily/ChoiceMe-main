@@ -48,20 +48,14 @@ const normalizeCourierListText = (value: unknown) =>
 
 const isDelhiveryListProvider = (value: unknown) => {
   const normalized = normalizeServiceProviderKey(value)
-  return normalized === 'delhivery' || normalized === 'deliveryone'
+  return normalized === 'deliveryone'
 }
 
 const normalizeCourierListToken = (value: unknown) =>
   normalizeCourierListText(value).replace(/[\s_-]+/g, '')
 
 const isDelhiveryCatalogRow = (row: { id: number; name: string }) => {
-  const name = normalizeCourierListToken(row.name)
-  return (
-    DELHIVERY_ALLOWED_COURIER_IDS.includes(Number(row.id)) ||
-    name.includes('delhivery') ||
-    name.includes('deliveryone') ||
-    name.includes('delivery1')
-  )
+  return DELHIVERY_ALLOWED_COURIER_IDS.includes(Number(row.id))
 }
 
 const getCanonicalDelhiveryCouriers = async (filters: {
@@ -119,7 +113,7 @@ const getCanonicalDelhiveryCouriers = async (filters: {
     .sort((left, right) => {
       const leftLegacy = legacyIds.has(Number(left.id)) ? 1 : 0
       const rightLegacy = legacyIds.has(Number(right.id)) ? 1 : 0
-      return leftLegacy - rightLegacy || Number(left.id) - Number(right.id)
+      return rightLegacy - leftLegacy || Number(left.id) - Number(right.id)
     })
     .forEach((row) => {
       const displayName = getDelhiveryCourierDisplayName(row.name || row.id)
@@ -131,8 +125,8 @@ const getCanonicalDelhiveryCouriers = async (filters: {
         ...row,
         name: displayName,
         displayName,
-        serviceProvider: 'delhivery',
-        service_provider: 'delhivery',
+        serviceProvider: 'deliveryone',
+        service_provider: 'deliveryone',
         mode,
         shipping_mode: mode,
         shippingMode: mode === 'air' ? 'Express' : 'Surface',
@@ -386,7 +380,6 @@ export const getServiceProvidersController = async (req: Request, res: Response)
       .where(
         and(
           inArray(couriers.serviceProvider, allowedProviders),
-          sql`${couriers.id} not in (99, 100)`,
         ),
       )
       .groupBy(couriers.serviceProvider)
@@ -450,7 +443,6 @@ export const updateServiceProviderStatusController = async (req: Request, res: R
       .where(
         and(
           eq(couriers.serviceProvider, normalizedProvider),
-          sql`${couriers.id} not in (99, 100)`,
         ),
       )
       .returning()
@@ -493,7 +485,7 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
 
     const defaults = {
       deliveryOne: {
-        provider: 'delhivery',
+        provider: 'deliveryone',
         apiBase: 'https://track.delhivery.com',
         clientId: '',
         username: '',
@@ -505,15 +497,15 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
     }
 
     const activeCredential =
-      rows.find((row) => String(row.provider || '').toLowerCase() === 'delhivery') ||
-      rows.find((row) => String(row.provider || '').toLowerCase() === 'deliveryone')
+      rows.find((row) => String(row.provider || '').toLowerCase() === 'deliveryone') ||
+      rows.find((row) => String(row.provider || '').toLowerCase() === 'delhivery')
     const apiKey = activeCredential?.apiKey || ''
     const data = {
       ...defaults,
       ...(activeCredential
         ? {
             deliveryOne: {
-              provider: 'delhivery',
+              provider: 'deliveryone',
               apiBase: activeCredential.apiBase || 'https://track.delhivery.com',
               clientId: activeCredential.clientId || '',
               username: activeCredential.username || '',
@@ -540,7 +532,7 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
 
 export const updateDeliveryOneCredentialsController = async (req: Request, res: Response) => {
   const { apiBase, clientId, username, password, apiKey, webhookSecret } = req.body || {}
-  const credentialsProvider = 'delhivery'
+  const credentialsProvider = 'deliveryone'
 
   try {
     const nextApiBase = typeof apiBase === 'string' ? apiBase.trim() : undefined

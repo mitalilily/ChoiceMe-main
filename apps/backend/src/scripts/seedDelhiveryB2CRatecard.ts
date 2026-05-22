@@ -10,9 +10,19 @@ import {
 } from '../models/schema/shippingRates'
 import { zones } from '../models/schema/zones'
 
-const TARGET_PROVIDER = String(process.env.B2C_RATECARD_PROVIDER || 'delhivery')
+const TARGET_PROVIDER = String(process.env.B2C_RATECARD_PROVIDER || 'deliveryone')
   .trim()
   .toLowerCase()
+if (
+  TARGET_PROVIDER === 'delhivery' &&
+  !['1', 'true', 'yes'].includes(
+    String(process.env.ENABLE_PLAIN_DELHIVERY_RATECARD_SEED || '').trim().toLowerCase(),
+  )
+) {
+  throw new Error(
+    'Plain Delhivery rate-card seeding is disabled. Use the deliveryone seed scripts instead.',
+  )
+}
 const TARGET_COURIER_ID = Number(process.env.B2C_RATECARD_COURIER_ID || 99)
 const MODE = String(process.env.B2C_RATECARD_MODE || 'Surface').trim() || 'Surface'
 const TARGET_MODE_FILTER = MODE.toLowerCase()
@@ -21,7 +31,7 @@ const TARGET_COURIER_NAME =
   process.env.B2C_RATECARD_COURIER_NAME ||
   (TARGET_PROVIDER === 'deliveryone' ? `Delhivery ${MODE}` : `Delhivery ${MODE}`)
 const TARGET_LEGACY_COURIER_NAME_PATTERN =
-  TARGET_PROVIDER === 'deliveryone' ? '%delivery%one%' : '%delhivery%'
+  TARGET_PROVIDER === 'deliveryone' ? '%delhivery%' : '%delhivery%'
 const BUSINESS_TYPE = 'B2C'
 const forceReseed =
   process.argv.includes('--force') ||

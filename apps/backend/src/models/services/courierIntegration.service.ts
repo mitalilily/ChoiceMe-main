@@ -62,7 +62,7 @@ export const buildCourierWhereClause = (filters: CourierFilters = {}) => {
   const conditions = [
     eq(couriers.isEnabled, true),
     inArray(couriers.serviceProvider, [...VISIBLE_SERVICE_PROVIDERS]),
-    sql`${couriers.id} not in (99, 100)`,
+    inArray(couriers.id, DELIVERY_ONE_ALLOWED_COURIER_IDS),
   ]
 
   if (filters.name) {
@@ -282,7 +282,7 @@ export const getCourierById = async (id: number) => {
         eq(couriers.id, id),
         eq(couriers.isEnabled, true),
         inArray(couriers.serviceProvider, [...VISIBLE_SERVICE_PROVIDERS]),
-        sql`${couriers.id} not in (99, 100)`,
+        inArray(couriers.id, DELIVERY_ONE_ALLOWED_COURIER_IDS),
       ),
     )
 
@@ -361,7 +361,7 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
         eq(couriers.id, shippingRates.courier_id),
         eq(couriers.isEnabled, true),
         inArray(couriers.serviceProvider, [...VISIBLE_SERVICE_PROVIDERS]),
-        sql`${couriers.id} not in (99, 100)`,
+        inArray(couriers.id, DELIVERY_ONE_ALLOWED_COURIER_IDS),
         sql`lower(trim(${couriers.serviceProvider})) = lower(trim(coalesce(${shippingRates.service_provider}, '')))`,
       ),
     )
@@ -982,8 +982,8 @@ export const createCourier = async (data: {
   if (!isVisibleServiceProvider(normalizedProvider)) {
     throw new Error(`Only these service providers can be used: ${visibleServiceProviderList()}`)
   }
-  if (normalizedProvider === 'delhivery' && DELIVERY_ONE_ALLOWED_COURIER_IDS.includes(courierId)) {
-    throw new Error('Seeded Delhivery courier IDs 99 and 100 are hidden; use the active custom Delhivery courier instead')
+  if (normalizedProvider === 'deliveryone' && !DELIVERY_ONE_ALLOWED_COURIER_IDS.includes(courierId)) {
+    throw new Error('Only Delhivery Surface and Delhivery Express can be used for DeliveryOne')
   }
   console.log('data', data)
   // Check if courier already exists for this service provider

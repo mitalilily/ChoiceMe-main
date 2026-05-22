@@ -11,13 +11,13 @@ import {
 // Map integration types to opaque codes that don't reveal the provider
 const PROVIDER_CODE_MAP: Record<IntegratedServiceProvider, string> = {
   deliveryone: 'QH8L2',
-  delhivery: 'R7M4K',
+  delhivery: 'QH8L2',
 }
 
 // Reverse map: provider code -> integration type
 const PROVIDER_CODE_REVERSE_MAP: Record<string, string> = {
   QH8L2: 'deliveryone',
-  R7M4K: 'delhivery',
+  R7M4K: 'deliveryone',
 }
 
 /**

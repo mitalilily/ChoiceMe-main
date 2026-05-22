@@ -45,7 +45,7 @@ import { useState } from 'react'
 import { GenericTable } from 'views/Dashboard/Tables/components/GenericTable'
 
 const providerOptions = [
-  { value: 'delhivery', label: 'Delhivery' },
+  { value: 'deliveryone', label: 'Delhivery' },
 ]
 
 const providerLabels = providerOptions.reduce((acc, option) => {
@@ -255,7 +255,7 @@ const Couriers = () => {
   if (isLoading) return <Spinner size="md" />
   if (error) return <Text color="red.500">Failed to load couriers</Text>
 
-  const delhiveryCouriers = couriers.filter((c) => c.serviceProvider === 'delhivery')
+  const delhiveryCouriers = couriers.filter((c) => c.serviceProvider === 'deliveryone')
   const activeDelhiveryIds = delhiveryCouriers.map((c) => c.id).join(', ')
 
   return (

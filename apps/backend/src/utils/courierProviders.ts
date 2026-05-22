@@ -2,7 +2,7 @@ export const INTEGRATED_SERVICE_PROVIDERS = ['deliveryone', 'delhivery'] as cons
 
 export type IntegratedServiceProvider = (typeof INTEGRATED_SERVICE_PROVIDERS)[number]
 
-export const VISIBLE_SERVICE_PROVIDERS = ['delhivery'] as const
+export const VISIBLE_SERVICE_PROVIDERS = ['deliveryone'] as const
 
 export type VisibleServiceProvider = (typeof VISIBLE_SERVICE_PROVIDERS)[number]
 

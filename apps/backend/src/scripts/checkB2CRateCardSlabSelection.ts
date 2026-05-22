@@ -7,7 +7,7 @@ import {
 const rateCard: ResolvedB2CRateCard = {
   shippingRateId: 'test-rate-card',
   courier_id: 99,
-  service_provider: 'delhivery',
+  service_provider: 'deliveryone',
   zone_id: 'test-zone',
   type: 'forward',
   mode: 'surface',

@@ -16,6 +16,13 @@ import { and, eq, sql } from 'drizzle-orm'
 import crypto from 'crypto'
 
 const EKART_PROVIDER = 'ekart'
+const ekartSeedingEnabled = ['1', 'true', 'yes'].includes(
+  String(process.env.ENABLE_LEGACY_EKART_SEED || '').trim().toLowerCase(),
+)
+
+if (!ekartSeedingEnabled) {
+  throw new Error('Ekart seeding is disabled because Ekart is a retired legacy provider.')
+}
 
 async function ensureEkartCourier() {
   const existing = await db

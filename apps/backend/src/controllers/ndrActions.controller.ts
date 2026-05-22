@@ -8,7 +8,7 @@ import { EkartService } from '../models/services/couriers/ekart.service'
 import { XpressbeesService } from '../models/services/couriers/xpressbees.service'
 import { recordNdrEvent } from '../models/services/ndr.service'
 
-// Provider values are trusted from orders (integration_type: 'delhivery')
+// Provider values are trusted from orders (integration_type: 'deliveryone')
 
 const hasDelhiveryActionAccepted = (resp: any): boolean => {
   if (!resp) return false

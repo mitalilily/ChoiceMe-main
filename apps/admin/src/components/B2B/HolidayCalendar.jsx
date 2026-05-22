@@ -688,7 +688,7 @@ const HolidayCalendar = () => {
                         setFormData({ ...formData, serviceProvider: e.target.value })
                       }
                     >
-                      <option value="delhivery">Delhivery</option>
+                      <option value="deliveryone">Delhivery</option>
                     </Select>
                   </FormControl>
                 </>

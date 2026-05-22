@@ -109,7 +109,7 @@ const mockOrder = {
   codValue: 'Rs. 1350',
   declaredValue: 'Rs. 1350',
   courier: 'Delhivery Surface',
-  integration_type: 'delhivery',
+  integration_type: 'deliveryone',
   courierId: 99,
   shipping_mode: 'Surface',
   shipper: {
