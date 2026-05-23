@@ -21,19 +21,20 @@ const DeliveryDetailsForm = ({ type = 'b2c' }: { type?: FormType }) => {
   } = useFormContext<B2CFormData | B2BFormData>()
 
   const pincode = watch('pincode')
+  const normalizedPincode = String(pincode ?? '').trim()
 
   const {
     data: locationData,
     isFetching: pinFetching,
     isError,
   } = useLocations(
-    { pincode },
-    Boolean(/^\d{6}$/.test(pincode)), // only when valid pincode
-    ['locationLookup', pincode],
+    { pincode: normalizedPincode, limit: 1 },
+    Boolean(/^[1-9][0-9]{5}$/.test(normalizedPincode)), // only when valid pincode
+    ['locationLookup', normalizedPincode],
   )
 
   useEffect(() => {
-    if (!/^\d{6}$/.test(pincode)) return
+    if (!/^[1-9][0-9]{5}$/.test(normalizedPincode)) return
 
     if (isError) {
       setError('pincode', { type: 'manual', message: 'PIN lookup failed' })
@@ -54,7 +55,7 @@ const DeliveryDetailsForm = ({ type = 'b2c' }: { type?: FormType }) => {
         setValue('state', state, { shouldValidate: true })
       }
     }
-  }, [locationData, isError, pincode, setError, clearErrors, setValue, getValues])
+  }, [locationData, isError, normalizedPincode, setError, clearErrors, setValue, getValues])
 
   const fields = [
     { name: 'buyerName', label: 'Name' },

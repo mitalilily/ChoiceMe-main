@@ -87,6 +87,7 @@ import {
   formatCourierSlabDisplayName,
   normalizeB2CShippingMode,
 } from './b2cRateCard.service'
+import { fetchPostalLocationsByPincode } from './location.service'
 import { calculateFreight } from './pricing/chargeableFreight'
 
 // Load correct .env based on NODE_ENV
@@ -712,7 +713,20 @@ const fetchLocationByPincode = async (pincode: string): Promise<LocRow | null> =
     .limit(1)
 
   const row = rows[0] as unknown as LocRow | undefined
-  if (!row) return null
+  if (!row) {
+    const fallbackLocation = (await fetchPostalLocationsByPincode(pincode))[0]
+    if (!fallbackLocation) return null
+
+    return {
+      id: '',
+      pincode: fallbackLocation.pincode,
+      city: fallbackLocation.city,
+      state: fallbackLocation.state,
+      country: fallbackLocation.country,
+      tags: normalizeTags(fallbackLocation.tags ?? []),
+    }
+  }
+
   return {
     ...row,
     tags: normalizeTags(row.tags),

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { UseFormClearErrors, UseFormSetError, UseFormSetValue } from 'react-hook-form'
+import { fetchLocations } from '../../api/locations'
 
 export function usePincodeLookup(
   pincode: string,
@@ -14,8 +15,12 @@ export function usePincodeLookup(
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    let isCurrentLookup = true
+
     async function fetchLocation() {
-      if (!pincode || pincode.length !== 6) {
+      const normalizedPincode = String(pincode ?? '').trim()
+
+      if (!/^[1-9][0-9]{5}$/.test(normalizedPincode)) {
         clearErrors(`${type}Pincode`)
         setValue(`${type}City`, '')
         setValue(`${type}State`, '')
@@ -24,12 +29,12 @@ export function usePincodeLookup(
 
       setLoading(true)
       try {
-        const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`)
-        const data = await res.json()
-        const loc = data?.[0]?.PostOffice?.[0]
-        const status = data?.[0]?.Status
+        const data = await fetchLocations({ pincode: normalizedPincode, limit: 1 })
+        if (!isCurrentLookup) return
 
-        if (status !== 'Success' || !loc) {
+        const loc = data?.data?.[0]
+
+        if (!loc?.city || !loc?.state) {
           setError(`${type}Pincode`, {
             type: 'manual',
             message: `Invalid ${type} pincode`,
@@ -38,10 +43,11 @@ export function usePincodeLookup(
           setValue(`${type}State`, '')
         } else {
           clearErrors(`${type}Pincode`)
-          setValue(`${type}City`, loc?.District || '')
-          setValue(`${type}State`, loc?.State || '')
+          setValue(`${type}City`, loc.city || '', { shouldValidate: true })
+          setValue(`${type}State`, loc.state || '', { shouldValidate: true })
         }
       } catch {
+        if (!isCurrentLookup) return
         setError(`${type}Pincode`, {
           type: 'manual',
           message: `Failed to fetch ${type} location`,
@@ -49,12 +55,16 @@ export function usePincodeLookup(
         setValue(`${type}City`, '')
         setValue(`${type}State`, '')
       } finally {
-        setLoading(false)
+        if (isCurrentLookup) setLoading(false)
       }
     }
 
     fetchLocation()
-  }, [pincode])
+
+    return () => {
+      isCurrentLookup = false
+    }
+  }, [pincode, type, setValue, setError, clearErrors])
 
   return loading
 }
