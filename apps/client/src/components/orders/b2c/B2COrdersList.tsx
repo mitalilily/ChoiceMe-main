@@ -6,8 +6,13 @@ import {
   Box,
   Button,
   CircularProgress,
+  Divider,
   IconButton,
   Link,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
   Stack,
   Tooltip,
   Typography,
@@ -15,14 +20,27 @@ import {
   useTheme,
 } from '@mui/material'
 import moment from 'moment'
-import { useEffect, useState, type ReactNode } from 'react'
-import { MdAssignment, MdLocalOffer, MdReceipt, MdSync } from 'react-icons/md'
-import { Link as RouterLink, useLocation } from 'react-router-dom'
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
+import {
+  MdAssignment,
+  MdCancel,
+  MdEventAvailable,
+  MdKeyboardReturn,
+  MdLocalOffer,
+  MdLocalShipping,
+  MdMoreVert,
+  MdReceipt,
+  MdReplay,
+  MdSync,
+  MdVisibility,
+} from 'react-icons/md'
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
 import { generateManifestService } from '../../../api/order.service'
 import {
   useB2COrdersByUser,
   useCancelShipment,
   useCreateReverseShipment,
+  useRegenerateOrderDocuments,
   useRequestB2CPickup,
   useRetryFailedManifest,
   useSyncB2CTracking,
@@ -97,6 +115,50 @@ const documentButtonMeta: Record<DocumentType, { label: string; icon: ReactNode 
   manifest: { label: 'Manifest', icon: <MdAssignment /> },
 }
 
+const documentGenerationStatuses = new Set([
+  'booked',
+  'shipment_created',
+  'pickup_initiated',
+  'in_transit',
+  'out_for_delivery',
+  'delivered',
+  'ndr',
+  'undelivered',
+  'rto',
+  'rto_in_transit',
+  'rto_delivered',
+])
+
+const actionMenuItemSx = {
+  minHeight: 38,
+  px: 1.25,
+  py: 0.75,
+  gap: 0.75,
+  color: 'text.primary',
+  '&:hover': {
+    bgcolor: 'rgba(51, 51, 105, 0.06)',
+  },
+  '&.Mui-disabled': {
+    opacity: 0.48,
+  },
+}
+
+const actionMenuDangerItemSx = {
+  ...actionMenuItemSx,
+  color: 'error.main',
+  '& .MuiListItemIcon-root': {
+    color: 'error.main',
+  },
+}
+
+const actionMenuIconSx = {
+  minWidth: 28,
+  color: 'text.secondary',
+  '& svg': {
+    fontSize: 18,
+  },
+}
+
 export const statusColorMap: Record<string, 'success' | 'pending' | 'error' | 'info'> = {
   pending: 'pending',
   booked: 'info',
@@ -138,6 +200,7 @@ const shippingStatusMap: Record<string, string> = {
 const B2COrdersList = () => {
   const theme = useTheme()
   const location = useLocation()
+  const navigate = useNavigate()
   const isXs = useMediaQuery(theme.breakpoints.down('sm')) // mobile
   const isSm = useMediaQuery(theme.breakpoints.between('sm', 'md')) // tablet
   const isMd = useMediaQuery(theme.breakpoints.between('md', 'lg')) // small desktop
@@ -160,7 +223,11 @@ const B2COrdersList = () => {
   const [pendingManifestRequest, setPendingManifestRequest] =
     useState<PendingManifestRequest>(null)
   const [manifestScheduleOpen, setManifestScheduleOpen] = useState(false)
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null)
+  const [activeActionOrderId, setActiveActionOrderId] = useState<B2COrder['id'] | null>(null)
+  const [detailsOrder, setDetailsOrder] = useState<B2COrder | null>(null)
   const [bulkFeedback, setBulkFeedback] = useState<BulkFeedback | null>(null)
+  const [documentGenerationRef, setDocumentGenerationRef] = useState<string | null>(null)
   const [filters, setFilters] = useState<OrderFilters>({
     status: '',
     sortBy: 'created_at',
@@ -179,10 +246,12 @@ const B2COrdersList = () => {
   const { mutateAsync: retryFailedManifest, isPending: retryingManifest } = useRetryFailedManifest()
   const { mutateAsync: syncB2CTracking } = useSyncB2CTracking()
   const { mutateAsync: requestB2CPickup, isPending: requestingPickup } = useRequestB2CPickup()
+  const { mutateAsync: regenerateDocuments, isPending: regeneratingDocuments } =
+    useRegenerateOrderDocuments()
   const queryClient = useQueryClient()
   const { mutateAsync: presignDownloads } = usePresignedDownloadMutation()
   const { data: warehouses } = usePickupAddresses()
-  const { mutate: cancelShipment } = useCancelShipment()
+  const { mutate: cancelShipment, isPending: cancellingShipment } = useCancelShipment()
   const { mutate: createReverse } = useCreateReverseShipment()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [reverseOrder, setReverseOrder] = useState<any | null>(null)
@@ -196,6 +265,9 @@ const B2COrdersList = () => {
     setManifestScheduleOpen(false)
     setPendingManifestRequest(null)
     setPickupScheduleOrder(null)
+    setDetailsOrder(null)
+    setActionMenuAnchor(null)
+    setActiveActionOrderId(null)
   }, [location.pathname, location.search, location.hash])
 
   const orders: B2COrder[] = data?.orders || []
@@ -215,6 +287,42 @@ const B2COrdersList = () => {
   }
 
   /* ───────────── Handlers ───────────── */
+  const handleActionMenuOpen = (
+    event: MouseEvent<HTMLElement>,
+    orderId: B2COrder['id'],
+  ) => {
+    event.stopPropagation()
+    setActionMenuAnchor(event.currentTarget)
+    setActiveActionOrderId(orderId)
+  }
+
+  const handleActionMenuClose = () => {
+    setActionMenuAnchor(null)
+    setActiveActionOrderId(null)
+  }
+
+  const runActionFromMenu = (
+    event: MouseEvent<HTMLElement>,
+    action: () => void | Promise<void>,
+  ) => {
+    event.stopPropagation()
+    handleActionMenuClose()
+    void action()
+  }
+
+  const handleViewDetails = (order: B2COrder) => {
+    setDetailsOrder(order)
+  }
+
+  const handleTrackShipment = (order: B2COrder) => {
+    const awb = String(order.awb_number || '').trim()
+    if (!awb) {
+      toast.open({ message: 'AWB number is not available for this order.', severity: 'info' })
+      return
+    }
+    navigate(`/tools/order_tracking?awb=${encodeURIComponent(awb)}`)
+  }
+
   const handleGenerateManifest = async (
     order: B2COrder,
     schedule: ManifestSchedulePayload,
@@ -287,6 +395,36 @@ const B2COrdersList = () => {
   const handleRetryManifest = async (order: B2COrder) => {
     if (!order.id) return
     await retryFailedManifest(String(order.id))
+  }
+
+  const handleGenerateOrderDocument = async (order: B2COrder, type: 'label' | 'invoice') => {
+    const orderId = String(order.id || '').trim()
+    if (!orderId) {
+      toast.open({ message: 'Order identifier is not available.', severity: 'error' })
+      return
+    }
+
+    if (!isDocumentGenerationReady(order)) {
+      toast.open({
+        message: 'Generate the manifest before creating label or invoice documents.',
+        severity: 'info',
+      })
+      return
+    }
+
+    const documentRef = `${order.id}-${type}`
+    try {
+      setDocumentGenerationRef(documentRef)
+      await regenerateDocuments({
+        orderId,
+        regenerateLabel: type === 'label',
+        regenerateInvoice: type === 'invoice',
+      })
+    } catch (error) {
+      console.error(`Failed to generate ${type} for order:`, order.order_number, error)
+    } finally {
+      setDocumentGenerationRef((current) => (current === documentRef ? null : current))
+    }
   }
 
   const handleSyncTracking = async (order: B2COrder) => {
@@ -827,6 +965,15 @@ const B2COrdersList = () => {
     const { key, url } = getDocumentReference(row, type)
     return Boolean(key || url)
   }
+
+  const isDocumentGenerationReady = (row: B2COrder) => {
+    const normalizedStatus = String(row.order_status || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+    return (
+      Boolean(String(row.manifest_key || row.manifest || row.awb_number || '').trim()) ||
+      documentGenerationStatuses.has(normalizedStatus)
+    )
+  }
+
   const renderAwbLink = (value?: string | null) => {
     const awb = String(value || '').trim()
     if (!awb) return <Typography sx={{ color: 'text.secondary', fontSize: 12 }}>No AWB</Typography>
@@ -1002,97 +1149,20 @@ const B2COrdersList = () => {
     {
       label: 'Actions',
       id: 'id',
-      minWidth: 230,
+      minWidth: 128,
       sticky: 'right',
       stickyOffset: 160,
       truncate: false,
       render: (_, row) => {
-        const actions: ReactNode[] = []
         const orderStatus = String(row.order_status || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
         const canSyncTracking = isDeliveryOneTrackingOrder(row)
         const isTrackingSyncing = syncingTrackingOrderId === String(row.id)
         const canRequestPickup = isB2CPickupRequestEligible(row)
         const isPickupRequesting =
           requestingPickupOrderId === String(row.id) || (requestingPickup && pickupScheduleOrder?.id === row.id)
-
-        if (canSyncTracking) {
-          actions.push(
-            <Button
-              key="sync-tracking"
-              size="small"
-              variant="outlined"
-              startIcon={
-                isTrackingSyncing ? <CircularProgress size={12} /> : <MdSync size={14} />
-              }
-              disabled={isTrackingSyncing}
-              onClick={() => handleSyncTracking(row)}
-              sx={{ px: 0.85, py: 0.2, minWidth: 0, fontSize: 11.5 }}
-            >
-              {isTrackingSyncing ? 'Syncing' : 'Sync Status'}
-            </Button>,
-          )
-        }
-
-        if (isB2CCancelledStatus(orderStatus)) {
-          return (
-            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap alignItems="center">
-              {actions}
-              <Typography sx={{ fontSize: 12, color: 'error.main', fontWeight: 800 }}>
-                Cancelled
-              </Typography>
-            </Stack>
-          )
-        }
-
-        if (orderStatus === 'delivered') {
-          actions.push(
-            <Button
-              key="reverse"
-              size="small"
-              variant="outlined"
-              onClick={() => setReverseOrder(row)}
-              sx={{ px: 0.85, py: 0.2, minWidth: 0, fontSize: 11.5 }}
-            >
-              Reverse
-            </Button>,
-          )
-        }
-
-        if (isB2CManifestEligible(row)) {
-          const rowManifestRef = getB2CManifestIdentifier(row)
-          const isThisManifesting = Boolean(
-            rowManifestRef && manifestingRef === rowManifestRef,
-          )
-          actions.push(
-            <Button
-              key="manifest"
-              size="small"
-              variant="contained"
-              disabled={bulkManifesting || isThisManifesting}
-              onClick={() => openSingleManifestSchedule(row)}
-              sx={{ px: 0.85, py: 0.2, minWidth: 0, fontSize: 11.5 }}
-            >
-              {isThisManifesting ? 'Manifesting...' : 'Manifest'}
-            </Button>,
-          )
-        }
-
-        if (canRequestPickup) {
-          actions.push(
-            <Button
-              key="request-pickup"
-              size="small"
-              variant="outlined"
-              color="warning"
-              disabled={isPickupRequesting}
-              onClick={() => setPickupScheduleOrder(row)}
-              sx={{ px: 0.85, py: 0.2, minWidth: 0, fontSize: 11.5 }}
-            >
-              {isPickupRequesting ? 'Scheduling...' : 'Pickup'}
-            </Button>,
-          )
-        }
-
+        const rowManifestRef = getB2CManifestIdentifier(row)
+        const canManifest = isB2CManifestEligible(row)
+        const isThisManifesting = Boolean(rowManifestRef && manifestingRef === rowManifestRef)
         const retriesRemaining = Number(row.manifest_retries_remaining ?? 0)
         const isDelhiveryIntegration = ['delhivery', 'deliveryone'].includes(
           String(row.integration_type || '').toLowerCase(),
@@ -1100,92 +1170,195 @@ const B2COrdersList = () => {
         const canRetryManifest =
           row.can_retry_manifest === true &&
           isDelhiveryIntegration
+        const canTrackShipment = Boolean(String(row.awb_number || '').trim())
+        const isCancelled = isB2CCancelledStatus(orderStatus)
+        const isDocumentReady = isDocumentGenerationReady(row)
+        const isLabelGenerating = documentGenerationRef === `${row.id}-label`
+        const isInvoiceGenerating = documentGenerationRef === `${row.id}-invoice`
+        const isMenuOpen = activeActionOrderId === row.id && Boolean(actionMenuAnchor)
 
-        if (orderStatus === 'manifest_failed' && canRetryManifest) {
-          actions.push(
-            <Button
-              key="retry-manifest"
-              size="small"
-              variant="contained"
-              color="warning"
-              disabled={retryingManifest}
-              onClick={() => handleRetryManifest(row)}
-              sx={{ px: 0.85, py: 0.2, minWidth: 0, fontSize: 11.5 }}
-            >
-              {retryingManifest ? 'Retrying...' : `Retry (${retriesRemaining} left)`}
-            </Button>,
-          )
-        }
-
-        if (isB2CCancelEligible(row)) {
-          actions.push(
-            <Button
-              key="cancel"
-              size="small"
-              variant="outlined"
-              color="error"
-              onClick={() => cancelShipment(row.id as unknown as string)}
-              sx={{
-                px: 0.85,
-                py: 0.2,
-                minWidth: 0,
-                fontSize: 11.5,
-                border: '1px solid red',
-                color: 'red',
-              }}
-            >
-              Cancel
-            </Button>,
-          )
-        }
-
-        if (
-          actions.length === 0 &&
-          orderStatus !== 'manifest_failed' &&
-          isDelhiveryIntegration
-        ) {
-          return (
-            <Typography sx={{ fontSize: 12, color: 'text.secondary', fontWeight: 700 }}>
-              Auto-Manifested{' '}
-              {/* {row.manifest && (
-                <Typography component="span" color="primary" fontWeight={500}>
-                  (Batch ID: {row.manifest})
-                </Typography>
-              )} */}
-            </Typography>
-          )
-        }
-
-        if (
-          actions.length === 0 &&
-          orderStatus === 'manifest_failed' &&
-          isDelhiveryIntegration
-        ) {
-          return (
-            <Typography sx={{ fontSize: 12, color: 'error.main', fontWeight: 700 }}>
-              Retry limit reached
-            </Typography>
-          )
-        }
-
-        if (actions.length === 0 && orderStatus === 'manifest_generated' && row.manifest) {
-          actions.push(
-            <Link
-              key="view-manifest"
-              href={row.manifest}
-              target="_blank"
-              rel="noopener"
-              underline="hover"
-            >
-              View
-            </Link>,
-          )
-        }
+        const renderActionItem = ({
+          key,
+          icon,
+          label,
+          onClick,
+          disabled = false,
+          loading = false,
+          danger = false,
+        }: {
+          key: string
+          icon: ReactNode
+          label: string
+          onClick: () => void | Promise<void>
+          disabled?: boolean
+          loading?: boolean
+          danger?: boolean
+        }) => (
+          <MenuItem
+            key={key}
+            disabled={disabled || loading}
+            onClick={(event) => runActionFromMenu(event, onClick)}
+            sx={danger ? actionMenuDangerItemSx : actionMenuItemSx}
+          >
+            <ListItemIcon sx={danger ? { ...actionMenuIconSx, color: 'error.main' } : actionMenuIconSx}>
+              {loading ? <CircularProgress size={16} /> : icon}
+            </ListItemIcon>
+            <ListItemText
+              primary={label}
+              primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }}
+            />
+          </MenuItem>
+        )
 
         return (
-          <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-            {actions}
-          </Stack>
+          <>
+            <Button
+              size="small"
+              variant={isMenuOpen ? 'contained' : 'outlined'}
+              endIcon={<MdMoreVert size={16} />}
+              onClick={(event) => handleActionMenuOpen(event, row.id)}
+              aria-haspopup="menu"
+              aria-expanded={isMenuOpen ? 'true' : undefined}
+              sx={{
+                minHeight: 32,
+                px: 1.15,
+                borderRadius: '8px',
+                fontSize: 12,
+                fontWeight: 800,
+                textTransform: 'none',
+                whiteSpace: 'nowrap',
+                boxShadow: isMenuOpen ? '0 10px 20px rgba(51, 51, 105, 0.14)' : 'none',
+              }}
+            >
+              Actions
+            </Button>
+            <Menu
+              anchorEl={actionMenuAnchor}
+              open={isMenuOpen}
+              onClose={handleActionMenuClose}
+              onClick={(event) => event.stopPropagation()}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    mt: 0.75,
+                    minWidth: 260,
+                    borderRadius: '10px',
+                    border: '1px solid rgba(51, 51, 105, 0.12)',
+                    background: 'rgba(255, 255, 255, 0.98)',
+                    boxShadow: '0 18px 38px rgba(51, 51, 105, 0.16)',
+                    overflow: 'hidden',
+                  },
+                },
+                list: {
+                  dense: true,
+                  sx: { py: 0.45 },
+                },
+              }}
+            >
+              {renderActionItem({
+                key: 'view-details',
+                icon: <MdVisibility />,
+                label: 'View Details',
+                onClick: () => handleViewDetails(row),
+              })}
+              <Divider sx={{ my: 0.35 }} />
+              {renderActionItem({
+                key: 'generate-manifest',
+                icon: <MdAssignment />,
+                label: isThisManifesting ? 'Generating Manifest' : 'Generate Manifest',
+                onClick: () => openSingleManifestSchedule(row),
+                disabled: isCancelled || !canManifest || bulkManifesting,
+                loading: isThisManifesting,
+              })}
+              {renderActionItem({
+                key: 'generate-label',
+                icon: <MdLocalOffer />,
+                label: isLabelGenerating
+                  ? 'Generating Label'
+                  : hasDocument(row, 'label')
+                    ? 'Regenerate Label'
+                    : 'Generate Label',
+                onClick: () => handleGenerateOrderDocument(row, 'label'),
+                disabled:
+                  isCancelled ||
+                  !isDocumentReady ||
+                  regeneratingDocuments ||
+                  Boolean(documentGenerationRef),
+                loading: isLabelGenerating,
+              })}
+              {renderActionItem({
+                key: 'generate-invoice',
+                icon: <MdReceipt />,
+                label: isInvoiceGenerating
+                  ? 'Generating Invoice'
+                  : hasDocument(row, 'invoice')
+                    ? 'Regenerate Invoice'
+                    : 'Generate Invoice',
+                onClick: () => handleGenerateOrderDocument(row, 'invoice'),
+                disabled:
+                  isCancelled ||
+                  !isDocumentReady ||
+                  regeneratingDocuments ||
+                  Boolean(documentGenerationRef),
+                loading: isInvoiceGenerating,
+              })}
+              {(canRequestPickup ||
+                (orderStatus === 'manifest_failed' && canRetryManifest) ||
+                orderStatus === 'delivered' ||
+                isB2CCancelEligible(row)) && <Divider sx={{ my: 0.35 }} />}
+              {canRequestPickup &&
+                renderActionItem({
+                  key: 'request-pickup',
+                  icon: <MdEventAvailable />,
+                  label: isPickupRequesting ? 'Scheduling Pickup' : 'Request Pickup',
+                  onClick: () => setPickupScheduleOrder(row),
+                  disabled: isPickupRequesting,
+                })}
+              {orderStatus === 'manifest_failed' &&
+                canRetryManifest &&
+                renderActionItem({
+                  key: 'retry-manifest',
+                  icon: <MdReplay />,
+                  label: retryingManifest ? 'Retrying Manifest' : `Retry Manifest (${retriesRemaining} left)`,
+                  onClick: () => handleRetryManifest(row),
+                  disabled: retryingManifest,
+                })}
+              {orderStatus === 'delivered' &&
+                renderActionItem({
+                  key: 'reverse',
+                  icon: <MdKeyboardReturn />,
+                  label: 'Create Reverse',
+                  onClick: () => setReverseOrder(row),
+                })}
+              {isB2CCancelEligible(row) &&
+                renderActionItem({
+                  key: 'cancel',
+                  icon: <MdCancel />,
+                  label: cancellingShipment ? 'Cancelling Shipment' : 'Cancel Shipment',
+                  onClick: () => cancelShipment(String(row.id)),
+                  disabled: cancellingShipment,
+                  danger: true,
+                })}
+              <Divider sx={{ my: 0.35 }} />
+              {renderActionItem({
+                key: 'track-shipment',
+                icon: <MdLocalShipping />,
+                label: 'Track Shipment',
+                onClick: () => handleTrackShipment(row),
+                disabled: !canTrackShipment,
+              })}
+              {renderActionItem({
+                key: 'sync-live-status',
+                icon: <MdSync />,
+                label: isTrackingSyncing ? 'Syncing Live Status' : 'Sync Live Status',
+                onClick: () => handleSyncTracking(row),
+                disabled: !canSyncTracking,
+                loading: isTrackingSyncing,
+              })}
+            </Menu>
+          </>
         )
       },
     },
@@ -1426,6 +1599,15 @@ const B2COrdersList = () => {
         }}
         onConfirm={handlePickupScheduleConfirm}
       />
+
+      <CustomDrawer
+        width={isXs ? '100%' : 820}
+        open={Boolean(detailsOrder)}
+        onClose={() => setDetailsOrder(null)}
+        title={detailsOrder?.order_number ? `Order ${detailsOrder.order_number}` : 'Order Details'}
+      >
+        {detailsOrder && <OrderExpandedRow row={detailsOrder} />}
+      </CustomDrawer>
 
       <CustomDrawer
         width={drawerWidth}
