@@ -24,6 +24,7 @@ import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   MdAssignment,
   MdCancel,
+  MdDownload,
   MdEventAvailable,
   MdKeyboardReturn,
   MdLocalOffer,
@@ -35,7 +36,7 @@ import {
   MdVisibility,
 } from 'react-icons/md'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
-import { generateManifestService } from '../../../api/order.service'
+import { fetchOrdersForCsvExport, generateManifestService } from '../../../api/order.service'
 import {
   useB2COrdersByUser,
   useCancelShipment,
@@ -53,6 +54,7 @@ import {
   DELHIVERY_COURIER_FILTER_OPTIONS_BY_NAME,
   getCourierDisplayName,
 } from '../../../utils/courierDisplay'
+import { downloadClientOrdersCsv } from '../../../utils/orderCsvExport'
 import { FilterBar, type FilterField } from '../../FilterBar'
 import { toast } from '../../UI/Toast'
 import StatusChip from '../../UI/chip/StatusChip'
@@ -219,6 +221,7 @@ const B2COrdersList = () => {
   const [downloadingDocumentType, setDownloadingDocumentType] = useState<DocumentType | null>(null)
   const [downloadingRowDocument, setDownloadingRowDocument] = useState<string | null>(null)
   const [bulkManifesting, setBulkManifesting] = useState(false)
+  const [exportingCsv, setExportingCsv] = useState(false)
   const [manifestingRef, setManifestingRef] = useState<string | null>(null)
   const [pendingManifestRequest, setPendingManifestRequest] =
     useState<PendingManifestRequest>(null)
@@ -287,6 +290,23 @@ const B2COrdersList = () => {
   }
 
   /* ───────────── Handlers ───────────── */
+  const handleExportCsv = async () => {
+    try {
+      setExportingCsv(true)
+      const exportRows = await fetchOrdersForCsvExport('b2c', effectiveFilters)
+      downloadClientOrdersCsv(exportRows, 'b2c')
+      toast.open({
+        message: `${exportRows.length} B2C order${exportRows.length === 1 ? '' : 's'} exported to CSV.`,
+        severity: 'success',
+      })
+    } catch (error) {
+      console.error('B2C order CSV export failed:', error)
+      toast.open({ message: 'Failed to export B2C orders CSV. Please try again.', severity: 'error' })
+    } finally {
+      setExportingCsv(false)
+    }
+  }
+
   const handleActionMenuOpen = (
     event: MouseEvent<HTMLElement>,
     orderId: B2COrder['id'],
@@ -1417,14 +1437,25 @@ const B2COrdersList = () => {
             ]}
           />
         </Box>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleCreateB2COrder}
-          sx={{ minHeight: 36, px: 1.6, textTransform: 'none', fontWeight: 700 }}
-        >
-          Create B2C Order
-        </Button>
+        <Stack direction={{ xs: 'column', sm: 'row' }} gap={0.75} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+          <Button
+            variant="outlined"
+            startIcon={exportingCsv ? <CircularProgress size={14} /> : <MdDownload />}
+            onClick={handleExportCsv}
+            disabled={exportingCsv}
+            sx={{ minHeight: 36, px: 1.6, textTransform: 'none', fontWeight: 700 }}
+          >
+            {exportingCsv ? 'Exporting' : 'Export CSV'}
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleCreateB2COrder}
+            sx={{ minHeight: 36, px: 1.6, textTransform: 'none', fontWeight: 700 }}
+          >
+            Create B2C Order
+          </Button>
+        </Stack>
       </Stack>
 
       {/* 🔹 Status Tabs Row */}

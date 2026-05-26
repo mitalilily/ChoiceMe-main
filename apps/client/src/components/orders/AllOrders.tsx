@@ -13,11 +13,12 @@ import {
 } from '@mui/material'
 import { useEffect, useState, type ReactNode } from 'react'
 import { MdAssignment, MdLocalOffer, MdReceipt } from 'react-icons/md'
-import { TbFilter, TbPlus, TbRefresh } from 'react-icons/tb'
+import { TbDownload, TbFilter, TbPlus, TbRefresh } from 'react-icons/tb'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { generateManifestService } from '../../api/order.service'
+import { fetchOrdersForCsvExport, generateManifestService } from '../../api/order.service'
 import { useAllOrders, useB2BOrdersByUser, useB2COrdersByUser } from '../../hooks/Orders/useOrders'
 import { usePresignedDownloadMutation } from '../../hooks/Uploads/usePresignedDownloadUrls'
+import { downloadClientOrdersCsv } from '../../utils/orderCsvExport'
 import { FilterBar, type FilterField } from '../FilterBar'
 import { toast } from '../UI/Toast'
 import StatusChip from '../UI/chip/StatusChip'
@@ -86,6 +87,7 @@ const AllOrders = () => {
   )
   const [downloadingRowDocument, setDownloadingRowDocument] = useState<string | null>(null)
   const [bulkManifesting, setBulkManifesting] = useState(false)
+  const [exportingCsv, setExportingCsv] = useState(false)
   const [manifestScheduleOpen, setManifestScheduleOpen] = useState(false)
   const [bulkFeedback, setBulkFeedback] = useState<BulkFeedback | null>(null)
   const [filters, setFilters] = useState<OrdersFilters>({
@@ -190,6 +192,23 @@ const AllOrders = () => {
         : selectedOrders.some((order) => !isManifestEligible(order))
           ? 'Some selected orders are not ready for manifest yet.'
           : ''
+
+  const handleExportCsv = async () => {
+    try {
+      setExportingCsv(true)
+      const exportRows = await fetchOrdersForCsvExport(currentOrderView, filters)
+      downloadClientOrdersCsv(exportRows, currentOrderView)
+      toast.open({
+        message: `${exportRows.length} order${exportRows.length === 1 ? '' : 's'} exported to CSV.`,
+        severity: 'success',
+      })
+    } catch (error) {
+      console.error('Order CSV export failed:', error)
+      toast.open({ message: 'Failed to export orders CSV. Please try again.', severity: 'error' })
+    } finally {
+      setExportingCsv(false)
+    }
+  }
 
   const openBulkManifestSchedule = () => {
     if (!selectedOrders.length) {
@@ -740,6 +759,15 @@ const AllOrders = () => {
               sx={{ borderRadius: 1, minHeight: 34, fontSize: 12 }}
             >
               Filters
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={exportingCsv ? <CircularProgress size={14} /> : <TbDownload size={16} />}
+              onClick={handleExportCsv}
+              disabled={exportingCsv}
+              sx={{ borderRadius: 1, minHeight: 34, fontSize: 12 }}
+            >
+              {exportingCsv ? 'Exporting' : 'Export CSV'}
             </Button>
             <Button
               variant="contained"
