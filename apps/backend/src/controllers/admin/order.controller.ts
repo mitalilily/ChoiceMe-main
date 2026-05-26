@@ -4,6 +4,10 @@ import {
   regenerateOrderDocumentsServiceAdmin,
   updateOrderStatusServiceAdmin,
 } from '../../models/services/adminOrders.service'
+import {
+  ADMIN_ORDER_EXPORT_HEADERS,
+  toAdminOrderExportRow,
+} from '../../utils/adminOrderExportCsv'
 import { buildCsv } from '../../utils/csv'
 
 export const getAllOrdersControllerAdmin = async (req: any, res: Response) => {
@@ -56,42 +60,8 @@ export const exportOrdersControllerAdmin = async (req: any, res: Response) => {
       filters,
     })
 
-    // Generate CSV
-    const headers = [
-      'Order ID',
-      'AWB Number',
-      'Customer Name',
-      'Customer Phone',
-      'Customer Email',
-      'Status',
-      'Order Type',
-      'Amount',
-      'Courier Partner',
-      'Order Date',
-      'City',
-      'State',
-      'Pincode',
-      'Address',
-    ]
-
-    const rows = orders.map((order: any) => [
-      order.order_id,
-      order.awb_number,
-      order.buyer_name,
-      order.buyer_phone,
-      order.buyer_email,
-      order.order_status,
-      order.order_type,
-      order.order_amount,
-      order.courier_partner,
-      order.order_date,
-      order.city,
-      order.state,
-      order.pincode,
-      order.address,
-    ])
-
-    const csv = buildCsv(headers, rows)
+    const rows = orders.map(toAdminOrderExportRow)
+    const csv = buildCsv(ADMIN_ORDER_EXPORT_HEADERS, rows)
 
     // Set headers for file download
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')

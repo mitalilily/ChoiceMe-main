@@ -90,8 +90,11 @@ export const getAllOrdersServiceAdmin = async ({
     const userRecord = userId ? usersMap.get(userId) || null : null
 
     const companyName =
+      profile?.companyInfo?.businessName ||
+      profile?.companyInfo?.brandName ||
       profile?.companyInfo?.companyName ||
       profile?.companyInfo?.displayName ||
+      profile?.companyInfo?.contactPerson ||
       null
 
     return {
