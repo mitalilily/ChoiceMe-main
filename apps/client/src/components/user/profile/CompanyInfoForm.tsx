@@ -2,6 +2,7 @@ import { alpha, Divider, Grid, Paper, Stack, Tooltip, Typography } from '@mui/ma
 import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
+import { fetchLocations } from '../../../api/locations'
 import { BiInfoCircle } from 'react-icons/bi'
 import { useAuth } from '../../../context/auth/AuthContext'
 import { usePresignedDownloadUrls } from '../../../hooks/Uploads/usePresignedDownloadUrls'
@@ -27,6 +28,14 @@ interface CompanyFormValues {
   logo?: string
 }
 
+interface LocationRow {
+  city?: string
+  state?: string
+}
+
+const PINCODE_REGEX = /^[1-9][0-9]{5}$/
+const normalizePincode = (value: unknown) => String(value ?? '').replace(/\D/g, '').slice(0, 6)
+
 export default function CompanyInfoForm() {
   const { user } = useAuth()
   const { mutateAsync, isPending: saving } = useUpdateUserProfile()
@@ -39,6 +48,7 @@ export default function CompanyInfoForm() {
     setError,
     clearErrors,
     reset,
+    getValues,
     formState: { errors },
   } = useForm<CompanyFormValues>({
     defaultValues: {
@@ -84,29 +94,80 @@ export default function CompanyInfoForm() {
   const pincode = watch('pincode')
   const [pinFetching, setPinFetching] = useState(false)
 
+  const lookupPincode = useCallback(async (pin: string): Promise<LocationRow | null> => {
+    const data = await fetchLocations({ pincode: pin, limit: 1 })
+    const location = Array.isArray(data?.data) ? data.data[0] : data?.data
+
+    if (!location?.city || !location?.state) return null
+
+    return {
+      city: String(location.city),
+      state: String(location.state),
+    }
+  }, [])
+
   useEffect(() => {
+    const normalizedPincode = normalizePincode(pincode)
+
+    if (pincode !== normalizedPincode) {
+      setValue('pincode', normalizedPincode, { shouldDirty: true, shouldValidate: true })
+      return
+    }
+
+    if (!normalizedPincode) {
+      clearErrors('pincode')
+      setValue('city', '', { shouldValidate: true })
+      setValue('state', '', { shouldValidate: true })
+      return
+    }
+
+    if (normalizedPincode.length < 6) {
+      clearErrors('pincode')
+      setValue('city', '', { shouldValidate: true })
+      setValue('state', '', { shouldValidate: true })
+      return
+    }
+
+    if (!PINCODE_REGEX.test(normalizedPincode)) {
+      setError('pincode', { type: 'manual', message: 'Enter a valid 6-digit pincode' })
+      setValue('city', '', { shouldValidate: true })
+      setValue('state', '', { shouldValidate: true })
+      return
+    }
+
+    let isCurrentLookup = true
+
     const fetchPin = async (pin: string) => {
       setPinFetching(true)
       try {
-        const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`)
-        const data = await res.json()
-        if (data?.[0]?.Status !== 'Success') {
+        const location = await lookupPincode(pin)
+        if (!isCurrentLookup) return
+
+        if (!location) {
           setError('pincode', { type: 'manual', message: 'Invalid pincode' })
-          setValue('city', '')
-          setValue('state', '')
+          setValue('city', '', { shouldValidate: true })
+          setValue('state', '', { shouldValidate: true })
         } else {
           clearErrors('pincode')
-          setValue('city', data[0].PostOffice[0].District)
-          setValue('state', data[0].PostOffice[0].State)
+          setValue('city', location.city ?? '', { shouldDirty: true, shouldValidate: true })
+          setValue('state', location.state ?? '', { shouldDirty: true, shouldValidate: true })
         }
       } catch {
+        if (!isCurrentLookup) return
         setError('pincode', { type: 'manual', message: 'PIN lookup failed' })
+        setValue('city', '', { shouldValidate: true })
+        setValue('state', '', { shouldValidate: true })
       } finally {
-        setPinFetching(false)
+        if (isCurrentLookup) setPinFetching(false)
       }
     }
-    if (/^\d{6}$/.test(pincode)) fetchPin(pincode)
-  }, [pincode, setError, clearErrors, setValue])
+
+    fetchPin(normalizedPincode)
+
+    return () => {
+      isCurrentLookup = false
+    }
+  }, [pincode, setError, clearErrors, setValue, lookupPincode])
 
   /* logo upload cb */
   const handleLogoUploaded = useCallback(
@@ -122,6 +183,34 @@ export default function CompanyInfoForm() {
   /* submit */
   const onSubmit = async (values: CompanyFormValues) => {
     try {
+      const normalizedPincode = normalizePincode(values.pincode)
+      let city = values.city || getValues('city')
+      let state = values.state || getValues('state')
+
+      if (PINCODE_REGEX.test(normalizedPincode) && (!city || !state)) {
+        setPinFetching(true)
+        try {
+          const location = await lookupPincode(normalizedPincode)
+          if (location) {
+            city = location.city ?? ''
+            state = location.state ?? ''
+            setValue('city', city, { shouldValidate: true })
+            setValue('state', state, { shouldValidate: true })
+            clearErrors('pincode')
+          }
+        } finally {
+          setPinFetching(false)
+        }
+      }
+
+      if (!PINCODE_REGEX.test(normalizedPincode) || !city || !state) {
+        setError('pincode', {
+          type: 'manual',
+          message: 'Enter a valid pincode to auto-fill city and state',
+        })
+        return
+      }
+
       await mutateAsync({
         companyInfo: {
           brandName: values.brandName ?? '',
@@ -130,9 +219,9 @@ export default function CompanyInfoForm() {
           companyContactNumber: values.contact,
           companyEmail: values.email,
           companyAddress: values.address,
-          pincode: values.pincode,
-          state: values.state,
-          city: values.city,
+          pincode: normalizedPincode,
+          state,
+          city,
           companyLogoUrl: values.logo,
         } as CompanyInfo,
       })
@@ -296,21 +385,34 @@ export default function CompanyInfoForm() {
                 <CustomInput
                   required
                   label="Pincode"
+                  maxLength={6}
                   {...register('pincode', {
+                    required: 'Pincode is required',
                     pattern: {
-                      value: /^\d{6}$/,
-                      message: 'Must be 6 digits',
+                      value: PINCODE_REGEX,
+                      message: 'Enter a valid 6-digit pincode',
                     },
                   })}
                   error={!!errors.pincode}
                   helperText={errors.pincode?.message || (pinFetching ? 'Validating...' : '')}
+                  inputProps={{
+                    inputMode: 'numeric',
+                  }}
                 />
               </Grid>
               <Grid size={{ md: 6, xs: 12 }}>
-                <CustomInput label="City" disabled {...register('city')} />
+                <CustomInput
+                  label="City"
+                  {...register('city', { required: true })}
+                  inputProps={{ readOnly: true }}
+                />
               </Grid>
               <Grid size={{ md: 6, xs: 12 }}>
-                <CustomInput label="State" disabled {...register('state')} />
+                <CustomInput
+                  label="State"
+                  {...register('state', { required: true })}
+                  inputProps={{ readOnly: true }}
+                />
               </Grid>
             </Grid>
           </Stack>
@@ -322,7 +424,7 @@ export default function CompanyInfoForm() {
       <Stack direction="row" justifyContent="flex-end" gap={2}>
         <CustomIconLoadingButton
           type="submit"
-          disabled={saving}
+          disabled={saving || pinFetching}
           text="Update Business Info"
           loading={saving}
           loadingText="Saving…"
