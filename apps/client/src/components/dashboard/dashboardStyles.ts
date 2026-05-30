@@ -1,5 +1,5 @@
 import { alpha, type SxProps, type Theme } from '@mui/material/styles'
-import { brand } from '../../theme/brand'
+import { brand, brandFonts } from '../../theme/brand'
 
 export const dashboardPalette = {
   page: '#F5F7FB',
@@ -52,14 +52,14 @@ export const dashboardButtonSx = {
   px: 1.8,
   boxShadow: 'none',
   textTransform: 'none',
-  fontWeight: 800,
+  fontWeight: 600,
   '&:hover': {
     boxShadow: `0 12px 26px ${alpha(dashboardPalette.orange, 0.16)}`,
   },
 } satisfies SxProps<Theme>
 
 export const dashboardChartBase = {
-  fontFamily: 'Inter, Poppins, sans-serif',
+  fontFamily: brandFonts.body,
   toolbar: { show: false },
   animations: { enabled: false },
 }

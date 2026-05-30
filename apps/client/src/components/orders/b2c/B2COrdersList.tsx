@@ -129,6 +129,7 @@ const actionMenuItemSx = {
   py: 0.75,
   gap: 0.75,
   color: 'text.primary',
+  fontWeight: 400,
   '&:hover': {
     bgcolor: 'rgba(51, 51, 105, 0.06)',
   },
@@ -1073,7 +1074,7 @@ const B2COrdersList = () => {
       truncate: false,
       render: (_v, row) => (
         <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: 'primary.dark', lineHeight: 1.25 }} noWrap>
+          <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: 'primary.dark', lineHeight: 1.25 }} noWrap>
             {row.order_number || '-'}
           </Typography>
           <Typography sx={{ fontSize: 11.2, color: 'text.secondary', lineHeight: 1.25 }} noWrap>
@@ -1092,7 +1093,7 @@ const B2COrdersList = () => {
       truncate: false,
       render: (_value, row) => (
         <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: 'text.primary', lineHeight: 1.28 }} noWrap>
+          <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: 'text.primary', lineHeight: 1.28 }} noWrap>
             {row.buyer_name || '-'}
           </Typography>
           <Typography sx={{ fontSize: 11.5, color: 'text.secondary', lineHeight: 1.28 }} noWrap>
@@ -1111,10 +1112,10 @@ const B2COrdersList = () => {
       truncate: false,
       render: (_value, row) => (
         <Stack spacing={0.25}>
-          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: 'text.primary', maxWidth: 150 }} noWrap>
+          <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: 'text.primary', maxWidth: 150 }} noWrap>
             {getProductName(row)}
           </Typography>
-          <Typography sx={{ fontSize: 11.5, color: 'text.primary', fontWeight: 700 }}>
+          <Typography sx={{ fontSize: 11.5, color: 'text.primary', fontWeight: 500 }}>
             QTY:{getProductQuantity(row)}
           </Typography>
         </Stack>
@@ -1153,7 +1154,7 @@ const B2COrdersList = () => {
         const isCod = String(row.order_type || '').toLowerCase() === 'cod'
         return (
           <Stack spacing={0.45} alignItems="flex-start">
-            <Typography sx={{ fontSize: 12.5, color: 'text.primary', fontWeight: 700 }}>
+            <Typography sx={{ fontSize: 12.5, color: 'text.primary', fontWeight: 500 }}>
               {formatCurrency(row.order_amount, 0)}
             </Typography>
             <Chip
@@ -1169,7 +1170,7 @@ const B2COrdersList = () => {
                 '& .MuiChip-label': {
                   px: 0.65,
                   fontSize: 10.5,
-                  fontWeight: 800,
+                  fontWeight: 600,
                 },
               }}
             />
@@ -1189,7 +1190,7 @@ const B2COrdersList = () => {
             maxWidth: 145,
             fontSize: 12.5,
             color: 'text.primary',
-            fontWeight: 700,
+            fontWeight: 500,
             borderBottom: `1px dashed ${alpha(theme.palette.text.primary, 0.28)}`,
             lineHeight: 1.3,
           }}
@@ -1218,7 +1219,7 @@ const B2COrdersList = () => {
             '& .MuiChip-label': {
               px: 0.9,
               fontSize: 10.5,
-              fontWeight: 800,
+              fontWeight: 600,
             },
           }}
         />
@@ -1271,7 +1272,7 @@ const B2COrdersList = () => {
             </ListItemIcon>
             <ListItemText
               primary={label}
-              primaryTypographyProps={{ fontSize: 13.5, fontWeight: 600 }}
+              primaryTypographyProps={{ fontSize: 13.5, fontWeight: 500 }}
             />
           </MenuItem>
         )
@@ -1292,7 +1293,7 @@ const B2COrdersList = () => {
                 px: 1.45,
                 borderRadius: '8px',
                 fontSize: 12,
-                fontWeight: 800,
+                fontWeight: 600,
                 textTransform: 'none',
                 whiteSpace: 'nowrap',
               }}
@@ -1318,7 +1319,7 @@ const B2COrdersList = () => {
                   color: 'secondary.main',
                   bgcolor: isMenuOpen ? alpha(theme.palette.secondary.main, 0.08) : '#FFFFFF',
                   fontSize: 12,
-                  fontWeight: 800,
+                  fontWeight: 600,
                   textTransform: 'none',
                   whiteSpace: 'nowrap',
                   '& .MuiButton-endIcon': {
@@ -1457,7 +1458,7 @@ const B2COrdersList = () => {
             startIcon={exportingCsv ? <CircularProgress size={14} /> : <MdDownload />}
             onClick={handleExportCsv}
             disabled={exportingCsv}
-            sx={{ minHeight: 36, px: 1.6, textTransform: 'none', fontWeight: 700 }}
+            sx={{ minHeight: 36, px: 1.6, textTransform: 'none', fontWeight: 600 }}
           >
             {exportingCsv ? 'Exporting' : 'Export CSV'}
           </Button>
@@ -1465,7 +1466,7 @@ const B2COrdersList = () => {
             variant="contained"
             color="primary"
             onClick={handleCreateB2COrder}
-            sx={{ minHeight: 36, px: 1.6, textTransform: 'none', fontWeight: 700 }}
+            sx={{ minHeight: 36, px: 1.6, textTransform: 'none', fontWeight: 600 }}
           >
             Create B2C Order
           </Button>
@@ -1511,7 +1512,7 @@ const B2COrdersList = () => {
             gap={1.25}
           >
             <Box>
-              <Typography sx={{ fontWeight: 700, color: '#333369', fontSize: '14px' }}>
+              <Typography sx={{ fontWeight: 600, color: '#333369', fontSize: '14px' }}>
                 {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
               </Typography>
               <Typography sx={{ color: '#6B7280', fontSize: '12px', mt: 0.25 }}>

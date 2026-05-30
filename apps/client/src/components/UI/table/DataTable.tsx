@@ -251,7 +251,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                 <Typography
                   sx={{
                     fontSize: isCompact ? { xs: '0.95rem', sm: '1.02rem' } : { xs: '1.02rem', sm: '1.18rem' },
-                    fontWeight: 800,
+                    fontWeight: 600,
                     letterSpacing: 0,
                     color: textPrimary,
                   }}
@@ -295,11 +295,11 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                   '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
                     fontSize: isCompact ? '11px' : '12px',
                     color: textSecondary,
-                    fontWeight: 600,
+                    fontWeight: 500,
                   },
                   '& .MuiTablePagination-select': {
                     color: textPrimary,
-                    fontWeight: 700,
+                    fontWeight: 600,
                   },
                   '& .MuiTablePagination-actions button': {
                     color: primary,
@@ -332,7 +332,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
               alt="No data"
               sx={{ width: 260, opacity: 0.78 }}
             />
-            <Typography variant="body1" sx={{ fontSize: '14px', fontWeight: 700, color: textPrimary }}>
+            <Typography variant="body1" sx={{ fontSize: '14px', fontWeight: 600, color: textPrimary }}>
               No records to display
             </Typography>
             <Typography variant="body2" sx={{ color: textSecondary }}>
@@ -356,7 +356,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                     checked={isAllSelected}
                     onChange={(e) => handleSelectAll(e.target.checked)}
                   />
-                  <Typography fontSize="12px" fontWeight={700} sx={{ color: textPrimary }}>
+                  <Typography fontSize="12px" fontWeight={500} sx={{ color: textPrimary }}>
                     Select all
                   </Typography>
                 </Stack>
@@ -387,7 +387,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                               checked={selectedIds.includes(row.id)}
                               onChange={() => handleSelect(row.id)}
                             />
-                            <Typography fontSize="12px" fontWeight={700} sx={{ color: textPrimary }}>
+                            <Typography fontSize="12px" fontWeight={500} sx={{ color: textPrimary }}>
                               Select entry
                             </Typography>
                           </Stack>
@@ -400,13 +400,13 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                           <Box key={col.id as string}>
                             <Typography
                               fontSize="11px"
-                              fontWeight={800}
-                              sx={{ color: alpha(textSecondary, 0.92), textTransform: 'uppercase', letterSpacing: '0.08em' }}
+                              fontWeight={600}
+                              sx={{ color: alpha(textSecondary, 0.92), textTransform: 'uppercase', letterSpacing: 0 }}
                             >
                               {col.label}
                             </Typography>
                             {col.label_desc ? (
-                              <Typography fontSize="10px" fontWeight={600} sx={{ color: textSecondary, opacity: 0.85 }}>
+                              <Typography fontSize="10px" fontWeight={500} sx={{ color: textSecondary, opacity: 0.85 }}>
                                 {col.label_desc}
                               </Typography>
                             ) : null}
@@ -523,10 +523,10 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                             background: headerBg,
                             color: isShipmentVariant ? '#FFFFFF' : alpha(textPrimary, 0.86),
                             minWidth: col.minWidth || (isCompact ? 80 : 100),
-                            fontWeight: 800,
+                            fontWeight: 600,
                             fontSize: isShipmentVariant ? '12px' : isCompact ? '10.5px' : '11px',
                             textTransform: isShipmentVariant ? 'none' : 'uppercase',
-                            letterSpacing: isShipmentVariant ? 0 : isCompact ? '0.04em' : '0.09em',
+                            letterSpacing: 0,
                             zIndex: col.sticky ? theme.zIndex.appBar + 3 : theme.zIndex.appBar + 1,
                             borderBottom: isShipmentVariant ? 'none' : `1px solid ${borderColor}`,
                             py: isShipmentVariant ? 1.15 : isCompact ? 0.75 : 1.4,
@@ -550,7 +550,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                         >
                           {col.label}
                           {col.label_desc ? (
-                            <Typography fontSize="10px" fontWeight={600} sx={{ color: alpha(textSecondary, 0.92), mt: 0.45 }}>
+                            <Typography fontSize="10px" fontWeight={500} sx={{ color: alpha(textSecondary, 0.92), mt: 0.45 }}>
                               {col.label_desc}
                             </Typography>
                           ) : null}
@@ -644,7 +644,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                                   position: col.sticky ? 'sticky' : 'static',
                                   color: textPrimary,
                                   fontSize: '13px',
-                                  fontWeight: 600,
+                                  fontWeight: 400,
                                   whiteSpace: shouldTruncate ? 'nowrap' : 'normal',
                                   overflow: shouldTruncate ? 'hidden' : 'visible',
                                   textOverflow: shouldTruncate ? 'ellipsis' : 'clip',

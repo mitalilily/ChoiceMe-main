@@ -42,10 +42,10 @@ const SectionHeading: React.FC<SectionHeadingProps> = ({
           <Typography
             sx={{
               fontSize: '0.72rem',
-              fontWeight: 800,
+              fontWeight: 600,
               color,
               textTransform: 'uppercase',
-              letterSpacing: '0.16em',
+              letterSpacing: 0,
             }}
           >
             ChoiceMee workflow
@@ -54,9 +54,9 @@ const SectionHeading: React.FC<SectionHeadingProps> = ({
             variant="h3"
             sx={{
               fontSize: { xs: '1.48rem', md: '1.92rem' },
-              fontWeight: 800,
+              fontWeight: 700,
               color: brand.ink,
-              letterSpacing: '-0.03em',
+              letterSpacing: 0,
               lineHeight: 1.06,
             }}
           >

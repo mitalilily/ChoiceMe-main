@@ -69,21 +69,21 @@ const PageHeading: React.FC<PageHeadingProps> = ({
             <Typography
               sx={{
                 fontSize: '0.68rem',
-                fontWeight: 700,
+                fontWeight: 600,
                 color: brand.inkSoft,
                 textTransform: 'uppercase',
-                letterSpacing: '0.18em',
+                letterSpacing: 0,
               }}
             >
               {eyebrow}
             </Typography>
             <Typography
               fontSize={fontSize ?? { xs: '1.45rem', md: '1.95rem' }}
-              fontWeight={800}
+              fontWeight={700}
               lineHeight={1.08}
               sx={{
                 color: brand.ink,
-                letterSpacing: '-0.04em',
+                letterSpacing: 0,
               }}
             >
               {title}

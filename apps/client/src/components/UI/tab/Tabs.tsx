@@ -53,7 +53,7 @@ const StyledTab = styled(Tab)(({ theme }) => ({
   textTransform: 'none',
   borderRadius: 10,
   padding: '10px 18px',
-  fontWeight: 700,
+  fontWeight: 500,
   fontSize: '0.92rem',
   color: theme.palette.text.secondary,
   border: `1px solid ${alpha(theme.palette.primary.main, 0.08)}`,
@@ -78,7 +78,7 @@ const CounterChip = styled('span')(({ theme }) => ({
   borderRadius: 8,
   background: alpha(theme.palette.primary.main, 0.08),
   color: theme.palette.primary.main,
-  fontWeight: 800,
+  fontWeight: 600,
 }))
 
 export function SmartTabs<T extends string = string>({
