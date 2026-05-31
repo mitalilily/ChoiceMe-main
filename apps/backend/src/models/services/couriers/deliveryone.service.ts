@@ -485,26 +485,54 @@ export class DeliveryOneService {
   private extractErrorMessage(raw: any, fallback: string) {
     if (!raw) return fallback
     if (typeof raw === 'string') return raw
-    const normalizedRemarks = (remarks: unknown): string[] => {
-      if (!remarks) return []
-      if (Array.isArray(remarks)) return remarks.flatMap((entry) => normalizedRemarks(entry))
-      if (typeof remarks === 'object') {
-        return Object.values(remarks as Record<string, unknown>).flatMap((entry) =>
-          normalizedRemarks(entry),
-        )
+    const normalizedRemarks = (remarks: unknown, messages: string[] = []): string[] => {
+      if (remarks === undefined || remarks === null || typeof remarks === 'boolean') {
+        return messages
       }
-      return [String(remarks).trim()].filter(Boolean)
+      if (Array.isArray(remarks)) {
+        remarks.forEach((entry) => normalizedRemarks(entry, messages))
+        return messages
+      }
+      if (typeof remarks === 'object') {
+        Object.values(remarks as Record<string, unknown>).forEach((entry) =>
+          normalizedRemarks(entry, messages),
+        )
+        return messages
+      }
+      const text = String(remarks).trim()
+      if (text && !['true', 'false'].includes(text.toLowerCase())) {
+        messages.push(text)
+      }
+      return messages
     }
+    const uniqueMessages = (values: string[]) => Array.from(new Set(values.filter(Boolean)))
+    const directMessages = uniqueMessages(
+      normalizedRemarks([
+        raw?.detail,
+        raw?.message,
+        raw?.error_message,
+        raw?.status_message,
+        raw?.reason,
+        raw?.prepaid,
+        raw?.pre_paid,
+        raw?.cod,
+        raw?.wallet,
+        raw?.balance,
+        raw?.pickup_date,
+        raw?.pickup_time,
+        raw?.pickup_location,
+        raw?.expected_package_count,
+        raw?.non_field_errors,
+      ]),
+    )
+    const allMessages = uniqueMessages(normalizedRemarks(raw)).slice(0, 4)
 
     return (
-      raw?.detail ||
-      raw?.message ||
+      directMessages.join(' | ') ||
       (typeof raw?.error === 'string' ? raw.error : normalizedRemarks(raw?.error).join(' | ')) ||
-      raw?.error_message ||
-      raw?.status_message ||
-      raw?.reason ||
       normalizedRemarks(raw?.rmk).join(' | ') ||
       normalizedRemarks(raw?.remarks).join(' | ') ||
+      allMessages.join(' | ') ||
       fallback
     )
   }

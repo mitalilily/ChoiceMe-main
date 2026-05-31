@@ -150,6 +150,17 @@ const getUserFacingManifestError = (
     return rawMessage
   }
 
+  const delhiveryWalletMatch = rawMessage.match(
+    /client wallet balance is\s*([0-9,.]+)\s*which is less than\s*([0-9,.]+)/i,
+  )
+  if (delhiveryWalletMatch) {
+    return `Delhivery could not schedule the pickup because the Delhivery wallet balance is Rs. ${delhiveryWalletMatch[1]} and the required minimum is Rs. ${delhiveryWalletMatch[2]}. Please top up the Delhivery wallet and try Ship Now again.`
+  }
+
+  if (/wallet balance/i.test(rawMessage) && /less than|low|insufficient/i.test(rawMessage)) {
+    return `Delhivery could not schedule the pickup because the Delhivery wallet balance is too low. Please top up the Delhivery wallet and try Ship Now again. ${rawMessage}`
+  }
+
   return rawMessage
 }
 

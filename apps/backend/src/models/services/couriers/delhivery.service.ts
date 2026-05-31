@@ -1191,6 +1191,28 @@ export class DelhiveryService {
       const providerError = err.response?.data
       console.error('❌ Delhivery pickup request error:', providerError || err.message)
 
+      const collectProviderMessages = (value: unknown, messages: string[] = []): string[] => {
+        if (value === undefined || value === null || typeof value === 'boolean') return messages
+        if (typeof value === 'string' || typeof value === 'number') {
+          const text = String(value).trim()
+          if (text && !['true', 'false'].includes(text.toLowerCase())) messages.push(text)
+          return messages
+        }
+        if (Array.isArray(value)) {
+          value.forEach((entry) => collectProviderMessages(entry, messages))
+          return messages
+        }
+        if (typeof value === 'object') {
+          Object.values(value as Record<string, unknown>).forEach((entry) =>
+            collectProviderMessages(entry, messages),
+          )
+        }
+        return messages
+      }
+      const providerMessages = Array.from(new Set(collectProviderMessages(providerError))).slice(
+        0,
+        4,
+      )
       const providerMessage =
         typeof providerError?.pickup_date === 'string'
           ? providerError.pickup_date
@@ -1198,9 +1220,11 @@ export class DelhiveryService {
             ? providerError.message
             : typeof providerError?.error === 'string'
               ? providerError.error
-              : typeof err.message === 'string' && err.message.trim().length > 0
-                ? err.message.trim()
-                : 'Failed to create pickup request in Delhivery'
+              : providerMessages.length
+                ? providerMessages.join(' | ')
+                : typeof err.message === 'string' && err.message.trim().length > 0
+                  ? err.message.trim()
+                  : 'Failed to create pickup request in Delhivery'
 
       const error = new Error(providerMessage)
       ;(error as any).statusCode =
