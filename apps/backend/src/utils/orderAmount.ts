@@ -20,7 +20,15 @@ export const extractOrderAmountFromBody = (body: Record<string, any>): OrderAmou
     return { wasProvided: false, invalid: false }
   }
 
-  const rawValue = body.order_amount ?? body.orderAmount
+  const rawValue =
+    body.order_amount ??
+    body.orderAmount ??
+    body.shipment_value ??
+    body.shipmentValue ??
+    body.invoice_value ??
+    body.invoiceValue ??
+    body.declared_value ??
+    body.declaredValue
 
   if (rawValue === undefined || rawValue === null || rawValue === '') {
     return { wasProvided: false, invalid: false }
@@ -50,7 +58,15 @@ export const extractCodChargeBasisFromBody = (
     return { value: fallback, wasProvided: false, invalid: false }
   }
 
-  const rawValue = body.cod_charge_basis ?? body.codChargeBasis
+  const rawValue =
+    body.cod_charge_basis ??
+    body.codChargeBasis ??
+    body.shipment_value ??
+    body.shipmentValue ??
+    body.invoice_value ??
+    body.invoiceValue ??
+    body.declared_value ??
+    body.declaredValue
 
   if (rawValue === undefined || rawValue === null || rawValue === '') {
     return { value: fallback, wasProvided: false, invalid: false }

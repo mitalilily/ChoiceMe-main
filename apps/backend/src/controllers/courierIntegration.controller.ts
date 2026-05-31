@@ -102,6 +102,21 @@ const buildServiceabilityOptions = (body: any): Record<string, any> => {
   return options
 }
 
+const extractPincodePairFromBody = (body: any) => ({
+  origin:
+    body?.origin ??
+    body?.pickupPincode ??
+    body?.pickup_pincode ??
+    body?.sourcePincode ??
+    body?.source_pincode,
+  destination:
+    body?.destination ??
+    body?.deliveryPincode ??
+    body?.delivery_pincode ??
+    body?.destinationPincode ??
+    body?.destination_pincode,
+})
+
 // src/controllers/courier.controller.ts
 export const getCouriers = async (req: Request, res: Response) => {
   try {
@@ -190,8 +205,6 @@ export const getToken = async (): Promise<string> => {
 export const fetchAvailableCouriers = async (req: Request, res: Response) => {
   try {
     const {
-      origin,
-      destination,
       payment_type,
       weight,
       length,
@@ -199,6 +212,7 @@ export const fetchAvailableCouriers = async (req: Request, res: Response) => {
       height,
       shipment_type,
     } = req.body
+    const { origin, destination } = extractPincodePairFromBody(req.body)
     if (!origin || !destination) {
       return res.status(400).json({
         success: false,
@@ -251,8 +265,8 @@ export const fetchAvailableCouriers = async (req: Request, res: Response) => {
 
 export const fetchAvailableCouriersForGuestController = async (req: Request, res: Response) => {
   try {
-    const { origin, destination, payment_type, weight, length, breadth, height, shipment_type } =
-      req.body
+    const { payment_type, weight, length, breadth, height, shipment_type } = req.body
+    const { origin, destination } = extractPincodePairFromBody(req.body)
 
     // Validate required fields
     if (!origin || !destination) {
@@ -373,8 +387,6 @@ export const fetchAvailableCouriersForGuestController = async (req: Request, res
 export const fetchAvailableCouriersToUser = async (req: Request, res: Response) => {
   try {
     const {
-      origin,
-      destination,
       payment_type,
       weight,
       length,
@@ -382,6 +394,7 @@ export const fetchAvailableCouriersToUser = async (req: Request, res: Response) 
       height,
       shipment_type,
     } = req.body
+    const { origin, destination } = extractPincodePairFromBody(req.body)
     if (!origin || !destination) {
       return res.status(400).json({
         success: false,

@@ -120,11 +120,10 @@ const run = async () => {
     {
       const req: MockReq = {
         body: {
-          origin: 400001,
-          destination: 560001,
+          pickupPincode: '400001',
+          deliveryPincode: '560001',
           payment_type: 'cod',
-          order_amount: 2500,
-          cod_charge_basis: 2500,
+          shipment_value: 2500,
           shipment_type: 'b2c',
           weight: 750,
           length: 10,
@@ -141,6 +140,8 @@ const run = async () => {
       assert.equal(res.body?.data?.[0]?.localRates?.forward?.rate, 110)
       assert.equal(res.body?.data?.[0]?.provider_rate?.total, 95)
       assert.equal(res.body?.data?.[0]?.final_courier_charge, 150)
+      assert.equal(guestCall?.params?.origin, 400001)
+      assert.equal(guestCall?.params?.destination, 560001)
       assert.equal(guestCall?.params?.shipment_type, 'b2c')
       assert.equal(guestCall?.params?.isCalculator, true)
       assert.equal(guestCall?.params?.order_amount, 2500)

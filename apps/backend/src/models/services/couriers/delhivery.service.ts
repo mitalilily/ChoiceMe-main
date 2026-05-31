@@ -1100,22 +1100,34 @@ export class DelhiveryService {
         return Array.from(new Set(allMessages)).slice(0, 4).join(' | ') || fallback
       }
 
+      const postPickupFormFields = async () =>
+        axios.post(`${this.apiBase}/fm/request/new/`, qs.stringify(payload), {
+          headers: {
+            Authorization: `Token ${this.token}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          timeout: 30000,
+        })
+
       let res
       try {
         res = await axios.post(url, payload, { headers, timeout: 30000 })
       } catch (error: any) {
-        if (Number(error?.response?.status) !== 415) {
+        const status = Number(error?.response?.status)
+        if (![400, 415, 422].includes(status)) {
           throw error
         }
 
-        console.warn('Delhivery pickup JSON rejected with 415, retrying as form-encoded', {
+        console.warn('Delhivery pickup JSON rejected, retrying as form-encoded', {
           pickup_date: payload.pickup_date,
           pickup_time: payload.pickup_time,
           pickup_location: payload.pickup_location,
           expected_package_count: payload.expected_package_count,
+          status,
           response: error?.response?.data || null,
         })
-        res = await this.postFormEncoded('/fm/request/new/', payload)
+        res = await postPickupFormFields()
       }
 
       const raw = res.data

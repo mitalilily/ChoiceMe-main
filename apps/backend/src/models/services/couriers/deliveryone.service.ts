@@ -454,6 +454,10 @@ export class DeliveryOneService {
     return ['y', 'yes', 'true', '1', 'available', 'serviceable'].includes(normalized)
   }
 
+  private isAnyYes(...values: unknown[]) {
+    return values.some((value) => this.isYes(value))
+  }
+
   private getRecords(raw: any): DeliveryOnePincodeRecord[] {
     if (Array.isArray(raw?.delivery_codes)) return raw.delivery_codes
     if (Array.isArray(raw?.data?.delivery_codes)) return raw.data.delivery_codes
@@ -1642,6 +1646,18 @@ export class DeliveryOneService {
     const headers = await this.getHeaders()
 
     try {
+      const postPickupFormFields = async () => {
+        const token = await this.getToken()
+        return axios.post(`${this.apiBase}/fm/request/new/`, qs.stringify(payload), {
+          headers: {
+            Authorization: `Token ${token}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          timeout: 30000,
+        })
+      }
+
       let response
       try {
         response = await axios.post(`${this.apiBase}/fm/request/new/`, payload, {
@@ -1649,18 +1665,20 @@ export class DeliveryOneService {
           timeout: 30000,
         })
       } catch (error: any) {
-        if (Number(error?.response?.status) !== 415) {
+        const status = Number(error?.response?.status)
+        if (![400, 415, 422].includes(status)) {
           throw error
         }
 
-        this.log('Pickup request JSON rejected with 415, retrying as form-encoded', {
+        this.log('Pickup request JSON rejected, retrying as form-encoded', {
           pickupDate: payload.pickup_date,
           pickupTime: payload.pickup_time,
           pickupLocation: payload.pickup_location,
           expectedPackageCount: payload.expected_package_count,
+          status,
           response: error?.response?.data || null,
         })
-        response = await this.postFormEncoded('/fm/request/new/', payload)
+        response = await postPickupFormFields()
       }
       const raw = response.data
       const extractedMessage = this.extractErrorMessage(raw, '')
@@ -2664,12 +2682,52 @@ export class DeliveryOneService {
       const records = this.getRecords(response.data)
       const record = records[0] ?? null
       const postalCode = record?.postal_code ?? {}
-      const remark = String(postalCode?.remark ?? '').trim()
-      const embargoed = remark.toLowerCase() === 'embargo'
+      const remarkText = [
+        postalCode?.remark,
+        postalCode?.remarks,
+        postalCode?.status,
+        postalCode?.sort_code,
+        record?.remark,
+        record?.remarks,
+        record?.status,
+      ]
+        .filter((value) => value !== undefined && value !== null)
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      const embargoed =
+        this.isAnyYes(postalCode?.embargo, postalCode?.embargoed) ||
+        /\b(embargo|nsz|non[-\s]?serviceable|not\s+serviceable|inactive|disabled)\b/i.test(
+          remarkText,
+        )
       const hasRecord = records.length > 0
-      const pickupAvailable = hasRecord && this.isYes(postalCode?.pickup)
-      const codAvailable = hasRecord && this.isYes(postalCode?.cod)
-      const prepaidAvailable = hasRecord && this.isYes(postalCode?.pre_paid)
+      const pickupAvailable =
+        hasRecord &&
+        this.isAnyYes(
+          postalCode?.pickup,
+          postalCode?.pickup_available,
+          postalCode?.pickupAvailable,
+          postalCode?.pickup_enabled,
+        )
+      const codAvailable =
+        hasRecord &&
+        this.isAnyYes(
+          postalCode?.cod,
+          postalCode?.cod_available,
+          postalCode?.codAvailable,
+          postalCode?.cash,
+          postalCode?.cash_on_delivery,
+        )
+      const prepaidAvailable =
+        hasRecord &&
+        this.isAnyYes(
+          postalCode?.pre_paid,
+          postalCode?.prepaid,
+          postalCode?.prepaid_available,
+          postalCode?.prepaidAvailable,
+          postalCode?.pre_paid_available,
+        )
       const serviceable = hasRecord && !embargoed
 
       this.log('B2C pincode serviceability', {
