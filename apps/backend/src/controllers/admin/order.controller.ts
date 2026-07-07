@@ -23,6 +23,9 @@ export const getAllOrdersControllerAdmin = async (req: any, res: Response) => {
       toDate: req.query.toDate as string | undefined,
       search: req.query.search as string | undefined,
       userId: req.query.userId as string | undefined,
+      pickupStatus: req.query.pickupStatus as string | undefined,
+      dashboardView: req.query.dashboardView as string | undefined,
+      businessDate: req.query.businessDate as string | undefined,
       sortBy: (req.query.sortBy as 'created_at' | undefined) || 'created_at',
       sortOrder: (req.query.sortOrder as 'asc' | 'desc' | undefined) || 'desc',
     }
@@ -49,6 +52,9 @@ export const exportOrdersControllerAdmin = async (req: any, res: Response) => {
       toDate: req.query.toDate as string | undefined,
       search: req.query.search as string | undefined,
       userId: req.query.userId as string | undefined,
+      pickupStatus: req.query.pickupStatus as string | undefined,
+      dashboardView: req.query.dashboardView as string | undefined,
+      businessDate: req.query.businessDate as string | undefined,
       sortBy: (req.query.sortBy as 'created_at' | undefined) || 'created_at',
       sortOrder: (req.query.sortOrder as 'asc' | 'desc' | undefined) || 'desc',
     }

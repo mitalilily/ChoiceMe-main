@@ -24,6 +24,11 @@ import { sendWebhookEvent } from '../../services/webhookDelivery.service'
 import { recordRtoEvent } from './rto.service'
 import { applyRtoChargeOnce } from './webhookProcessor'
 import { sendShipmentStatusEmailIfChanged } from './shipmentNotification.service'
+import {
+  formatBusinessDateKey,
+  getBusinessDateKey,
+  getFirstBusinessDateKey,
+} from '../../utils/businessDate'
 
 const ADMIN_EDITABLE_ORDER_STATUSES = new Set([
   'pending',
@@ -45,12 +50,42 @@ const ADMIN_EDITABLE_ORDER_STATUSES = new Set([
 
 const ADMIN_RTO_STATUSES = new Set(['rto', 'rto_in_transit', 'rto_delivered'])
 
+const getOrderStatus = (order: any) => String(order?.order_status || '').trim().toLowerCase()
+
+const getOrderCreatedDateKey = (order: any) =>
+  getFirstBusinessDateKey(order?.order_date, order?.created_at, order?.updated_at)
+
+const getOrderActivityDateKey = (order: any) =>
+  getFirstBusinessDateKey(order?.updated_at, order?.created_at, order?.order_date)
+
+const getDeliveredDateKey = (order: any) =>
+  getFirstBusinessDateKey(order?.delivered_at, order?.updated_at)
+
+const getPickupDateKey = (order: any) =>
+  getFirstBusinessDateKey(
+    order?.pickup_date,
+    order?.pickupDate,
+    order?.pickup_details?.pickup_date,
+    order?.pickup_details?.pickupDate,
+    order?.pickup_details?.requested_pickup_date,
+    order?.pickup_details?.requestedPickupDate,
+    order?.pickup_details?.final_pickup_date,
+    order?.pickup_details?.finalPickupDate,
+    order?.pickup_details?.expected_pickup_date,
+    order?.pickup_details?.expectedPickupDate,
+  )
+
+const isManifestedOrder = (order: any) =>
+  Boolean(order?.manifest || order?.awb_number || order?.shipment_id)
+
 export const getAllOrdersServiceAdmin = async ({
   page = 1,
   limit = 10,
   filters = {} as IOrderFilters,
 }: PaginationParams & { filters?: IOrderFilters }) => {
   const offset = (page - 1) * limit
+  const dashboardDateKey =
+    filters.businessDate || formatBusinessDateKey(new Date()) || getBusinessDateKey(new Date()) || ''
 
   // Fetch B2C orders
   const b2cOrdersRaw = await db.select().from(b2c_orders)
@@ -116,6 +151,50 @@ export const getAllOrdersServiceAdmin = async ({
     combinedOrders = combinedOrders.filter((o) => o.order_status === filters.status)
   }
 
+  if (filters.pickupStatus) {
+    const pickupStatus = String(filters.pickupStatus).trim().toLowerCase()
+    combinedOrders = combinedOrders.filter(
+      (o) => String(o.pickup_status || '').trim().toLowerCase() === pickupStatus,
+    )
+  }
+
+  if (filters.dashboardView) {
+    const dashboardView = String(filters.dashboardView).trim()
+    combinedOrders = combinedOrders.filter((order) => {
+      const status = getOrderStatus(order)
+
+      switch (dashboardView) {
+        case 'todayOrders':
+          return getOrderCreatedDateKey(order) === dashboardDateKey
+        case 'todayManifest':
+          return (
+            status !== 'cancelled' &&
+            isManifestedOrder(order) &&
+            getOrderActivityDateKey(order) === dashboardDateKey
+          )
+        case 'todayDelivery':
+          return status === 'delivered' && getDeliveredDateKey(order) === dashboardDateKey
+        case 'todayShipped':
+          return (
+            ['booked', 'pickup_initiated', 'shipment_created', 'in_transit', 'out_for_delivery'].includes(
+              status,
+            ) && getOrderActivityDateKey(order) === dashboardDateKey
+          )
+        case 'upcomingPickup': {
+          const pickupStatus = String(order.pickup_status || '').trim().toLowerCase()
+          const pickupDateKey = getPickupDateKey(order)
+          return (
+            order.type === 'b2c' &&
+            pickupStatus === 'scheduled' &&
+            (!pickupDateKey || pickupDateKey >= dashboardDateKey)
+          )
+        }
+        default:
+          return true
+      }
+    })
+  }
+
   if (filters.fromDate) {
     combinedOrders = combinedOrders.filter((o) =>
       o.created_at ? new Date(o.created_at) >= new Date(filters.fromDate!) : false,
@@ -131,13 +210,20 @@ export const getAllOrdersServiceAdmin = async ({
   if (filters.search) {
     const keyword = filters.search.toLowerCase()
     combinedOrders = combinedOrders.filter((o) => {
-      return (
-        o.order_number?.toLowerCase().includes(keyword) ||
-        o.buyer_name?.toLowerCase().includes(keyword) ||
-        o.buyer_phone?.includes(keyword) ||
-        o.awb_number?.includes(keyword)
-        // o.userProfile?.name?.toLowerCase().includes(keyword) || // ✅ search in user profile
-        // o.userProfile?.email?.toLowerCase().includes(keyword)
+      const searchableValues = [
+        o.order_number,
+        o.buyer_name,
+        o.buyer_phone,
+        o.awb_number,
+        o.merchantName,
+        o.merchantEmail,
+        o.merchantPhone,
+      ]
+
+      return searchableValues.some((value) =>
+        String(value || '')
+          .toLowerCase()
+          .includes(keyword),
       )
     })
   }

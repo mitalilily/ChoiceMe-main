@@ -35,22 +35,29 @@ import {
 import { useAdminNdr } from 'hooks/useOps'
 import { useEffect, useState } from 'react'
 import { FiClock, FiMapPin, FiPaperclip, FiPhone, FiRotateCw } from 'react-icons/fi'
+import { useLocation } from 'react-router-dom'
 import { getPresignedDownloadUrls } from 'services/upload.service'
 import { exportAdminNdr, getAdminNdrKpis, getNdrTimeline } from 'services/ops.service'
 import { getCourierDisplayName } from 'utils/courierDisplay'
 import { GenericTable } from 'views/Dashboard/Tables/components/GenericTable'
 
+const getFiltersFromSearch = (search) => {
+  const params = new URLSearchParams(search)
+  return {
+    search: params.get('search') || '',
+    fromDate: params.get('fromDate') || undefined,
+    toDate: params.get('toDate') || undefined,
+    courier: params.get('courier') || '',
+    integration_type: params.get('integration_type') || '',
+    attempt_count: params.get('attempt_count') || '',
+    status: params.get('status') || '',
+  }
+}
+
 export default function AdminNdr() {
+  const location = useLocation()
   const toast = useToast()
-  const [filters, setFilters] = useState({
-    search: '',
-    fromDate: undefined,
-    toDate: undefined,
-    courier: '',
-    integration_type: '',
-    attempt_count: '',
-    status: '',
-  })
+  const [filters, setFilters] = useState(() => getFiltersFromSearch(location.search))
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(20)
   const [selected, setSelected] = useState([])
@@ -135,6 +142,16 @@ export default function AdminNdr() {
     'attempt_no',
     'last_event_time',
   ]
+
+  useEffect(() => {
+    const nextFilters = getFiltersFromSearch(location.search)
+    setFilters((prev) => {
+      const prevString = JSON.stringify(prev)
+      const nextString = JSON.stringify(nextFilters)
+      return prevString === nextString ? prev : nextFilters
+    })
+    setPage(1)
+  }, [location.search])
 
   useEffect(() => {
     ;(async () => {

@@ -12,6 +12,8 @@ const TablesTableRow = ({
   actionsStickyLeft = false,
   hasCheckbox = false,
   actionsColumnWidth = '180px',
+  cellPaddingX = 8,
+  cellPaddingY = 5,
   stickyDivider,
   stickyShadow,
   stickyRightColumnKeys = [],
@@ -30,8 +32,9 @@ const TablesTableRow = ({
         return (
           <Td
             key={idx}
-            ps={8}
-            pe={isLastDataColumn && renderActions ? 10 : 8}
+            ps={cellPaddingX}
+            pe={isLastDataColumn && renderActions ? cellPaddingX + 2 : cellPaddingX}
+            py={cellPaddingY}
             minW={columnWidths[key] || 'auto'}
             maxW={columnWidths[key] || 'auto'}
             overflow="visible"
@@ -52,7 +55,8 @@ const TablesTableRow = ({
 
       {renderActions && (
         <Td
-          px={8}
+          px={cellPaddingX}
+          py={cellPaddingY}
           minW={actionsColumnWidth}
           w={actionsColumnWidth}
           bg={bg}

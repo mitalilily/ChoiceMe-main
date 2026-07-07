@@ -73,8 +73,8 @@ const remittanceFilterOptions = [
   {
     key: 'search',
     label: 'Search',
-    type: 'text',
-    placeholder: 'Order Number, AWB, Email',
+    type: 'search',
+    placeholder: 'Order, AWB, seller name, or seller email',
   },
   {
     key: 'status',
@@ -471,15 +471,14 @@ export default function AdminCodRemittancePage() {
   // Table columns
   const captions = [
     'Order',
-    'User',
+    'Seller',
     'Courier',
-    'COD Amount',
-    'Deductions',
-    'Remittable',
+    'COD',
+    'Fees',
+    'Net',
     'Status',
     'Collected',
     'Settled',
-    'Actions',
   ]
 
   const columnKeys = [
@@ -717,10 +716,12 @@ export default function AdminCodRemittancePage() {
         setPerPage={setUserSummaryPerPage}
         title="Pending COD Totals By Seller"
         data={pendingUserTotals}
-        captions={['Seller', 'Pending Orders', 'Total Amount', 'Collected Window', 'Actions']}
+        density="compact"
+        actionsColumnWidth="170px"
+        captions={['Seller', 'Orders', 'Pending Total', 'Collected Window']}
         columnKeys={['userEmail', 'orderCount', 'totalAmount', 'latestCollectedAt']}
         renderActions={(row) => (
-          <HStack spacing={2}>
+          <HStack spacing={1.5}>
             <Button size="xs" variant="outline" onClick={() => handleOpenUserOrders(row)}>
               Orders
             </Button>
@@ -732,17 +733,31 @@ export default function AdminCodRemittancePage() {
             </Button>
           </HStack>
         )}
+        columnWidths={{
+          userEmail: '220px',
+          orderCount: '90px',
+          totalAmount: '130px',
+          latestCollectedAt: '150px',
+        }}
         renderers={{
-          userEmail: (value) => (
-            <Text fontWeight="600" fontSize="sm">
-              {value || 'Unknown seller'}
-            </Text>
+          userEmail: (value, row) => (
+            <Box maxW="210px">
+              <Text fontWeight="700" fontSize="sm" noOfLines={1}>
+                {row.userName || value || 'Unknown seller'}
+              </Text>
+              {value && row.userName && (
+                <Text fontSize="xs" color="gray.500" noOfLines={1}>
+                  {value}
+                </Text>
+              )}
+            </Box>
           ),
-          orderCount: (value) => <Text fontWeight="600">{value}</Text>,
+          orderCount: (value) => <Text fontWeight="700">{value}</Text>,
           totalAmount: (value, row) => (
             <Button
               variant="link"
               colorScheme="green"
+              size="sm"
               fontWeight="700"
               onClick={() => handleOpenUserOrders(row)}
             >
@@ -773,10 +788,12 @@ export default function AdminCodRemittancePage() {
         setPerPage={setPerPage}
         title="COD Remittances (All Users)"
         data={remittances}
+        density="compact"
+        actionsColumnWidth="150px"
         captions={captions}
         columnKeys={columnKeys}
         renderActions={(row) => (
-          <HStack spacing={2}>
+          <HStack spacing={1.5}>
             {row.status === 'pending' && (
               <Tooltip label="Mark settled offline">
                 <Button size="xs" colorScheme="green" onClick={() => handleOpenCredit(row)}>
@@ -796,37 +813,56 @@ export default function AdminCodRemittancePage() {
             </Tooltip>
           </HStack>
         )}
+        columnWidths={{
+          orderNumber: '150px',
+          userEmail: '220px',
+          courierPartner: '130px',
+          codAmount: '100px',
+          deductions: '100px',
+          remittableAmount: '110px',
+          status: '100px',
+          collectedAt: '105px',
+          creditedAt: '105px',
+        }}
         renderers={{
           orderNumber: (value, row) => (
             <Tooltip label={`AWB: ${row.awbNumber || 'N/A'}`}>
-              <Box>
-                <Text fontWeight="600" fontSize="sm">
+              <Box maxW="145px">
+                <Text fontWeight="700" fontSize="sm" noOfLines={1}>
                   {value}
                 </Text>
-                <Text fontSize="xs" color="gray.500">
+                <Text fontSize="xs" color="gray.500" noOfLines={1}>
                   AWB: {row.awbNumber || 'N/A'}
                 </Text>
               </Box>
             </Tooltip>
           ),
           userEmail: (value, row) => (
-            <Box>
-              <Text fontSize="sm" fontWeight="500">
-                {value}
+            <Box maxW="210px">
+              <Text fontSize="sm" fontWeight="700" noOfLines={1}>
+                {row.userName || value || 'Unknown seller'}
               </Text>
-              {row.userName && (
-                <Text fontSize="xs" color="gray.500">
-                  {row.userName}
+              {value && row.userName && (
+                <Text fontSize="xs" color="gray.500" noOfLines={1}>
+                  {value}
                 </Text>
               )}
             </Box>
           ),
-          courierPartner: (value) => getCourierDisplayName(value, 'N/A'),
-          codAmount: (value) => <Text fontWeight="600">₹{value?.toLocaleString('en-IN')}</Text>,
-          deductions: (value) => <Text color="red.500">₹{value?.toLocaleString('en-IN')}</Text>,
+          courierPartner: (value) => (
+            <Text fontSize="sm" noOfLines={2} maxW="120px">
+              {getCourierDisplayName(value, 'N/A')}
+            </Text>
+          ),
+          codAmount: (value) => (
+            <Text fontSize="sm" fontWeight="700">{`\u20B9${value?.toLocaleString('en-IN')}`}</Text>
+          ),
+          deductions: (value) => (
+            <Text fontSize="sm" color="red.500">{`\u20B9${value?.toLocaleString('en-IN')}`}</Text>
+          ),
           remittableAmount: (value) => (
-            <Text fontWeight="700" color="green.600">
-              ₹{value?.toLocaleString('en-IN')}
+            <Text fontSize="sm" fontWeight="700" color="green.600">
+              {`\u20B9${value?.toLocaleString('en-IN')}`}
             </Text>
           ),
           status: (value) => (

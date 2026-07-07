@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Flex,
@@ -27,35 +28,49 @@ import {
   FiTruck,
   FiXCircle,
 } from 'react-icons/fi'
-import { useLocation } from 'react-router-dom'
+import { useHistory, useLocation } from 'react-router-dom'
 import { exportOrdersToCSV } from 'services/order.service'
 
+const PRESET_LABELS = {
+  todayOrders: 'Today orders',
+  todayManifest: 'Today manifest',
+  todayDelivery: 'Today delivery',
+  todayShipped: 'Today shipped',
+  upcomingPickup: 'Upcoming pickups',
+}
+
+const getFiltersFromSearch = (search) => {
+  const params = new URLSearchParams(search)
+  return {
+    status: params.get('status') || '',
+    sortBy: params.get('sortBy') || 'created_at',
+    sortOrder: params.get('sortOrder') || 'desc',
+    search: params.get('search') || '',
+    fromDate: params.get('fromDate') || '',
+    toDate: params.get('toDate') || '',
+    pickupStatus: params.get('pickupStatus') || '',
+    dashboardView: params.get('dashboardView') || '',
+    businessDate: params.get('businessDate') || '',
+  }
+}
+
 const Orders = () => {
+  const history = useHistory()
   const location = useLocation()
-  const initialSearch = new URLSearchParams(location.search).get('search') || ''
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
-  const [filters, setFilters] = useState({
-    status: '',
-    sortBy: 'created_at',
-    sortOrder: 'desc',
-    search: initialSearch,
-    fromDate: '',
-    toDate: '',
-  })
+  const [filters, setFilters] = useState(() => getFiltersFromSearch(location.search))
   const [isExporting, setIsExporting] = useState(false)
 
   const { data: ordersData, isLoading, isFetching, refetch } = useOrders(page, limit, filters)
   const toast = useToast()
 
   useEffect(() => {
-    const nextSearch = new URLSearchParams(location.search).get('search') || ''
+    const nextFilters = getFiltersFromSearch(location.search)
     setFilters((prev) => {
-      if (prev.search === nextSearch) return prev
-      return {
-        ...prev,
-        search: nextSearch,
-      }
+      const prevString = JSON.stringify(prev)
+      const nextString = JSON.stringify(nextFilters)
+      return prevString === nextString ? prev : nextFilters
     })
     setPage(1)
   }, [location.search])
@@ -63,6 +78,7 @@ const Orders = () => {
   const textColor = useColorModeValue('gray.700', 'white')
   const bgStats = useColorModeValue('white', 'gray.700')
   const borderColor = useColorModeValue('gray.200', 'gray.600')
+  const presetLabel = PRESET_LABELS[filters.dashboardView] || ''
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -84,6 +100,8 @@ const Orders = () => {
     setFilters((prev) => ({
       ...prev,
       status: statusValue,
+      dashboardView: '',
+      businessDate: '',
     }))
     setPage(1)
   }
@@ -114,12 +132,23 @@ const Orders = () => {
     }
   }
 
+  const clearDashboardPreset = () => {
+    setFilters((prev) => ({
+      ...prev,
+      dashboardView: '',
+      businessDate: '',
+      pickupStatus: prev.dashboardView === 'upcomingPickup' ? '' : prev.pickupStatus,
+    }))
+    setPage(1)
+    history.replace('/admin/orders')
+  }
+
   const filterOptions = [
     {
       key: 'search',
       label: 'Search',
       type: 'search',
-      placeholder: 'Search by Order ID, AWB, or Customer...',
+      placeholder: 'Order ID, AWB, customer, seller name, or seller email...',
     },
     {
       key: 'status',
@@ -137,6 +166,17 @@ const Orders = () => {
         { value: 'rto', label: 'RTO' },
         { value: 'rto_in_transit', label: 'RTO In Transit' },
         { value: 'rto_delivered', label: 'RTO Delivered' },
+      ],
+    },
+    {
+      key: 'pickupStatus',
+      label: 'Pickup',
+      type: 'select',
+      placeholder: 'All pickup statuses',
+      options: [
+        { value: 'scheduled', label: 'Scheduled pickup' },
+        { value: 'pending', label: 'Pending pickup' },
+        { value: 'failed', label: 'Failed pickup' },
       ],
     },
     {
@@ -361,6 +401,40 @@ const Orders = () => {
         </Flex>
       </Grid>
 
+      {filters.dashboardView && (
+        <Flex
+          mb={4}
+          p={3}
+          borderRadius="xl"
+          borderWidth="1px"
+          borderColor={borderColor}
+          bg={useColorModeValue('orange.50', 'white')}
+          align={{ base: 'flex-start', md: 'center' }}
+          justify="space-between"
+          gap={3}
+          direction={{ base: 'column', md: 'row' }}
+        >
+          <HStack spacing={3} align="flex-start">
+            <Badge colorScheme="orange" borderRadius="full" px={3} py={1}>
+              Dashboard preset
+            </Badge>
+            <Box>
+              <Text fontSize="sm" fontWeight="700" color={textColor}>
+                {presetLabel}
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                {filters.businessDate
+                  ? `Filtered for business date ${filters.businessDate}.`
+                  : 'Filtered from dashboard action.'}
+              </Text>
+            </Box>
+          </HStack>
+          <Button size="sm" variant="outline" onClick={clearDashboardPreset}>
+            Clear preset
+          </Button>
+        </Flex>
+      )}
+
       <Flex justify="flex-end" align="center" mb={3}>
         <HStack spacing={3}>
           <Text fontSize="sm" color="gray.500">
@@ -379,20 +453,21 @@ const Orders = () => {
               setPage(1)
             }}
           >
-            <option value="asc">Newest first</option>
-            <option value="desc">Oldest first</option>
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
           </Select>
         </HStack>
       </Flex>
 
       {/* Filters Card */}
       <Card mb={4} boxShadow="sm">
-        <CardBody p={4}>
+        <CardBody p={3}>
           <TableFilters
             filters={filterOptions}
             values={filters}
             onApply={(appliedFilters) => {
               setFilters((prev) => ({
+                ...prev,
                 ...appliedFilters,
                 sortBy: prev.sortBy || 'created_at',
                 sortOrder: prev.sortOrder || 'desc',

@@ -9215,6 +9215,9 @@ export interface IOrderFilters {
   toDate?: string
   search?: string
   userId?: string
+  pickupStatus?: string
+  dashboardView?: string
+  businessDate?: string
   sortBy?: 'created_at'
   sortOrder?: 'asc' | 'desc'
 }

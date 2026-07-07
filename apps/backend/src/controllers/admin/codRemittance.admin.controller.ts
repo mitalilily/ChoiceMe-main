@@ -1,8 +1,9 @@
-import { and, desc, eq, gte, like, lte, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm'
 import { Response } from 'express'
 import { buildCsv } from '../../utils/csv'
 import { db } from '../../models/client'
 import { codRemittances } from '../../models/schema/codRemittance'
+import { userProfiles } from '../../models/schema/userProfile'
 import { users } from '../../models/schema/users'
 import { wallets } from '../../models/schema/wallet'
 import { markCodRemittanceSettledOffline } from '../../models/services/codRemittance.service'
@@ -20,12 +21,25 @@ const parseSettlementDate = (value: unknown) => {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed
 }
 
+const sellerNameExpr = sql<string>`NULLIF(
+  COALESCE(
+    ${userProfiles.companyInfo}->>'businessName',
+    ${userProfiles.companyInfo}->>'brandName',
+    ${userProfiles.companyInfo}->>'companyName',
+    ${userProfiles.companyInfo}->>'displayName',
+    ${userProfiles.companyInfo}->>'contactPerson',
+    ''
+  ),
+  ''
+)`
+
 /**
  * Admin: Get all COD remittances across all users
  */
 export const getAllCodRemittances = async (req: any, res: Response): Promise<any> => {
   try {
     const { status, fromDate, toDate, search, page = 1, limit = 50 } = req.query
+    const normalizedSearch = String(search || '').trim()
 
     const offset = (parseInt(page as string) - 1) * parseInt(limit as string)
     const conditions = []
@@ -44,12 +58,13 @@ export const getAllCodRemittances = async (req: any, res: Response): Promise<any
       conditions.push(lte(codRemittances.collectedAt, inclusiveToDate))
     }
 
-    if (search) {
+    if (normalizedSearch) {
       conditions.push(
         or(
-          like(codRemittances.orderNumber, `%${search}%`),
-          like(codRemittances.awbNumber, `%${search}%`),
-          like(users.email, `%${search}%`),
+          ilike(codRemittances.orderNumber, `%${normalizedSearch}%`),
+          ilike(codRemittances.awbNumber, `%${normalizedSearch}%`),
+          ilike(users.email, `%${normalizedSearch}%`),
+          ilike(sellerNameExpr, `%${normalizedSearch}%`),
         ),
       )
     }
@@ -60,7 +75,7 @@ export const getAllCodRemittances = async (req: any, res: Response): Promise<any
         id: codRemittances.id,
         userId: codRemittances.userId,
         userEmail: users.email,
-        // userName: users.name,
+        userName: sellerNameExpr,
         orderId: codRemittances.orderId,
         orderType: codRemittances.orderType,
         orderNumber: codRemittances.orderNumber,
@@ -79,6 +94,7 @@ export const getAllCodRemittances = async (req: any, res: Response): Promise<any
       })
       .from(codRemittances)
       .leftJoin(users, eq(codRemittances.userId, users.id))
+      .leftJoin(userProfiles, eq(codRemittances.userId, userProfiles.userId))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(codRemittances.createdAt))
       .limit(parseInt(limit as string))
@@ -87,6 +103,8 @@ export const getAllCodRemittances = async (req: any, res: Response): Promise<any
     const [countResult] = await db
       .select({ count: sql<number>`count(*)` })
       .from(codRemittances)
+      .leftJoin(users, eq(codRemittances.userId, users.id))
+      .leftJoin(userProfiles, eq(codRemittances.userId, userProfiles.userId))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
 
     return res.json({
@@ -179,6 +197,7 @@ export const getPendingCodRemittanceUserTotals = async (
 ): Promise<any> => {
   try {
     const { fromDate, toDate, search, page = 1, limit = 20 } = req.query
+    const normalizedSearch = String(search || '').trim()
 
     const parsedPage = Math.max(parseInt(page as string, 10) || 1, 1)
     const parsedLimit = Math.max(parseInt(limit as string, 10) || 20, 1)
@@ -196,11 +215,12 @@ export const getPendingCodRemittanceUserTotals = async (
       conditions.push(lte(codRemittances.collectedAt, inclusiveToDate))
     }
 
-    if (search) {
+    if (normalizedSearch) {
       const searchCondition = or(
-        like(users.email, `%${search}%`),
-        like(codRemittances.orderNumber, `%${search}%`),
-        like(codRemittances.awbNumber, `%${search}%`),
+        ilike(users.email, `%${normalizedSearch}%`),
+        ilike(sellerNameExpr, `%${normalizedSearch}%`),
+        ilike(codRemittances.orderNumber, `%${normalizedSearch}%`),
+        ilike(codRemittances.awbNumber, `%${normalizedSearch}%`),
       )
 
       if (searchCondition) {
@@ -217,6 +237,7 @@ export const getPendingCodRemittanceUserTotals = async (
       .select({
         userId: codRemittances.userId,
         userEmail: users.email,
+        userName: sellerNameExpr,
         totalAmount: totalAmountExpr,
         orderCount: orderCountExpr,
         oldestCollectedAt: oldestCollectedAtExpr,
@@ -224,8 +245,9 @@ export const getPendingCodRemittanceUserTotals = async (
       })
       .from(codRemittances)
       .leftJoin(users, eq(codRemittances.userId, users.id))
+      .leftJoin(userProfiles, eq(codRemittances.userId, userProfiles.userId))
       .where(and(...conditions))
-      .groupBy(codRemittances.userId, users.email)
+      .groupBy(codRemittances.userId, users.email, sellerNameExpr)
       .orderBy(desc(totalAmountExpr), desc(latestCollectedAtExpr))
       .limit(parsedLimit)
       .offset(offset)
@@ -234,6 +256,7 @@ export const getPendingCodRemittanceUserTotals = async (
       .select({ count: sql<number>`COUNT(DISTINCT ${codRemittances.userId})` })
       .from(codRemittances)
       .leftJoin(users, eq(codRemittances.userId, users.id))
+      .leftJoin(userProfiles, eq(codRemittances.userId, userProfiles.userId))
       .where(and(...conditions))
 
     return res.json({
@@ -445,7 +468,8 @@ export const updateRemittanceNotes = async (req: any, res: Response): Promise<an
  */
 export const exportAllCodRemittances = async (req: any, res: Response): Promise<any> => {
   try {
-    const { status, fromDate, toDate } = req.query
+    const { status, fromDate, toDate, search } = req.query
+    const normalizedSearch = String(search || '').trim()
 
     const conditions = []
 
@@ -463,12 +487,23 @@ export const exportAllCodRemittances = async (req: any, res: Response): Promise<
       conditions.push(lte(codRemittances.collectedAt, inclusiveToDate))
     }
 
+    if (normalizedSearch) {
+      conditions.push(
+        or(
+          ilike(codRemittances.orderNumber, `%${normalizedSearch}%`),
+          ilike(codRemittances.awbNumber, `%${normalizedSearch}%`),
+          ilike(users.email, `%${normalizedSearch}%`),
+          ilike(sellerNameExpr, `%${normalizedSearch}%`),
+        ),
+      )
+    }
+
     const remittances = await db
       .select({
         orderNumber: codRemittances.orderNumber,
         awbNumber: codRemittances.awbNumber,
         userEmail: users.email,
-        // userName: users.name,
+        userName: sellerNameExpr,
         courierPartner: codRemittances.courierPartner,
         codAmount: codRemittances.codAmount,
         deductions: codRemittances.deductions,
@@ -479,6 +514,7 @@ export const exportAllCodRemittances = async (req: any, res: Response): Promise<
       })
       .from(codRemittances)
       .leftJoin(users, eq(codRemittances.userId, users.id))
+      .leftJoin(userProfiles, eq(codRemittances.userId, userProfiles.userId))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(codRemittances.createdAt))
       .limit(10000)

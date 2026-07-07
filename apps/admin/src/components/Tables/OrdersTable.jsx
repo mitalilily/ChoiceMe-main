@@ -1,5 +1,6 @@
 import {
   Badge,
+  Box,
   Button,
   Flex,
   Icon,
@@ -9,6 +10,7 @@ import {
   MenuList,
   Portal,
   Stack,
+  Text,
   Tooltip,
   useDisclosure,
   useToast,
@@ -48,18 +50,7 @@ const OrdersTable = ({
 
   const supportedCancellationProviders = useMemo(() => new Set(['delhivery', 'deliveryone']), [])
 
-  const captions = [
-    'Order ID',
-    'AWB Number',
-    'Docs',
-    'Merchant',
-    'Customer',
-    'Status',
-    'Order Type',
-    'Amount',
-    'Courier',
-    'Order Date',
-  ]
+  const captions = ['Order', 'AWB', 'Docs', 'Seller', 'Customer', 'Status', 'Type', 'Amount', 'Courier', 'Created']
   const columnKeys = [
     'order_number',
     'awb_number',
@@ -72,8 +63,8 @@ const OrdersTable = ({
     'courier_partner',
     'order_date',
   ]
-  const actionsColumnWidth = '180px'
-  const docsColumnWidth = '240px'
+  const actionsColumnWidth = '140px'
+  const docsColumnWidth = '170px'
 
   const getStatusColor = (status) => {
     const statusColors = {
@@ -108,7 +99,6 @@ const OrdersTable = ({
   const handleCopyAWB = (awb) => {
     if (awb) {
       navigator.clipboard.writeText(awb)
-      // You might want to show a toast notification here
     }
   }
 
@@ -201,47 +191,56 @@ const OrdersTable = ({
   }
 
   const renderers = {
-    order_id: (value) => (
-      <Tooltip label={value}>
-        <span
-          style={{
-            maxWidth: '120px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            display: 'block',
-            fontWeight: 'bold',
-          }}
-        >
-          {value || 'N/A'}
-        </span>
+    order_number: (value, row) => (
+      <Tooltip label={value || row?.id}>
+        <Box maxW="120px">
+          <Text fontSize="sm" fontWeight="700" noOfLines={1}>
+            {value || 'N/A'}
+          </Text>
+          <Text fontSize="xs" color="gray.500" noOfLines={1}>
+            {row?.id || 'No internal ID'}
+          </Text>
+        </Box>
       </Tooltip>
     ),
     merchantName: (value, row) => (
-      <Button
-        variant="link"
-        colorScheme="blue"
-        size="sm"
-        onClick={() => {
-          if (row?.user_id) {
-            history.push(`/admin/users-management/${row.user_id}/overview`)
-          } else {
-            toast({
-              title: 'Merchant details unavailable',
-              description: 'User identifier missing for this order.',
-              status: 'warning',
-              duration: 4000,
-              isClosable: true,
-            })
-          }
-        }}
-      >
-        {value || row?.merchantEmail || row?.merchantPhone || 'Unknown Merchant'}
-      </Button>
+      <Box maxW="180px">
+        <Button
+          variant="link"
+          colorScheme="blue"
+          size="sm"
+          h="auto"
+          minH="unset"
+          whiteSpace="normal"
+          textAlign="left"
+          onClick={() => {
+            if (row?.user_id) {
+              history.push(`/admin/users-management/${row.user_id}/overview`)
+            } else {
+              toast({
+                title: 'Merchant details unavailable',
+                description: 'User identifier missing for this order.',
+                status: 'warning',
+                duration: 4000,
+                isClosable: true,
+              })
+            }
+          }}
+        >
+          {value || row?.merchantEmail || row?.merchantPhone || 'Unknown Seller'}
+        </Button>
+        {row?.merchantEmail && (
+          <Text fontSize="xs" color="gray.500" noOfLines={1}>
+            {row.merchantEmail}
+          </Text>
+        )}
+      </Box>
     ),
     awb_number: (value) => (
-      <Flex align="center" gap={2}>
-        <span style={{ fontFamily: 'monospace' }}>{value || 'N/A'}</span>
+      <Flex align="center" gap={1.5} maxW="140px">
+        <Text fontFamily="mono" fontSize="xs" noOfLines={1}>
+          {value || 'N/A'}
+        </Text>
         {value && (
           <Icon
             as={FiCopy}
@@ -260,67 +259,101 @@ const OrdersTable = ({
       )
 
       return (
-        <Stack direction="row" spacing={2} flexWrap="wrap">
-          <Badge colorScheme={hasLabel ? 'green' : 'orange'} borderRadius="md" px={2} py={1}>
-            {hasLabel ? 'Label Generated' : 'Label Pending'}
+        <Stack direction="row" spacing={1.5} flexWrap="wrap">
+          <Badge colorScheme={hasLabel ? 'green' : 'orange'} borderRadius="full" px={2} py={0.5}>
+            {hasLabel ? 'Label' : 'Label Pending'}
           </Badge>
-          <Badge colorScheme={hasInvoice ? 'green' : 'orange'} borderRadius="md" px={2} py={1}>
-            {hasInvoice ? 'Invoice Generated' : 'Invoice Pending'}
+          <Badge colorScheme={hasInvoice ? 'green' : 'orange'} borderRadius="full" px={2} py={0.5}>
+            {hasInvoice ? 'Invoice' : 'Invoice Pending'}
           </Badge>
         </Stack>
       )
     },
     buyer_name: (value, row) => (
-      <div>
-        <div style={{ fontWeight: '500' }}>{value}</div>
+      <Box maxW="170px">
+        <Text fontSize="sm" fontWeight="600" noOfLines={1}>
+          {value || 'N/A'}
+        </Text>
         {row.buyer_phone && (
-          <div style={{ fontSize: '0.85em', color: 'gray' }}>{row.buyer_phone}</div>
+          <Text fontSize="xs" color="gray.500" noOfLines={1}>
+            {row.buyer_phone}
+          </Text>
         )}
-      </div>
+      </Box>
     ),
     order_status: (value) => (
-      <Badge colorScheme={getStatusColor(value)} fontSize="0.8em" px={2} py={1} borderRadius="md">
-        {value?.replace(/_/g, ' ').toUpperCase()}
+      <Badge colorScheme={getStatusColor(value)} fontSize="0.72em" px={2} py={0.5} borderRadius="full">
+        {String(value || 'unknown')
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (char) => char.toUpperCase())}
       </Badge>
     ),
     order_type: (value) => (
       <Badge
         colorScheme={getOrderTypeColor(value)}
-        fontSize="0.8em"
+        fontSize="0.72em"
         px={2}
-        py={1}
-        borderRadius="md"
+        py={0.5}
+        borderRadius="full"
       >
         {value?.toUpperCase()}
       </Badge>
     ),
     order_amount: (value) => (
-      <span style={{ fontWeight: '600' }}>₹{parseFloat(value || 0).toFixed(2)}</span>
+      <Text fontSize="sm" fontWeight="700">
+        {`\u20B9${parseFloat(value || 0).toFixed(2)}`}
+      </Text>
     ),
-    courier_partner: (value, row) =>
-      getCourierDisplayName(
-        {
-          name: value,
-          courier_id: row?.courier_id,
-          integration_type: row?.integration_type,
-        },
-        'Not Assigned',
-      ),
+    courier_partner: (value, row) => (
+      <Tooltip
+        label={getCourierDisplayName(
+          {
+            name: value,
+            courier_id: row?.courier_id,
+            integration_type: row?.integration_type,
+          },
+          'Not Assigned',
+        )}
+      >
+        <Text fontSize="sm" noOfLines={2} maxW="130px">
+          {getCourierDisplayName(
+            {
+              name: value,
+              courier_id: row?.courier_id,
+              integration_type: row?.integration_type,
+            },
+            'Not Assigned',
+          )}
+        </Text>
+      </Tooltip>
+    ),
     order_date: (value) => {
       if (!value) return 'N/A'
       const date = new Date(value)
-      return date.toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })
+      return (
+        <Box>
+          <Text fontSize="sm" fontWeight="600">
+            {date.toLocaleDateString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </Text>
+          <Text fontSize="xs" color="gray.500">
+            {date.toLocaleTimeString('en-IN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </Text>
+        </Box>
+      )
     },
   }
 
   const renderActions = (order) => (
     <Menu placement="bottom-end">
-      <MenuButton as={Button} size="sm" variant="ghost" rightIcon={<FiMoreVertical />}>
-        Actions
+      <MenuButton as={Button} size="xs" variant="ghost" rightIcon={<FiMoreVertical />} minW="auto">
+        More
       </MenuButton>
       <Portal>
         <MenuList zIndex={2000} boxShadow="xl">
@@ -371,19 +404,19 @@ const OrdersTable = ({
         setPerPage={setPerPage}
         perPageOptions={[10, 20, 50, 100]}
         actionsColumnWidth={actionsColumnWidth}
+        density="compact"
         columnWidths={{
-          order_id: '140px',
-          awb_number: '180px',
+          order_number: '130px',
+          awb_number: '150px',
           documents: docsColumnWidth,
-          buyer_name: '200px',
-          order_status: '150px',
-          order_type: '100px',
-          order_amount: '120px',
-          courier_partner: '150px',
-          order_date: '120px',
+          merchantName: '190px',
+          buyer_name: '180px',
+          order_status: '130px',
+          order_type: '90px',
+          order_amount: '105px',
+          courier_partner: '140px',
+          order_date: '130px',
         }}
-        stickyRightColumnKeys={['documents']}
-        stickyRightOffsets={{ documents: actionsColumnWidth }}
       />
 
       {selectedOrder && (

@@ -45,7 +45,12 @@ export const GenericTable = ({
   actionsColumnWidth = '180px',
   stickyRightColumnKeys = [],
   stickyRightOffsets = {},
+  density = 'comfortable',
 }) => {
+  const isCompact = density === 'compact'
+  const headerPaddingX = isCompact ? 4 : 8
+  const cellPaddingX = isCompact ? 4 : 8
+  const cellPaddingY = isCompact ? 3 : 5
   const textColor = useColorModeValue('gray.800', 'gray.100')
   const headerBg = useColorModeValue('#F8FAFC', '#17243E')
   const headerColor = useColorModeValue('gray.600', 'gray.300')
@@ -88,7 +93,7 @@ export const GenericTable = ({
 
   return (
     <Card overflow="visible">
-      <CardHeader p="2px 2px 18px">
+      <CardHeader p={isCompact ? '2px 2px 12px' : '2px 2px 18px'}>
         <Flex width="100%" alignItems="center" justifyContent="space-between" direction={{ base: 'column', md: 'row' }} gap={2}>
           <Stack direction="row" gap={4} align="center">
             <Text fontSize={{ base: 'lg', md: 'xl' }} color={textColor} fontWeight="800" letterSpacing="-0.01em">
@@ -121,11 +126,21 @@ export const GenericTable = ({
           overflow="hidden"
           style={{ width: '100%', overflowX: 'auto', overflowY: 'visible' }}
         >
-          <Table variant="simple" color={textColor}>
+          <Table variant="simple" color={textColor} size={isCompact ? 'sm' : 'md'}>
             <Thead>
               <Tr>
                 {showCheckboxes && (
-                  <Th ps={8} bg={headerBg} position="sticky" top={0} zIndex={3} color={headerColor}>
+                  <Th
+                    ps={headerPaddingX}
+                    pe={headerPaddingX}
+                    py={isCompact ? 3 : 4}
+                    bg={headerBg}
+                    position="sticky"
+                    top={0}
+                    zIndex={3}
+                    color={headerColor}
+                    fontSize={isCompact ? 'xs' : 'sm'}
+                  >
                     <Checkbox
                       isChecked={selectedRows.length === data.length && data.length > 0}
                       isIndeterminate={selectedRows.length > 0 && selectedRows.length < data.length}
@@ -136,7 +151,9 @@ export const GenericTable = ({
                 {columnKeys.map((key, idx) => (
                   <Th
                     key={key}
-                    ps={8}
+                    ps={headerPaddingX}
+                    pe={headerPaddingX}
+                    py={isCompact ? 3 : 4}
                     color={headerColor}
                     minW={columnWidths[key] || 'auto'}
                     maxW={columnWidths[key] || 'auto'}
@@ -153,6 +170,9 @@ export const GenericTable = ({
                         ? '-6px 0 10px rgba(13, 59, 142, 0.08)'
                         : undefined
                     }
+                    fontSize={isCompact ? 'xs' : 'sm'}
+                    letterSpacing="0.02em"
+                    whiteSpace="nowrap"
                   >
                     {captions[idx]}
                   </Th>
@@ -161,7 +181,8 @@ export const GenericTable = ({
                   <Th
                     bg={headerBg}
                     color={headerColor}
-                    px={8}
+                    px={headerPaddingX}
+                    py={isCompact ? 3 : 4}
                     minW={actionsColumnWidth}
                     w={actionsColumnWidth}
                     position="sticky"
@@ -172,6 +193,7 @@ export const GenericTable = ({
                     borderLeft="1px solid"
                     borderColor={stickyDivider}
                     boxShadow={stickyShadow}
+                    fontSize={isCompact ? 'xs' : 'sm'}
                   >
                     Actions
                   </Th>
@@ -214,6 +236,8 @@ export const GenericTable = ({
                     columnWidths={columnWidths}
                     isScrolled={isScrolled}
                     actionsColumnWidth={actionsColumnWidth}
+                    cellPaddingX={cellPaddingX}
+                    cellPaddingY={cellPaddingY}
                     stickyDivider={stickyDivider}
                     stickyShadow={stickyShadow}
                     stickyRightColumnKeys={stickyRightColumnKeys}
