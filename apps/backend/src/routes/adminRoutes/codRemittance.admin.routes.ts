@@ -9,6 +9,7 @@ import {
   exportAllCodRemittances,
   getAllCodRemittances,
   getCodPlatformStats,
+  getPendingCodRemittanceUserTotals,
   getUserCodRemittances,
   manualCreditWallet,
   updateRemittanceNotes,
@@ -28,6 +29,7 @@ router.get('/stats', getCodPlatformStats)
 // All remittances (admin view)
 router.get('/remittances', getAllCodRemittances)
 router.get('/remittances/export', exportAllCodRemittances)
+router.get('/user-totals', getPendingCodRemittanceUserTotals)
 
 // User-specific view
 router.get('/users/:userId/remittances', getUserCodRemittances)

@@ -171,11 +171,98 @@ export const getCodPlatformStats = async (req: any, res: Response): Promise<any>
 }
 
 /**
+ * Admin: Get pending COD remittances grouped by seller
+ */
+export const getPendingCodRemittanceUserTotals = async (
+  req: any,
+  res: Response,
+): Promise<any> => {
+  try {
+    const { fromDate, toDate, search, page = 1, limit = 20 } = req.query
+
+    const parsedPage = Math.max(parseInt(page as string, 10) || 1, 1)
+    const parsedLimit = Math.max(parseInt(limit as string, 10) || 20, 1)
+    const offset = (parsedPage - 1) * parsedLimit
+
+    const conditions = [eq(codRemittances.status, 'pending')]
+
+    if (fromDate) {
+      conditions.push(gte(codRemittances.collectedAt, new Date(fromDate as string)))
+    }
+
+    if (toDate) {
+      const inclusiveToDate = new Date(toDate as string)
+      inclusiveToDate.setHours(23, 59, 59, 999)
+      conditions.push(lte(codRemittances.collectedAt, inclusiveToDate))
+    }
+
+    if (search) {
+      const searchCondition = or(
+        like(users.email, `%${search}%`),
+        like(codRemittances.orderNumber, `%${search}%`),
+        like(codRemittances.awbNumber, `%${search}%`),
+      )
+
+      if (searchCondition) {
+        conditions.push(searchCondition)
+      }
+    }
+
+    const totalAmountExpr = sql<number>`COALESCE(SUM(${codRemittances.remittableAmount}), 0)`
+    const orderCountExpr = sql<number>`COUNT(*)`
+    const oldestCollectedAtExpr = sql<Date | null>`MIN(${codRemittances.collectedAt})`
+    const latestCollectedAtExpr = sql<Date | null>`MAX(${codRemittances.collectedAt})`
+
+    const userTotals = await db
+      .select({
+        userId: codRemittances.userId,
+        userEmail: users.email,
+        totalAmount: totalAmountExpr,
+        orderCount: orderCountExpr,
+        oldestCollectedAt: oldestCollectedAtExpr,
+        latestCollectedAt: latestCollectedAtExpr,
+      })
+      .from(codRemittances)
+      .leftJoin(users, eq(codRemittances.userId, users.id))
+      .where(and(...conditions))
+      .groupBy(codRemittances.userId, users.email)
+      .orderBy(desc(totalAmountExpr), desc(latestCollectedAtExpr))
+      .limit(parsedLimit)
+      .offset(offset)
+
+    const [countResult] = await db
+      .select({ count: sql<number>`COUNT(DISTINCT ${codRemittances.userId})` })
+      .from(codRemittances)
+      .leftJoin(users, eq(codRemittances.userId, users.id))
+      .where(and(...conditions))
+
+    return res.json({
+      success: true,
+      data: {
+        users: userTotals.map((row: any) => ({
+          ...row,
+          totalAmount: Number(row.totalAmount || 0),
+          orderCount: Number(row.orderCount || 0),
+        })),
+        totalCount: Number(countResult?.count || 0),
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(Number(countResult?.count || 0) / parsedLimit),
+      },
+    })
+  } catch (error) {
+    console.error('[getPendingCodRemittanceUserTotals] Error:', error)
+    return res.status(500).json({ success: false, message: 'Failed to fetch user COD totals' })
+  }
+}
+
+/**
  * Admin: Get user-specific COD remittances
  */
 export const getUserCodRemittances = async (req: any, res: Response): Promise<any> => {
   try {
     const { userId } = req.params
+    const { status, fromDate, toDate, page = 1, limit = 100 } = req.query
 
     if (!userId) {
       return res.status(400).json({ success: false, message: 'User ID required' })
@@ -188,13 +275,39 @@ export const getUserCodRemittances = async (req: any, res: Response): Promise<an
       return res.status(404).json({ success: false, message: 'User not found' })
     }
 
+    const parsedPage = Math.max(parseInt(page as string, 10) || 1, 1)
+    const parsedLimit = Math.max(parseInt(limit as string, 10) || 100, 1)
+    const offset = (parsedPage - 1) * parsedLimit
+
+    const conditions = [eq(codRemittances.userId, userId)]
+
+    if (status) {
+      conditions.push(eq(codRemittances.status, status as any))
+    }
+
+    if (fromDate) {
+      conditions.push(gte(codRemittances.collectedAt, new Date(fromDate as string)))
+    }
+
+    if (toDate) {
+      const inclusiveToDate = new Date(toDate as string)
+      inclusiveToDate.setHours(23, 59, 59, 999)
+      conditions.push(lte(codRemittances.collectedAt, inclusiveToDate))
+    }
+
     // Get remittances
     const remittances = await db
       .select()
       .from(codRemittances)
-      .where(eq(codRemittances.userId, userId))
+      .where(and(...conditions))
       .orderBy(desc(codRemittances.createdAt))
-      .limit(50)
+      .limit(parsedLimit)
+      .offset(offset)
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(codRemittances)
+      .where(and(...conditions))
 
     // Get stats
     const [creditedStats] = await db
@@ -236,6 +349,10 @@ export const getUserCodRemittances = async (req: any, res: Response): Promise<an
           walletBalance: Number(wallet?.balance || 0),
         },
         remittances,
+        totalCount: Number(countResult?.count || 0),
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(Number(countResult?.count || 0) / parsedLimit),
       },
     })
   } catch (error) {

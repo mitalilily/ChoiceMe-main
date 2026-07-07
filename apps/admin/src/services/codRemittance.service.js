@@ -19,10 +19,24 @@ export const getAllCodRemittances = async (params = {}) => {
 }
 
 /**
+ * Get pending COD remittance totals grouped by seller
+ */
+export const getPendingCodUserTotals = async (params = {}) => {
+  const { page = 1, limit = 20, fromDate, toDate, search } = params
+  const response = await apiClient.get('/admin/cod-remittance/user-totals', {
+    params: { page, limit, fromDate, toDate, search },
+  })
+  return response.data
+}
+
+/**
  * Get user-specific COD remittances
  */
-export const getUserCodRemittances = async (userId) => {
-  const response = await apiClient.get(`/admin/cod-remittance/users/${userId}/remittances`)
+export const getUserCodRemittances = async (userId, params = {}) => {
+  const { page = 1, limit = 100, status, fromDate, toDate } = params
+  const response = await apiClient.get(`/admin/cod-remittance/users/${userId}/remittances`, {
+    params: { page, limit, status, fromDate, toDate },
+  })
   return response.data
 }
 

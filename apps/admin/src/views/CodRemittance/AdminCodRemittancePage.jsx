@@ -50,8 +50,10 @@ import {
   useCodPlatformStats,
   useConfirmCourierSettlement,
   useManualCreditWallet,
+  usePendingCodUserTotals,
   usePreviewCourierSettlement,
   useUpdateRemittanceNotes,
+  useUserCodRemittances,
 } from 'hooks/useCodRemittance'
 import { useMemo, useState } from 'react'
 import { useHistory } from 'react-router-dom'
@@ -101,8 +103,11 @@ export default function AdminCodRemittancePage() {
   const toast = useToast()
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(20)
+  const [userSummaryPage, setUserSummaryPage] = useState(1)
+  const [userSummaryPerPage, setUserSummaryPerPage] = useState(10)
   const [filters, setFilters] = useState({})
   const [selectedRemittance, setSelectedRemittance] = useState(null)
+  const [selectedUserBucket, setSelectedUserBucket] = useState(null)
   const [notes, setNotes] = useState('')
 
   // CSV Upload States
@@ -117,6 +122,8 @@ export default function AdminCodRemittancePage() {
   const [manualSettlementDate, setManualSettlementDate] = useState(formatDateInput())
   const [manualSettledAmount, setManualSettledAmount] = useState('')
   const [manualSettlementNotes, setManualSettlementNotes] = useState('')
+  const [groupUtrNumber, setGroupUtrNumber] = useState('')
+  const [groupSettlementDate, setGroupSettlementDate] = useState(formatDateInput())
 
   const { isOpen: isNotesOpen, onOpen: onNotesOpen, onClose: onNotesClose } = useDisclosure()
   const { isOpen: isCreditOpen, onOpen: onCreditOpen, onClose: onCreditClose } = useDisclosure()
@@ -130,6 +137,16 @@ export default function AdminCodRemittancePage() {
     onOpen: onCsvReviewOpen,
     onClose: onCsvReviewClose,
   } = useDisclosure()
+  const {
+    isOpen: isUserOrdersOpen,
+    onOpen: onUserOrdersOpen,
+    onClose: onUserOrdersClose,
+  } = useDisclosure()
+  const {
+    isOpen: isUserSettleOpen,
+    onOpen: onUserSettleOpen,
+    onClose: onUserSettleClose,
+  } = useDisclosure()
 
   // Hooks
   const { data: stats, isLoading: statsLoading } = useCodPlatformStats()
@@ -138,13 +155,34 @@ export default function AdminCodRemittancePage() {
     limit: perPage,
     ...filters,
   })
+  const { data: userTotalsData, isLoading: userTotalsLoading } = usePendingCodUserTotals({
+    page: userSummaryPage,
+    limit: userSummaryPerPage,
+    fromDate: filters.fromDate,
+    toDate: filters.toDate,
+    search: filters.search,
+  })
   const manualCreditMutation = useManualCreditWallet()
   const updateNotesMutation = useUpdateRemittanceNotes()
   const previewCsvMutation = usePreviewCourierSettlement()
   const confirmSettlementMutation = useConfirmCourierSettlement()
+  const userRemittanceQueryParams = useMemo(
+    () => ({
+      status: 'pending',
+      limit: 500,
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+    }),
+    [filters.fromDate, filters.toDate],
+  )
+  const { data: selectedUserRemittanceData, isLoading: selectedUserRemittancesLoading } =
+    useUserCodRemittances(selectedUserBucket?.userId, userRemittanceQueryParams)
 
   const remittances = remittanceData?.data?.remittances || []
   const totalCount = remittanceData?.data?.totalCount || 0
+  const pendingUserTotals = userTotalsData?.data?.users || []
+  const totalPendingUserCount = userTotalsData?.data?.totalCount || 0
+  const selectedUserPendingRemittances = selectedUserRemittanceData?.data?.remittances || []
 
   // Handlers
   const handleExport = async () => {
@@ -229,6 +267,28 @@ export default function AdminCodRemittancePage() {
 
   const handleViewUser = (userId) => {
     history.push(`/admin/users-management/${userId}/overview`)
+  }
+
+  const handleOpenUserOrders = (userBucket) => {
+    setSelectedUserBucket(userBucket)
+    onUserOrdersOpen()
+  }
+
+  const handleOpenUserSettle = (userBucket) => {
+    setSelectedUserBucket(userBucket)
+    setGroupUtrNumber('')
+    setGroupSettlementDate(formatDateInput())
+    onUserSettleOpen()
+  }
+
+  const handleCloseUserOrders = () => {
+    onUserOrdersClose()
+    setSelectedUserBucket(null)
+  }
+
+  const handleCloseUserSettle = () => {
+    onUserSettleClose()
+    setSelectedUserBucket(null)
   }
 
   // CSV Upload Handlers
@@ -450,6 +510,95 @@ export default function AdminCodRemittancePage() {
 
   const formatInr = (value) => `₹${toAmount(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+  const selectedUserSettlementRows = useMemo(
+    () =>
+      selectedUserPendingRemittances
+        .filter((item) => item.status === 'pending')
+        .map((item) => ({
+          remittanceId: item.id,
+          awb: item.awbNumber,
+          orderNumber: item.orderNumber,
+          courierAmount: toAmount(item.remittableAmount),
+        })),
+    [selectedUserPendingRemittances],
+  )
+
+  const handleConfirmUserGroupSettlement = async () => {
+    if (!selectedUserBucket) return
+
+    if (!groupUtrNumber.trim()) {
+      toast({
+        title: 'UTR Required',
+        description: 'Please enter the UTR/Transaction number',
+        status: 'warning',
+        duration: 3000,
+      })
+      return
+    }
+
+    if (selectedUserSettlementRows.length === 0) {
+      toast({
+        title: 'No pending orders',
+        description: 'There are no pending remittances left for this seller.',
+        status: 'info',
+        duration: 3500,
+      })
+      return
+    }
+
+    try {
+      const courierNames = Array.from(
+        new Set(
+          selectedUserPendingRemittances
+            .map((item) => getCourierDisplayName(item.courierPartner, '').trim())
+            .filter(Boolean),
+        ),
+      )
+
+      const apiResult = await confirmSettlementMutation.mutateAsync({
+        remittances: selectedUserSettlementRows,
+        utrNumber: groupUtrNumber.trim(),
+        settlementDate: groupSettlementDate,
+        courierPartner:
+          courierNames.length === 1
+            ? courierNames[0]
+            : courierNames.length > 1
+            ? 'Multiple couriers'
+            : 'Courier',
+      })
+
+      const settled = apiResult?.data?.results?.credited || []
+      const failed = apiResult?.data?.results?.failed || []
+
+      if (failed.length > 0) {
+        toast({
+          title: 'Settlement partially processed',
+          description: `Settled ${settled.length}, failed ${failed.length}. Please review the remaining orders.`,
+          status: 'warning',
+          duration: 6000,
+        })
+        return
+      }
+
+      toast({
+        title: 'Seller COD settled',
+        description: `Marked ${settled.length} orders as settled for ${selectedUserBucket.userEmail}.`,
+        status: 'success',
+        duration: 5000,
+      })
+
+      handleCloseUserSettle()
+      onUserOrdersClose()
+    } catch (error) {
+      toast({
+        title: 'Settlement Failed',
+        description: error.response?.data?.message || 'Failed to settle this seller COD batch',
+        status: 'error',
+        duration: 5000,
+      })
+    }
+  }
+
   const creditPreview = useMemo(() => {
     const codAmount = toAmount(selectedRemittance?.codAmount)
     const freightCharges = toAmount(selectedRemittance?.shippingCharges)
@@ -541,6 +690,7 @@ export default function AdminCodRemittancePage() {
         onApply={(finalFilters) => {
           setFilters(finalFilters)
           setPage(1)
+          setUserSummaryPage(1)
         }}
       />
 
@@ -556,6 +706,61 @@ export default function AdminCodRemittancePage() {
           Export CSV
         </Button>
       </Flex>
+
+      <GenericTable
+        paginated
+        loading={userTotalsLoading}
+        page={userSummaryPage}
+        setPage={setUserSummaryPage}
+        totalCount={totalPendingUserCount}
+        perPage={userSummaryPerPage}
+        setPerPage={setUserSummaryPerPage}
+        title="Pending COD Totals By Seller"
+        data={pendingUserTotals}
+        captions={['Seller', 'Pending Orders', 'Total Amount', 'Collected Window', 'Actions']}
+        columnKeys={['userEmail', 'orderCount', 'totalAmount', 'latestCollectedAt']}
+        renderActions={(row) => (
+          <HStack spacing={2}>
+            <Button size="xs" variant="outline" onClick={() => handleOpenUserOrders(row)}>
+              Orders
+            </Button>
+            <Button size="xs" colorScheme="green" onClick={() => handleOpenUserSettle(row)}>
+              Settle All
+            </Button>
+            <Button size="xs" variant="ghost" onClick={() => handleViewUser(row.userId)}>
+              User
+            </Button>
+          </HStack>
+        )}
+        renderers={{
+          userEmail: (value) => (
+            <Text fontWeight="600" fontSize="sm">
+              {value || 'Unknown seller'}
+            </Text>
+          ),
+          orderCount: (value) => <Text fontWeight="600">{value}</Text>,
+          totalAmount: (value, row) => (
+            <Button
+              variant="link"
+              colorScheme="green"
+              fontWeight="700"
+              onClick={() => handleOpenUserOrders(row)}
+            >
+              {formatInr(value)}
+            </Button>
+          ),
+          latestCollectedAt: (_, row) => (
+            <Box>
+              <Text fontSize="xs" color="gray.600">
+                First: {row.oldestCollectedAt ? new Date(row.oldestCollectedAt).toLocaleDateString() : 'N/A'}
+              </Text>
+              <Text fontSize="xs" color="gray.600">
+                Last: {row.latestCollectedAt ? new Date(row.latestCollectedAt).toLocaleDateString() : 'N/A'}
+              </Text>
+            </Box>
+          ),
+        }}
+      />
 
       {/* Table */}
       <GenericTable
@@ -800,6 +1005,146 @@ export default function AdminCodRemittancePage() {
               isLoading={manualCreditMutation.isPending}
             >
               Confirm Settlement
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={isUserOrdersOpen} onClose={handleCloseUserOrders} size="5xl">
+        <ModalOverlay />
+        <ModalContent maxW="88vw">
+          <ModalHeader>Seller COD Order Breakdown</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Box p="12px" bg="gray.50" borderRadius="md" mb="16px">
+              <Text fontWeight="700">{selectedUserBucket?.userEmail}</Text>
+              <Text fontSize="sm" color="gray.600">
+                Pending orders: {selectedUserBucket?.orderCount || 0} | Pending total:{' '}
+                {formatInr(selectedUserBucket?.totalAmount)}
+              </Text>
+            </Box>
+
+            {selectedUserRemittancesLoading ? (
+              <Text fontSize="sm" color="gray.600">
+                Loading seller order details...
+              </Text>
+            ) : selectedUserPendingRemittances.length > 0 ? (
+              <Box overflowX="auto">
+                <Table size="sm" variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th>Order #</Th>
+                      <Th>AWB</Th>
+                      <Th>Courier</Th>
+                      <Th>Collected</Th>
+                      <Th isNumeric>COD Amount</Th>
+                      <Th isNumeric>Remittable</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {selectedUserPendingRemittances.map((item) => (
+                      <Tr key={item.id}>
+                        <Td fontSize="xs" fontWeight="600">
+                          {item.orderNumber}
+                        </Td>
+                        <Td fontSize="xs">{item.awbNumber || 'N/A'}</Td>
+                        <Td fontSize="xs">{getCourierDisplayName(item.courierPartner, 'N/A')}</Td>
+                        <Td fontSize="xs">
+                          {item.collectedAt ? new Date(item.collectedAt).toLocaleDateString() : 'N/A'}
+                        </Td>
+                        <Td fontSize="xs" isNumeric>
+                          {formatInr(item.codAmount)}
+                        </Td>
+                        <Td fontSize="xs" isNumeric>
+                          <Text as="span" fontWeight="700" color="green.600">
+                            {formatInr(item.remittableAmount)}
+                          </Text>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </Box>
+            ) : (
+              <Text fontSize="sm" color="gray.600">
+                No pending COD orders found for this seller.
+              </Text>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={handleCloseUserOrders}>
+              Close
+            </Button>
+            <Button
+              colorScheme="green"
+              onClick={() => {
+                onUserOrdersClose()
+                handleOpenUserSettle(selectedUserBucket)
+              }}
+              isDisabled={selectedUserPendingRemittances.length === 0}
+            >
+              Settle These Orders
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={isUserSettleOpen} onClose={handleCloseUserSettle}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Settle Seller COD Total</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Box p="12px" bg="gray.50" borderRadius="md" mb="12px">
+              <Text fontWeight="700">{selectedUserBucket?.userEmail}</Text>
+              <Text fontSize="sm" color="gray.600">
+                Orders to settle: {selectedUserSettlementRows.length}
+              </Text>
+              <Text fontSize="sm" color="green.600" fontWeight="700">
+                Total pending: {formatInr(selectedUserBucket?.totalAmount)}
+              </Text>
+            </Box>
+
+            <SimpleGrid columns={1} spacing={3}>
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  UTR / Transaction Number
+                </FormLabel>
+                <Input
+                  value={groupUtrNumber}
+                  onChange={(e) => setGroupUtrNumber(e.target.value)}
+                  placeholder="Enter UTR/Reference number"
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600">
+                  Settlement Date
+                </FormLabel>
+                <Input
+                  type="date"
+                  value={groupSettlementDate}
+                  onChange={(e) => setGroupSettlementDate(e.target.value)}
+                />
+              </FormControl>
+            </SimpleGrid>
+
+            <Text fontSize="xs" color="red.500" mt="12px">
+              This marks all listed COD remittances as settled offline for this seller. It does not
+              credit the wallet automatically.
+            </Text>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={handleCloseUserSettle}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme="green"
+              onClick={handleConfirmUserGroupSettlement}
+              isLoading={confirmSettlementMutation.isPending}
+              isDisabled={selectedUserSettlementRows.length === 0 || !groupUtrNumber.trim()}
+            >
+              Confirm Settle All
             </Button>
           </ModalFooter>
         </ModalContent>

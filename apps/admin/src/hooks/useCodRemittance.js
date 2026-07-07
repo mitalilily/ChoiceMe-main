@@ -4,6 +4,7 @@ import {
   confirmCourierSettlement,
   getAllCodRemittances,
   getCodPlatformStats,
+  getPendingCodUserTotals,
   getUserCodRemittances,
   manualCreditWallet,
   previewCourierSettlement,
@@ -33,12 +34,23 @@ export const useAllCodRemittances = (params) => {
 }
 
 /**
+ * Hook to fetch pending COD totals grouped by seller
+ */
+export const usePendingCodUserTotals = (params) => {
+  return useQuery({
+    queryKey: ['pendingCodUserTotals', params],
+    queryFn: () => getPendingCodUserTotals(params),
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+/**
  * Hook to fetch user-specific COD remittances
  */
-export const useUserCodRemittances = (userId) => {
+export const useUserCodRemittances = (userId, params = {}) => {
   return useQuery({
-    queryKey: ['userCodRemittances', userId],
-    queryFn: () => getUserCodRemittances(userId),
+    queryKey: ['userCodRemittances', userId, params],
+    queryFn: () => getUserCodRemittances(userId, params),
     enabled: !!userId,
     staleTime: 1000 * 60 * 2,
   })
@@ -55,6 +67,7 @@ export const useManualCreditWallet = () => {
     mutationFn: manualCreditWallet,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allCodRemittances'] })
+      queryClient.invalidateQueries({ queryKey: ['pendingCodUserTotals'] })
       queryClient.invalidateQueries({ queryKey: ['codPlatformStats'] })
       queryClient.invalidateQueries({ queryKey: ['userCodRemittances'] })
       toast({
@@ -88,6 +101,7 @@ export const useUpdateRemittanceNotes = () => {
     mutationFn: ({ remittanceId, notes }) => updateRemittanceNotes(remittanceId, notes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allCodRemittances'] })
+      queryClient.invalidateQueries({ queryKey: ['pendingCodUserTotals'] })
       queryClient.invalidateQueries({ queryKey: ['userCodRemittances'] })
       toast({
         title: 'Notes Updated',
@@ -128,6 +142,7 @@ export const useConfirmCourierSettlement = () => {
     mutationFn: confirmCourierSettlement,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allCodRemittances'] })
+      queryClient.invalidateQueries({ queryKey: ['pendingCodUserTotals'] })
       queryClient.invalidateQueries({ queryKey: ['codPlatformStats'] })
       queryClient.invalidateQueries({ queryKey: ['userCodRemittances'] })
     },
