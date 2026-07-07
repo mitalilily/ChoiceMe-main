@@ -188,6 +188,82 @@ function resolveOrderFallbackEmail(orderDetails?: ShipmentOrderLike | null) {
   )
 }
 
+const mergeShipmentOrderDetails = (
+  dbOrder?: ShipmentOrderLike | null,
+  suppliedOrder?: ShipmentOrderLike | null,
+) => {
+  if (!dbOrder && !suppliedOrder) return null
+  const merged: Record<string, unknown> = { ...(dbOrder || {}) }
+
+  for (const [key, value] of Object.entries((suppliedOrder || {}) as Record<string, unknown>)) {
+    if (value === undefined || value === null) continue
+    if (typeof value === 'string' && !value.trim()) continue
+    merged[key] = value
+  }
+
+  return merged as ShipmentOrderLike
+}
+
+async function resolveShipmentOrderDetails(params: {
+  userId: string
+  orderNumber?: string | null
+  awbNumber?: string | null
+  suppliedOrder?: ShipmentOrderLike | null
+}) {
+  const result = await pool.query(
+    `
+      select order_details
+      from (
+        select to_jsonb(b2c) as order_details, 1 as priority
+        from b2c_orders b2c
+        where b2c.user_id = $1
+          and (($2 <> '' and b2c.order_number = $2) or ($3 <> '' and b2c.awb_number = $3))
+        union all
+        select to_jsonb(b2b) as order_details, 2 as priority
+        from b2b_orders b2b
+        where b2b.user_id = $1
+          and (($2 <> '' and b2b.order_number = $2) or ($3 <> '' and b2b.awb_number = $3))
+      ) orders
+      order by priority
+      limit 1
+    `,
+    [params.userId, params.orderNumber || '', params.awbNumber || ''],
+  )
+
+  return mergeShipmentOrderDetails(
+    (result.rows[0]?.order_details || null) as ShipmentOrderLike | null,
+    params.suppliedOrder || null,
+  )
+}
+
+const hasRequiredConsigneeDetails = (orderDetails?: ShipmentOrderLike | null) => {
+  if (!orderDetails) return false
+
+  const order = orderDetails as Record<string, unknown>
+  const name = firstNonEmpty(
+    order.buyer_name as string | null | undefined,
+    order.consignee_name as string | null | undefined,
+    order.customer_name as string | null | undefined,
+    order.name as string | null | undefined,
+  )
+  const address = firstNonEmpty(
+    order.address as string | null | undefined,
+    order.addressLine1 as string | null | undefined,
+    order.delivery_address as string | null | undefined,
+    order.buyer_address as string | null | undefined,
+  )
+  const city = firstNonEmpty(order.city as string | null | undefined)
+  const pincode = firstNonEmpty(order.pincode as string | null | undefined)
+  const phone = firstNonEmpty(
+    order.buyer_phone as string | null | undefined,
+    order.consignee_phone as string | null | undefined,
+    order.customer_phone as string | null | undefined,
+    order.phone as string | null | undefined,
+  )
+
+  return Boolean(name && address && city && pincode && phone)
+}
+
 const shipmentEmailStages = new Set<ShipmentStatusEmailStage>([
   'booked',
   'manifested',
@@ -340,27 +416,11 @@ async function deliverShipmentEmail(
 }
 
 async function resolveShipmentOrderForRetry(delivery: ShipmentEmailDeliveryRow) {
-  const result = await pool.query(
-    `
-      select order_details
-      from (
-        select to_jsonb(b2c) as order_details, 1 as priority
-        from b2c_orders b2c
-        where b2c.user_id = $1
-          and (($2 <> '' and b2c.order_number = $2) or ($3 <> '' and b2c.awb_number = $3))
-        union all
-        select to_jsonb(b2b) as order_details, 2 as priority
-        from b2b_orders b2b
-        where b2b.user_id = $1
-          and (($2 <> '' and b2b.order_number = $2) or ($3 <> '' and b2b.awb_number = $3))
-      ) orders
-      order by priority
-      limit 1
-    `,
-    [delivery.sellerId, delivery.orderNumber || '', delivery.awbNumber],
-  )
-
-  return (result.rows[0]?.order_details || null) as ShipmentOrderLike | null
+  return resolveShipmentOrderDetails({
+    userId: delivery.sellerId,
+    orderNumber: delivery.orderNumber,
+    awbNumber: delivery.awbNumber,
+  })
 }
 
 export async function sendShipmentStatusEmailIfChanged(params: {
@@ -377,9 +437,26 @@ export async function sendShipmentStatusEmailIfChanged(params: {
     return { sent: false, reason: 'unsupported_status' as const }
   }
 
+  const resolvedOrderDetails = await resolveShipmentOrderDetails({
+    userId,
+    orderNumber,
+    awbNumber,
+    suppliedOrder: orderDetails,
+  })
+
+  if (!hasRequiredConsigneeDetails(resolvedOrderDetails)) {
+    console.error('[ShipmentEmail] Shipment email blocked because consignee details are incomplete', {
+      userId,
+      orderNumber,
+      awbNumber,
+      hasOrderDetails: Boolean(resolvedOrderDetails),
+    })
+    return { sent: false, reason: 'missing_consignee_details' as const }
+  }
+
   const sellerDetails = await resolveSellerBrandDetails(userId)
   const to = sellerDetails.recipientEmails
-  const fallbackTo = resolveOrderFallbackEmail(orderDetails)
+  const fallbackTo = resolveOrderFallbackEmail(resolvedOrderDetails)
   const recipients = to.length > 0 ? to : fallbackTo ? [fallbackTo] : []
   if (!recipients.length) {
     return { sent: false, reason: 'missing_recipient' as const }
@@ -408,7 +485,7 @@ export async function sendShipmentStatusEmailIfChanged(params: {
       shipmentKey,
       awbNumber,
       orderNumber,
-      orderDetails,
+      orderDetails: resolvedOrderDetails,
       stage: nextStage,
       recipient,
       sellerName: sellerDetails.brandName,
@@ -474,10 +551,10 @@ export async function retryFailedShipmentStatusEmails(limit = 25) {
     }
 
     const orderDetails = await resolveShipmentOrderForRetry(claim.delivery)
-    if (!orderDetails) {
+    if (!hasRequiredConsigneeDetails(orderDetails)) {
       await markShipmentEmailDeliveryFailed(
         claim.delivery.id,
-        new Error('Shipment order could not be resolved for email retry'),
+        new Error('Shipment order could not be resolved with complete consignee details for email retry'),
       )
       stats.failed += 1
       continue

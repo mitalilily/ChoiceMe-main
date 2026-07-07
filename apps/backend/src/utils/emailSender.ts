@@ -1013,11 +1013,14 @@ export const buildShipmentStatusEmailContent = (opts: {
   )
   const orderTotalValue = firstText(formatEmailCurrency(orderRecord.order_amount), productPrice)
   const amountPaidValue = firstText(formatEmailCurrency(orderRecord.prepaid_amount), orderTotalValue)
-  const customerName = firstText(
+  const explicitCustomerName = firstText(
     orderRecord.buyer_name,
     orderRecord.consignee_name,
     orderRecord.customer_name,
     orderRecord.name,
+  )
+  const customerName = firstText(
+    explicitCustomerName,
     safeOrderLabel,
     sellerDisplayName,
     'the customer',
@@ -1044,6 +1047,11 @@ export const buildShipmentStatusEmailContent = (opts: {
     orderRecord.customer_phone,
     orderRecord.phone,
   )
+  if (!explicitCustomerName || customerAddressLines.length < 3 || !contactNumber) {
+    throw new Error(
+      'Shipment email requires complete consignee details: name, address, city/state/pincode, and contact number.',
+    )
+  }
   const consigneeDetailsHtml = `
     <div style="font-size:15px;line-height:1.2;color:#111111;font-weight:800;margin:0 0 10px;">Delivery Address</div>
     <div style="font-size:12.5px;line-height:1.25;color:#111111;font-weight:800;margin:0 0 4px;">${escapeHtml(

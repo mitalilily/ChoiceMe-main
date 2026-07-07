@@ -5582,11 +5582,7 @@ export const createB2CShipmentService = async (
         userId,
         awbNumber: shipmentMeta.awb_number || '',
         orderNumber: params.order_number,
-        orderDetails: {
-          orderNumber: params.order_number,
-          buyer_email: params.consignee?.email || null,
-          order_items: params.order_items,
-        },
+        orderDetails: result.order as any,
         previousStatus: 'pending',
         nextStatus: 'booked',
       })
