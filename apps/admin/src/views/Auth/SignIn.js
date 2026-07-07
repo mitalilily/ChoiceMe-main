@@ -2,6 +2,7 @@
 import {
   Box,
   Button,
+  Checkbox,
   Flex,
   FormControl,
   FormLabel,
@@ -21,6 +22,7 @@ import { jwtDecode } from 'jwt-decode'
 import { useEffect, useState } from 'react'
 import { useHistory } from 'react-router-dom'
 import { DoorstepCourierScene } from '../../components/Brand/AnimatedCourierScene'
+import { getStoredAdminAuth } from '../../services/authStorage'
 import { loginAdmin } from '../../services/auth.service'
 import { useAuthStore } from '../../store/useAuthStore'
 import { brand as brandTokens, brandFonts, brandGradients, brandIdentity } from '../../theme/brand'
@@ -53,6 +55,7 @@ function SignIn() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [keepMeSignedIn, setKeepMeSignedIn] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const toast = useToast()
@@ -78,7 +81,7 @@ function SignIn() {
     try {
       const data = await loginAdmin(email, password)
 
-      login(data.token, data?.user?.id, data.refreshToken)
+      login(data.token, data?.user?.id, data.refreshToken, keepMeSignedIn)
 
       toast({
         title: 'Login successful',
@@ -105,8 +108,7 @@ function SignIn() {
   }
 
   useEffect(() => {
-    const accessToken = localStorage.getItem('accessToken')
-    const refreshToken = localStorage.getItem('refreshToken')
+    const { accessToken, refreshToken } = getStoredAdminAuth()
 
     if (accessToken && refreshToken && isTokenValid(refreshToken)) {
       history.replace('/admin/dashboard')
@@ -335,6 +337,17 @@ function SignIn() {
                   </InputRightElement>
                 </InputGroup>
               </FormControl>
+
+              <Checkbox
+                isChecked={keepMeSignedIn}
+                onChange={(event) => setKeepMeSignedIn(event.target.checked)}
+                colorScheme="orange"
+                alignSelf="flex-start"
+              >
+                <Text fontSize="sm" color={textSecondary}>
+                  Keep me signed in on this device
+                </Text>
+              </Checkbox>
 
               <Button
                 type="submit"

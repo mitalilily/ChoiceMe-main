@@ -1,6 +1,7 @@
 // store/useAuthStore.js
 import { jwtDecode } from 'jwt-decode'
 import { create } from 'zustand'
+import { clearStoredAdminAuth, getStoredAdminAuth, setStoredAdminAuth } from '../services/authStorage'
 
 function isTokenExpired(token) {
   try {
@@ -12,14 +13,12 @@ function isTokenExpired(token) {
 }
 
 export const useAuthStore = create((set) => {
-  const accessToken = localStorage.getItem('accessToken')
-  const refreshToken = localStorage.getItem('refreshToken')
-  const userId = localStorage.getItem('userId')
+  const { accessToken, refreshToken, userId } = getStoredAdminAuth()
 
   const isRefreshValid = refreshToken && !isTokenExpired(refreshToken)
 
   if (!isRefreshValid) {
-    localStorage.clear()
+    clearStoredAdminAuth()
   }
 
   return {
@@ -28,10 +27,8 @@ export const useAuthStore = create((set) => {
     userId: isRefreshValid ? userId : null,
     isLoggedIn: isRefreshValid && !!accessToken,
 
-    login: (token, userId, refreshToken) => {
-      localStorage.setItem('accessToken', token)
-      localStorage.setItem('refreshToken', refreshToken)
-      localStorage.setItem('userId', userId)
+    login: (token, userId, refreshToken, persist) => {
+      setStoredAdminAuth(token, refreshToken, userId, persist)
 
       set({
         token,
@@ -42,7 +39,7 @@ export const useAuthStore = create((set) => {
     },
 
     logout: () => {
-      localStorage.clear()
+      clearStoredAdminAuth()
       set({
         token: null,
         refreshToken: null,

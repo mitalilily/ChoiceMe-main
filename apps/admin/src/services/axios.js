@@ -1,4 +1,10 @@
 import axios from 'axios'
+import {
+  clearStoredAdminAuth,
+  getAuthPersistence,
+  getStoredAdminAuth,
+  setStoredAdminAuth,
+} from './authStorage'
 
 const isLocalhost =
   typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
@@ -41,15 +47,13 @@ const redirectToSignIn = () => {
 }
 
 const clearStoredAuth = () => {
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('refreshToken')
-  localStorage.removeItem('userId')
+  clearStoredAdminAuth()
 }
 
 const updateAuthStore = async (accessToken, refreshToken) => {
   const { useAuthStore } = await import('../store/useAuthStore')
-  const userId = localStorage.getItem('userId')
-  useAuthStore.getState().login(accessToken, userId, refreshToken)
+  const { userId } = getStoredAdminAuth()
+  useAuthStore.getState().login(accessToken, userId, refreshToken, getAuthPersistence())
 }
 
 const refreshAuthTokens = (refreshToken) => {
@@ -69,8 +73,8 @@ const refreshAuthTokens = (refreshToken) => {
           throw new Error('Invalid response from refresh token endpoint')
         }
 
-        localStorage.setItem('accessToken', data.accessToken)
-        localStorage.setItem('refreshToken', data.refreshToken)
+        const { userId } = getStoredAdminAuth()
+        setStoredAdminAuth(data.accessToken, data.refreshToken, userId, getAuthPersistence())
         await updateAuthStore(data.accessToken, data.refreshToken)
         return data
       })
@@ -83,7 +87,8 @@ const refreshAuthTokens = (refreshToken) => {
 }
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken')
+  const { accessToken } = getStoredAdminAuth()
+  const token = accessToken
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -105,7 +110,7 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    const refreshToken = localStorage.getItem('refreshToken')
+    const { refreshToken } = getStoredAdminAuth()
     if (!refreshToken) {
       clearStoredAuth()
       redirectToSignIn()
