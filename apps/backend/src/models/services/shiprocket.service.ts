@@ -1563,6 +1563,9 @@ async function filterCouriersByBusinessType(
   // Filter couriers to only include those with the expected business type
   const filtered = courierList.filter((c: any) => {
     const providerKey = normalizeServiceProviderKey(c.integration_type || c.serviceProvider)
+    const isLocalRateCardCourier = c.provider_serviceability?.source === 'local_rate_card'
+    if (isLocalRateCardCourier && expectedBusinessType === 'b2c') return true
+
     const types =
       businessTypeMap.get(`${c.id}__${providerKey}`) ||
       fallbackBusinessTypeMap.get(Number(c.id)) ||
@@ -2298,7 +2301,7 @@ export const fetchAvailableCouriersWithRates = async (
       }
     }
 
-    if (isCalculator && localRates.length) {
+    if (localRates.length) {
       const existingCandidateKeys = new Set(
         combinedCouriers.map(
           (courier) =>
@@ -2311,7 +2314,7 @@ export const fetchAvailableCouriersWithRates = async (
       for (const rateCard of localRates) {
         const providerKey = normalizeProviderKey(rateCard.service_provider)
         if (!providerKey) continue
-        if (!enabledProviders.has(providerKey) && !isCalculator) continue
+        if (!VISIBLE_SERVICE_PROVIDERS.includes(providerKey as any)) continue
 
         const candidateKey = `${String(rateCard.courier_id)}__${providerKey}`
         if (existingCandidateKeys.has(candidateKey)) continue
@@ -2320,7 +2323,6 @@ export const fetchAvailableCouriersWithRates = async (
         const courierRow = bucket?.rows.find(
           (row) => String(row.id) === String(rateCard.courier_id),
         )
-        if (!courierRow && !isCalculator) continue
 
         existingCandidateKeys.add(candidateKey)
         combinedCouriers.push({
@@ -2341,7 +2343,7 @@ export const fetchAvailableCouriersWithRates = async (
           chargeable_weight: null,
           provider_serviceability: {
             source: 'local_rate_card',
-            live_serviceability: serviceableProviders.has(providerKey)
+            live_serviceability: serviceableProviders.has(providerKey) || !isCalculator
               ? 'available'
               : 'unavailable',
           },
@@ -2611,20 +2613,19 @@ export const fetchAvailableCouriersWithRates = async (
       const inSystem = isCourierInSystem(providerKey, c.id)
       const requiredRateType = isReverseShipment ? 'rto' : 'forward'
       const localRatesAvailable = !requireLocalRates || Boolean(c.localRates?.[requiredRateType])
-      const calculatorLocalRate =
-        isCalculator && c.provider_serviceability?.source === 'local_rate_card'
+      const localRateCardCandidate = c.provider_serviceability?.source === 'local_rate_card'
 
-      if ((!inSystem && !calculatorLocalRate) || !localRatesAvailable) {
+      if ((!inSystem && !localRateCardCandidate) || !localRatesAvailable) {
         console.log('Removing courier from final list', {
           courierId: c.id,
           providerKey,
           inSystem,
-          calculatorLocalRate,
+          localRateCardCandidate,
           localRatesAvailable,
         })
       }
 
-      return (inSystem || calculatorLocalRate) && localRatesAvailable
+      return (inSystem || localRateCardCandidate) && localRatesAvailable
     })
 
     // ✅ Final filter: Ensure all couriers have correct business_type
