@@ -98,6 +98,48 @@ verify_shipment_email_template() {
   npm run verify:shipment-status-email
 }
 
+verify_backend_database() {
+  log "Verifying backend database connectivity before restart"
+  set -a
+  # shellcheck disable=SC1090
+  . "$BACKEND_ENV_FILE"
+  set +a
+
+  cd "$SOURCE_DIR/apps/backend"
+  node <<'NODE'
+const { Client } = require('pg')
+
+const databaseUrl = process.env.DATABASE_URL
+if (!databaseUrl) {
+  console.error('DATABASE_URL is missing')
+  process.exit(1)
+}
+
+const shouldUseSsl =
+  process.env.PGSSLMODE === 'require' ||
+  process.env.NODE_ENV === 'production' ||
+  /render\.com|railway\.app|rlwy\.net|supabase\.co/i.test(databaseUrl)
+
+const client = new Client({
+  connectionString: databaseUrl,
+  ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: Number(process.env.PG_CONNECTION_TIMEOUT_MS || 10000),
+})
+
+client
+  .connect()
+  .then(() => client.query('select 1'))
+  .then(() => client.end())
+  .catch(async (err) => {
+    try {
+      await client.end()
+    } catch (_) {}
+    console.error(`Database connectivity check failed: ${err.message}`)
+    process.exit(1)
+  })
+NODE
+}
+
 build_landing() {
   log "Building landing page"
   cd "$SOURCE_DIR/apps/landing-page"
@@ -385,6 +427,7 @@ main() {
   build_landing
   build_client
   build_admin
+  verify_backend_database
   start_backend
   setup_pgadmin
   configure_proxy
