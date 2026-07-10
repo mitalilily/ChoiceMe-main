@@ -117,6 +117,13 @@ const extractPincodePairFromBody = (body: any) => ({
     body?.destination_pincode,
 })
 
+const normalizeShipmentTypeFromBody = (body: any): 'b2b' | 'b2c' | undefined => {
+  const raw = body?.shipment_type ?? body?.shipmentType
+  const normalized = String(raw ?? '').trim().toLowerCase()
+  if (normalized === 'b2b' || normalized === 'b2c') return normalized
+  return undefined
+}
+
 // src/controllers/courier.controller.ts
 export const getCouriers = async (req: Request, res: Response) => {
   try {
@@ -210,8 +217,8 @@ export const fetchAvailableCouriers = async (req: Request, res: Response) => {
       length,
       breadth,
       height,
-      shipment_type,
     } = req.body
+    const shipment_type = normalizeShipmentTypeFromBody(req.body)
     const { origin, destination } = extractPincodePairFromBody(req.body)
     if (!origin || !destination) {
       return res.status(400).json({
@@ -265,7 +272,8 @@ export const fetchAvailableCouriers = async (req: Request, res: Response) => {
 
 export const fetchAvailableCouriersForGuestController = async (req: Request, res: Response) => {
   try {
-    const { payment_type, weight, length, breadth, height, shipment_type } = req.body
+    const { payment_type, weight, length, breadth, height } = req.body
+    const shipment_type = normalizeShipmentTypeFromBody(req.body)
     const { origin, destination } = extractPincodePairFromBody(req.body)
 
     // Validate required fields
@@ -392,8 +400,8 @@ export const fetchAvailableCouriersToUser = async (req: Request, res: Response) 
       length,
       breadth,
       height,
-      shipment_type,
     } = req.body
+    const shipment_type = normalizeShipmentTypeFromBody(req.body)
     const { origin, destination } = extractPincodePairFromBody(req.body)
     if (!origin || !destination) {
       return res.status(400).json({

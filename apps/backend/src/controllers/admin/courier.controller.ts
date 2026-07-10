@@ -176,11 +176,16 @@ export const fetchAvailableCouriersForAdmin = async (req: Request, res: Response
       length,
       breadth,
       height,
-      shipment_type,
       plan_id,
       isCalculator,
       context,
     } = req.body
+    const rawShipmentType = req.body?.shipment_type ?? req.body?.shipmentType
+    const normalizedShipmentType = String(rawShipmentType ?? '').trim().toLowerCase()
+    const shipment_type =
+      normalizedShipmentType === 'b2b' || normalizedShipmentType === 'b2c'
+        ? normalizedShipmentType
+        : undefined
     if (!origin || !destination) {
       return res.status(400).json({
         success: false,
