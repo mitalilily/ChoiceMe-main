@@ -13,6 +13,7 @@ export const labelPreferences = createTable('label_preferences', {
     .references(() => users.id, { onDelete: 'cascade' }),
 
   printer_type: varchar('printer_type', { length: 20 }).notNull().default('thermal'),
+  label_sheet_layout: varchar('label_sheet_layout', { length: 20 }).notNull().default('a4_single'),
 
   order_info: jsonb('order_info')
     .default(

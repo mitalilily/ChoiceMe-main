@@ -11,6 +11,7 @@ export function mapApiToForm(prefs: LabelPreferences): LabelSettingsForm {
     charLimit: prefs.char_limit,
     maxItems: prefs.max_items,
     printer: prefs.printer_type,
+    labelSheetLayout: prefs.label_sheet_layout ?? 'a4_single',
   }
 }
 
@@ -22,5 +23,6 @@ export function mapFormToApi(form: LabelSettingsForm): Partial<LabelPreferences>
     char_limit: form.charLimit,
     max_items: form.maxItems,
     printer_type: form.printer,
+    label_sheet_layout: form.printer === 'inkjet' ? form.labelSheetLayout : 'a4_single',
   }
 }

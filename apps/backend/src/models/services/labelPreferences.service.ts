@@ -6,6 +6,7 @@ const PLATFORM_BRAND_NAME = 'ChoiceMee Courier'
 
 export const DEFAULT_PREFERENCES = {
   printer_type: 'thermal',
+  label_sheet_layout: 'a4_single',
   char_limit: 25,
   max_items: 3,
   order_info: {
@@ -47,6 +48,10 @@ export const DEFAULT_PREFERENCES = {
 
 const enforcePlatformBranding = <T extends Record<string, any>>(prefs: T) => ({
   ...prefs,
+  label_sheet_layout:
+    prefs?.printer_type === 'inkjet' && prefs?.label_sheet_layout === 'a4_4up'
+      ? 'a4_4up'
+      : 'a4_single',
   brand_logo: null,
   powered_by: PLATFORM_BRAND_NAME,
 })

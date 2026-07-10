@@ -33,6 +33,8 @@ export type ResolvedDocumentEntry = DocumentEntry & {
   url: string
 }
 
+export type MergedPdfLayout = 'single' | 'a4_4up'
+
 export {
   BULK_MANIFEST_LIMIT,
   getB2CManifestIdentifier,
@@ -124,10 +126,52 @@ export const downloadFile = async (url: string, fileName: string) => {
   }
 }
 
-export const downloadMergedPdf = async (entries: ResolvedDocumentEntry[], fileName: string) => {
+const A4_PAGE = { width: 595.28, height: 841.89 }
+const A4_4UP_MARGIN = 18
+const A4_4UP_GUTTER = 8
+
+const drawPageOnA4Cell = async (
+  targetPdf: PDFDocument,
+  sourcePdf: PDFDocument,
+  sourcePageIndex: number,
+  targetPage: ReturnType<PDFDocument['addPage']>,
+  cellIndex: number,
+) => {
+  const embeddedPage = await targetPdf.embedPage(sourcePdf.getPage(sourcePageIndex))
+  const cellWidth = (A4_PAGE.width - A4_4UP_MARGIN * 2 - A4_4UP_GUTTER) / 2
+  const cellHeight = (A4_PAGE.height - A4_4UP_MARGIN * 2 - A4_4UP_GUTTER) / 2
+  const column = cellIndex % 2
+  const row = Math.floor(cellIndex / 2)
+  const scale = Math.min(cellWidth / embeddedPage.width, cellHeight / embeddedPage.height)
+  const drawWidth = embeddedPage.width * scale
+  const drawHeight = embeddedPage.height * scale
+  const x = A4_4UP_MARGIN + column * (cellWidth + A4_4UP_GUTTER) + (cellWidth - drawWidth) / 2
+  const y =
+    A4_PAGE.height -
+    A4_4UP_MARGIN -
+    (row + 1) * cellHeight -
+    row * A4_4UP_GUTTER +
+    (cellHeight - drawHeight) / 2
+
+  targetPage.drawPage(embeddedPage, {
+    x,
+    y,
+    width: drawWidth,
+    height: drawHeight,
+  })
+}
+
+export const downloadMergedPdf = async (
+  entries: ResolvedDocumentEntry[],
+  fileName: string,
+  options?: { layout?: MergedPdfLayout },
+) => {
   const mergedPdf = await PDFDocument.create()
   let downloadedCount = 0
   let skippedCount = 0
+  const layout = options?.layout ?? 'single'
+  let currentA4Page: ReturnType<PDFDocument['addPage']> | null = null
+  let currentA4Cell = 0
 
   for (const entry of entries) {
     try {
@@ -138,9 +182,22 @@ export const downloadMergedPdf = async (entries: ResolvedDocumentEntry[], fileNa
       })
       const pdfBytes = await blob.arrayBuffer()
       const sourcePdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true })
-      const pages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices())
 
-      pages.forEach((page) => mergedPdf.addPage(page))
+      if (layout === 'a4_4up') {
+        for (const sourcePageIndex of sourcePdf.getPageIndices()) {
+          if (!currentA4Page || currentA4Cell === 4) {
+            currentA4Page = mergedPdf.addPage([A4_PAGE.width, A4_PAGE.height])
+            currentA4Cell = 0
+          }
+
+          await drawPageOnA4Cell(mergedPdf, sourcePdf, sourcePageIndex, currentA4Page, currentA4Cell)
+          currentA4Cell += 1
+        }
+      } else {
+        const pages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices())
+        pages.forEach((page) => mergedPdf.addPage(page))
+      }
+
       downloadedCount += 1
     } catch (error) {
       console.warn(`Skipping PDF while preparing ${fileName}:`, entry.fileName, error)

@@ -7,6 +7,7 @@ export type LabelPreferences = {
   id?: string
   user_id: string
   printer_type: 'thermal' | 'inkjet'
+  label_sheet_layout?: 'a4_single' | 'a4_4up'
   order_info: Record<string, boolean>
   shipper_info: Record<string, boolean>
   product_info: Record<string, boolean>

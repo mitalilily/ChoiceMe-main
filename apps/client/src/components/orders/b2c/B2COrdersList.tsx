@@ -48,6 +48,7 @@ import {
 import { usePickupAddresses } from '../../../hooks/Pickup/usePickupAddresses'
 import { usePresignedDownloadMutation } from '../../../hooks/Uploads/usePresignedDownloadUrls'
 import { useKycVerification } from '../../../hooks/User/useKycVerification'
+import { useLabelPreferences } from '../../../hooks/useLabelPreferences'
 import type { B2COrder } from '../../../types/generic.types'
 import {
   DELHIVERY_COURIER_FILTER_OPTIONS_BY_NAME,
@@ -291,6 +292,7 @@ const B2COrdersList = () => {
     useRegenerateOrderDocuments()
   const { mutate: syncB2CTracking, isPending: syncingTracking } = useSyncB2CTracking()
   const queryClient = useQueryClient()
+  const { preferences: labelPreferences } = useLabelPreferences()
   const { mutateAsync: presignDownloads } = usePresignedDownloadMutation()
   const { data: warehouses } = usePickupAddresses()
   const { mutate: cancelShipment, isPending: cancellingShipment } = useCancelShipment()
@@ -320,6 +322,10 @@ const B2COrdersList = () => {
 
   const orders: B2COrder[] = data?.orders || []
   const selectedOrders: B2COrder[] = orders.filter((order) => selectedOrderIds.includes(order.id))
+  const bulkLabelPdfLayout =
+    labelPreferences?.printer_type === 'inkjet' && labelPreferences?.label_sheet_layout === 'a4_4up'
+      ? 'a4_4up'
+      : 'single'
   const manifestValidationMessage =
     selectedOrders.length === 0
       ? 'Select orders to start a bulk action.'
@@ -921,6 +927,7 @@ const B2COrdersList = () => {
               const mergeResult = await downloadMergedPdf(
                 resolvedEntries,
                 `labels-${moment().format('YYYYMMDD-HHmmss')}.pdf`,
+                { layout: bulkLabelPdfLayout },
               )
 
               return {

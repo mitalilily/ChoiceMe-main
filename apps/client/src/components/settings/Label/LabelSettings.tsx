@@ -29,9 +29,11 @@ export type LabelSettingsForm = {
   charLimit: number
   maxItems: number
   printer: 'thermal' | 'inkjet'
+  labelSheetLayout: 'a4_single' | 'a4_4up'
 }
 const defaultValues: LabelSettingsForm = {
   printer: 'thermal',
+  labelSheetLayout: 'a4_single',
   charLimit: 25,
   maxItems: 3,
   orderInfo: {
@@ -144,6 +146,7 @@ export default function LabelSettingsPage() {
   }, [preferences, reset])
 
   const values = watch()
+  const selectedPrinter = watch('printer')
 
   const onSubmit = (data: LabelSettingsForm) => {
     savePreferences(mapFormToApi(data))
@@ -191,6 +194,31 @@ export default function LabelSettingsPage() {
                         </FormGroup>
                       )}
                     />
+                    {selectedPrinter === 'inkjet' && (
+                      <Controller
+                        name="labelSheetLayout"
+                        control={control}
+                        render={({ field }) => (
+                          <Box sx={{ mt: 1, pl: 3 }}>
+                            <Typography fontWeight="bold" gutterBottom>
+                              A4 Sheet Layout
+                            </Typography>
+                            <RadioGroup {...field}>
+                              <FormControlLabel
+                                value="a4_single"
+                                control={<Radio />}
+                                label="1 label in one A4 sheet"
+                              />
+                              <FormControlLabel
+                                value="a4_4up"
+                                control={<Radio />}
+                                label="4 labels in one A4 sheet"
+                              />
+                            </RadioGroup>
+                          </Box>
+                        )}
+                      />
+                    )}
                   </Box>
 
                   <Divider />
