@@ -117,8 +117,10 @@ if (!databaseUrl) {
 
 const shouldUseSsl =
   process.env.PGSSLMODE === 'require' ||
-  process.env.NODE_ENV === 'production' ||
-  /render\.com|railway\.app|rlwy\.net|supabase\.co/i.test(databaseUrl)
+  (process.env.PGSSLMODE !== 'disable' &&
+    !['localhost', '127.0.0.1', '::1'].includes(new URL(databaseUrl).hostname) &&
+    (process.env.NODE_ENV === 'production' ||
+      /render\.com|railway\.app|rlwy\.net|supabase\.co/i.test(databaseUrl)))
 
 const client = new Client({
   connectionString: databaseUrl,
