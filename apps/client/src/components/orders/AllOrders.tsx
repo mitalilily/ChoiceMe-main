@@ -636,6 +636,7 @@ const AllOrders = () => {
               const mergeResult = await downloadMergedPdf(
                 resolvedEntries,
                 `labels-${moment().format('YYYYMMDD-HHmmss')}.pdf`,
+                { layout: bulkLabelPdfLayout },
               )
 
               return {

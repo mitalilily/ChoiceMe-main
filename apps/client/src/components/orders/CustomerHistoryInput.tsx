@@ -106,7 +106,7 @@ export default function CustomerHistoryInput({
             helperText={helperText}
             multiline={multiline}
             rows={multiline ? 2 : undefined}
-            placeholder={`Type to match a previous ${label.toLowerCase()}`}
+            placeholder="Type"
             slotProps={{
               input: {
                 ...params.InputProps,
