@@ -17,6 +17,9 @@ if (!process.env.DATABASE_URL) {
 }
 
 const databaseUrl = process.env.DATABASE_URL as string
+const poolMax = Number(process.env.PG_POOL_MAX || process.env.DATABASE_POOL_MAX || 5)
+const connectionTimeoutMillis = Number(process.env.PG_CONNECTION_TIMEOUT_MS || 10000)
+const idleTimeoutMillis = Number(process.env.PG_IDLE_TIMEOUT_MS || 30000)
 const shouldUseSsl =
   process.env.PGSSLMODE === 'require' ||
   env === 'production' ||
@@ -25,6 +28,15 @@ const shouldUseSsl =
 export const pool = new Pool({
   connectionString: databaseUrl,
   ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
+  max: Number.isFinite(poolMax) && poolMax > 0 ? poolMax : 5,
+  connectionTimeoutMillis:
+    Number.isFinite(connectionTimeoutMillis) && connectionTimeoutMillis > 0
+      ? connectionTimeoutMillis
+      : 10000,
+  idleTimeoutMillis:
+    Number.isFinite(idleTimeoutMillis) && idleTimeoutMillis > 0
+      ? idleTimeoutMillis
+      : 30000,
 })
 
 // console.log('DEBUG: pool created?', !!pool, 'pool.constructor.name=', pool?.constructor?.name)

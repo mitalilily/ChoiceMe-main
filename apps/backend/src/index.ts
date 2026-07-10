@@ -1,7 +1,6 @@
 import * as dotenv from 'dotenv'
 import path from 'path'
 import { server } from './app'
-import './crons'
 import { testDatabaseConnection } from './models/client'
 import { ensureInsuranceChargeColumns } from './models/migrations/ensureInsuranceChargeColumns'
 import { ensureInvoicePreferencesColumns } from './models/migrations/ensureInvoicePreferencesColumns'
@@ -36,6 +35,10 @@ async function startServer() {
   await ensureInsuranceChargeColumns()
   await ensureInvoicePreferencesColumns()
   await ensureShipmentEmailDeliveriesTable()
+
+  // Start scheduled jobs only after the database is reachable. During DB outages,
+  // importing crons before this point creates noisy retry loops while PM2 restarts.
+  await import('./crons')
 
   // Set server timeout to 3.5 minutes (210000ms) to allow for slow external API calls
   // Default Node.js server timeout is 2 minutes (120000ms)

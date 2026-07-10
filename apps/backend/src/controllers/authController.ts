@@ -56,6 +56,17 @@ const isEmailDeliveryError = (err: unknown) => {
   )
 }
 
+const isDatabaseConnectivityError = (err: unknown) => {
+  const error = err as { code?: string; message?: string; cause?: { code?: string; message?: string } }
+  const code = error.code || error.cause?.code || ''
+  const message = `${error.message || ''} ${error.cause?.message || ''}`
+
+  return (
+    ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND'].includes(code) ||
+    /failed query|connection terminated|database connection|pg-pool|read econnreset/i.test(message)
+  )
+}
+
 const maskEmailForLog = (email: string) => {
   const [localPart = '', domain = ''] = email.split('@')
   if (!localPart || !domain) return '[invalid-email]'
@@ -292,10 +303,12 @@ export const requestOtp = async (req: Request, res: Response): Promise<any> => {
       email: maskEmailForLog(normalizedEmail),
       err,
     })
-    const message = isEmailDeliveryError(err)
+    const message = isDatabaseConnectivityError(err)
+      ? 'We could not reach the database right now. Please try again shortly.'
+      : isEmailDeliveryError(err)
       ? 'We could not send the verification email right now. Please try again in a minute.'
       : 'Something went wrong while requesting OTP'
-    return res.status(500).json({ error: message })
+    return res.status(isDatabaseConnectivityError(err) ? 503 : 500).json({ error: message })
   }
 }
 
@@ -446,6 +459,11 @@ export const requestEmailVerification = async (req: Request, res: Response): Pro
   } catch (err) {
     console.error('Error in requestEmailVerification:', err)
     const message = err instanceof Error ? err.message : 'Invalid credentials or token'
+    if (isDatabaseConnectivityError(err)) {
+      return res.status(503).json({
+        error: 'We could not reach the database right now. Please try again shortly.',
+      })
+    }
     const isEmailConfigError = message.includes('Email service is not configured')
     const isConflict =
       message.toLowerCase().includes('duplicate key') ||
@@ -503,6 +521,11 @@ export const requestPasswordReset = async (req: Request, res: Response): Promise
     })
   } catch (err) {
     console.error('Error in requestPasswordReset:', err)
+    if (isDatabaseConnectivityError(err)) {
+      return res.status(503).json({
+        error: 'We could not reach the database right now. Please try again shortly.',
+      })
+    }
     const message = err instanceof Error ? err.message : 'Unable to request password reset'
     const isEmailConfigError = message.includes('Email service is not configured')
 
@@ -748,6 +771,11 @@ export const adminLoginController = async (req: Request, res: Response) => {
       ...result,
     })
   } catch (err: any) {
+    if (isDatabaseConnectivityError(err)) {
+      return res.status(503).json({
+        error: 'We could not reach the database right now. Please try again shortly.',
+      })
+    }
     const isUnauthorized = err.message === 'Unauthorized' || err.message === 'Invalid credentials'
     return res
       .status(isUnauthorized ? 401 : 500)
