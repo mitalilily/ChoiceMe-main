@@ -31,6 +31,7 @@ const OrderTracking = lazy(() => import('../pages/orders/OrderTracking'))
 
 // Settings
 const Settings = lazy(() => import('../pages/settings/Settings'))
+const Customers = lazy(() => import('../pages/settings/Customers'))
 const PickupAddresses = lazy(() => import('../pages/pickup-addresses/PickupAddresses'))
 const InvoicePreferences = lazy(() => import('../components/settings/InvoicePreference'))
 const LabelSettingsPage = lazy(() => import('../components/settings/Label/LabelSettings'))
@@ -249,6 +250,7 @@ function RoutedApp() {
             }
           >
             <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/customers" element={<Customers />} />
             <Route path="/settings/manage_pickups" element={<PickupAddresses />} />
             <Route path="/billing/wallet_transactions" element={<WalletTransactions />} />
             <Route path="/billing/invoice_management" element={<Invoices />} />

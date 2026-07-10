@@ -4,11 +4,14 @@ import {
   Controller,
   type UseFieldArrayAppend,
   type UseFieldArrayRemove,
+  useFormContext,
 } from 'react-hook-form'
 import { BiRupee } from 'react-icons/bi'
 import { FaPlus, FaTrash } from 'react-icons/fa'
 import { TbPercentage } from 'react-icons/tb'
 import CustomInput from '../../UI/inputs/CustomInput'
+import ProductHistoryInput from '../ProductHistoryInput'
+import { useCustomerHistory } from '../../../hooks/useCustomerHistory'
 import type { B2CFormData } from './B2COrderForm'
 
 const ACCENT = '#0D3B8E'
@@ -21,6 +24,9 @@ interface PackageDetailsFormProps {
 }
 
 const PackageDetailsForm = ({ control, fields, remove, append }: PackageDetailsFormProps) => {
+  const { setValue } = useFormContext<B2CFormData>()
+  const { data: customerHistory, isLoading: historyLoading } = useCustomerHistory()
+
   return (
     <Stack gap={2}>
       {fields.map((item, index) => (
@@ -59,12 +65,34 @@ const PackageDetailsForm = ({ control, fields, remove, append }: PackageDetailsF
                   control={control}
                   rules={{ required: 'Name is required' }}
                   render={({ field, fieldState }) => (
-                    <CustomInput
-                      label="Name"
-                      required
-                      {...field}
+                    <ProductHistoryInput
+                      value={field.value ?? ''}
+                      products={customerHistory?.products ?? []}
+                      loading={historyLoading}
                       error={!!fieldState.error}
                       helperText={fieldState.error?.message}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      onProductSelect={(product) => {
+                        setValue(`products.${index}.productName`, product.productName, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                        setValue(`products.${index}.price`, product.price, { shouldDirty: true })
+                        setValue(`products.${index}.quantity`, product.quantity || 1, {
+                          shouldDirty: true,
+                        })
+                        setValue(`products.${index}.discount`, product.discount, {
+                          shouldDirty: true,
+                        })
+                        setValue(`products.${index}.taxRate`, product.taxRate, {
+                          shouldDirty: true,
+                        })
+                        setValue(`products.${index}.hsnCode`, product.hsnCode, {
+                          shouldDirty: true,
+                        })
+                        setValue(`products.${index}.sku`, product.sku, { shouldDirty: true })
+                      }}
                     />
                   )}
                 />

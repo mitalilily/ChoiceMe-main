@@ -5,6 +5,7 @@ import {
   createB2CShipmentController,
   deleteB2COrderController,
   generateManifestController,
+  getCustomerHistoryController,
   getAllOrdersController,
   getB2BOrdersController,
   getB2COrdersController,
@@ -24,6 +25,7 @@ const router = Router()
 router.post('/b2c/create', requireAuth, createB2CShipmentController)
 router.post('/b2b/create', requireAuth, createB2BShipmentController)
 router.get('/check-order-number', requireAuth, checkOrderNumberAvailabilityController)
+router.get('/customers', requireAuth, getCustomerHistoryController)
 router.get('/b2c/list', requireAuth, getB2COrdersController)
 router.get('/b2b/list', requireAuth, getB2BOrdersController)
 router.post('/b2c/:orderId/select-courier', requireAuth, selectB2CCourierController)

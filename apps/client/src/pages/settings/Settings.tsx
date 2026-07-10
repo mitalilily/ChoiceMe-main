@@ -11,7 +11,7 @@ import {
   useTheme,
 } from '@mui/material'
 import type { ReactNode } from 'react'
-import { FaBuilding, FaFileInvoice, FaTruck, FaUsers } from 'react-icons/fa'
+import { FaAddressBook, FaBuilding, FaFileInvoice, FaTruck, FaUsers } from 'react-icons/fa'
 import { FaLink } from 'react-icons/fa6'
 import { IoDocumentTextOutline } from 'react-icons/io5'
 import {
@@ -100,6 +100,12 @@ const sections: Section[] = [
         description: 'Add and manage all pickup locations',
         key: '/settings/manage_pickups',
         icon: <FaTruck />,
+      },
+      {
+        title: 'Previous Customers',
+        description: 'View customer details saved in your order history',
+        key: '/settings/customers',
+        icon: <FaAddressBook />,
       },
       {
         title: 'Invoice Preferences',

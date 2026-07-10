@@ -1,5 +1,5 @@
 // controllers/shipmentController.ts
-import { and, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { Request, Response } from 'express'
 import {
   checkMerchantOrderNumberAvailability,
@@ -21,6 +21,48 @@ import {
 import { regenerateOrderDocumentsServiceAdmin } from '../models/services/adminOrders.service'
 import { db } from '../models/client'
 import { b2c_orders } from '../models/schema/b2cOrders'
+import { b2b_orders } from '../models/schema/b2bOrders'
+
+type HistoricalProduct = {
+  name?: unknown
+  productName?: unknown
+  sku?: unknown
+  qty?: unknown
+  quantity?: unknown
+  price?: unknown
+  hsn?: unknown
+  hsnCode?: unknown
+  discount?: unknown
+  tax_rate?: unknown
+  taxRate?: unknown
+}
+
+const normalizeText = (value: unknown) => String(value ?? '').trim()
+
+const normalizeHistoricalProducts = (value: unknown) => {
+  let products = value
+  if (typeof products === 'string') {
+    try {
+      products = JSON.parse(products)
+    } catch {
+      products = []
+    }
+  }
+
+  if (!Array.isArray(products)) return []
+
+  return products
+    .map((product: HistoricalProduct) => ({
+      productName: normalizeText(product?.productName ?? product?.name),
+      sku: normalizeText(product?.sku),
+      quantity: Number(product?.quantity ?? product?.qty ?? 1) || 1,
+      price: Number(product?.price ?? 0) || 0,
+      hsnCode: normalizeText(product?.hsnCode ?? product?.hsn),
+      discount: Number(product?.discount ?? 0) || 0,
+      taxRate: Number(product?.taxRate ?? product?.tax_rate ?? 0) || 0,
+    }))
+    .filter((product) => product.productName)
+}
 
 const normalizeOrderStatus = (value: unknown) =>
   String(value || '')
@@ -291,6 +333,136 @@ export const checkOrderNumberAvailabilityController = async (req: any, res: Resp
     return res.status(statusCode).json({
       success: false,
       message: error?.message || 'Failed to check order ID availability.',
+    })
+  }
+}
+
+/**
+ * Return the authenticated seller's customer and product history. Customer profiles are
+ * derived from immutable order snapshots, so no second store of personal data is needed.
+ */
+export const getCustomerHistoryController = async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.sub
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' })
+    }
+
+    const [b2cHistory, b2bHistory] = await Promise.all([
+      db
+        .select({
+          id: b2c_orders.id,
+          orderNumber: b2c_orders.order_number,
+          name: b2c_orders.buyer_name,
+          phone: b2c_orders.buyer_phone,
+          email: b2c_orders.buyer_email,
+          address: b2c_orders.address,
+          city: b2c_orders.city,
+          state: b2c_orders.state,
+          country: b2c_orders.country,
+          pincode: b2c_orders.pincode,
+          products: b2c_orders.products,
+          createdAt: b2c_orders.created_at,
+        })
+        .from(b2c_orders)
+        .where(eq(b2c_orders.user_id, userId))
+        .orderBy(desc(b2c_orders.created_at)),
+      db
+        .select({
+          id: b2b_orders.id,
+          orderNumber: b2b_orders.order_number,
+          name: b2b_orders.buyer_name,
+          phone: b2b_orders.buyer_phone,
+          email: b2b_orders.buyer_email,
+          address: b2b_orders.address,
+          city: b2b_orders.city,
+          state: b2b_orders.state,
+          country: b2b_orders.country,
+          pincode: b2b_orders.pincode,
+          companyName: b2b_orders.company_name,
+          gstin: b2b_orders.company_gst,
+          products: b2b_orders.products,
+          createdAt: b2b_orders.created_at,
+        })
+        .from(b2b_orders)
+        .where(eq(b2b_orders.user_id, userId))
+        .orderBy(desc(b2b_orders.created_at)),
+    ])
+
+    const orders = [
+      ...b2cHistory.map((order) => ({ ...order, source: 'b2c' as const })),
+      ...b2bHistory.map((order) => ({ ...order, source: 'b2b' as const })),
+    ].sort((left, right) => {
+      const leftTime = left.createdAt ? new Date(left.createdAt).getTime() : 0
+      const rightTime = right.createdAt ? new Date(right.createdAt).getTime() : 0
+      return rightTime - leftTime
+    })
+
+    const customerMap = new Map<string, any>()
+    const productMap = new Map<string, any>()
+
+    for (const order of orders) {
+      const phone = normalizeText(order.phone)
+      const pincode = normalizeText(order.pincode)
+      const address = normalizeText(order.address)
+      const name = normalizeText(order.name)
+      const profileKey = [phone.toLowerCase(), pincode.toLowerCase(), address.toLowerCase()].join('|')
+      const fallbackKey = [name.toLowerCase(), pincode.toLowerCase()].join('|')
+      const customerKey = profileKey.replace(/\|/g, '') ? profileKey : fallbackKey
+      const products = normalizeHistoricalProducts(order.products)
+
+      if (!customerMap.has(customerKey)) {
+        customerMap.set(customerKey, {
+          id: order.id,
+          name,
+          phone,
+          email: normalizeText(order.email),
+          address,
+          city: normalizeText(order.city),
+          state: normalizeText(order.state),
+          country: normalizeText(order.country) || 'India',
+          pincode,
+          companyName: normalizeText('companyName' in order ? order.companyName : ''),
+          gstin: normalizeText('gstin' in order ? order.gstin : ''),
+          orderCount: 0,
+          lastOrderAt: order.createdAt,
+          lastOrderNumber: order.orderNumber,
+          orderTypes: [] as string[],
+          productNames: [] as string[],
+        })
+      }
+
+      const customer = customerMap.get(customerKey)
+      customer.orderCount += 1
+      if (!customer.orderTypes.includes(order.source)) customer.orderTypes.push(order.source)
+      for (const product of products) {
+        if (!customer.productNames.includes(product.productName)) {
+          customer.productNames.push(product.productName)
+        }
+
+        const productKey = product.productName.toLowerCase()
+        if (!productMap.has(productKey)) {
+          productMap.set(productKey, {
+            id: `${order.id}-${productKey}`,
+            ...product,
+            orderCount: 0,
+            lastUsedAt: order.createdAt,
+          })
+        }
+        productMap.get(productKey).orderCount += 1
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      customers: Array.from(customerMap.values()),
+      products: Array.from(productMap.values()),
+    })
+  } catch (error: any) {
+    console.error('Error fetching customer history:', error)
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to fetch customer history',
     })
   }
 }
