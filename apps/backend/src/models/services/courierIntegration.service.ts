@@ -356,18 +356,24 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
       zone: zones,
     })
     .from(shippingRates)
-    .innerJoin(
+    .leftJoin(
       couriers,
       and(
         eq(couriers.id, shippingRates.courier_id),
-        eq(couriers.isEnabled, true),
-        inArray(couriers.serviceProvider, [...VISIBLE_SERVICE_PROVIDERS]),
-        inArray(couriers.id, DELIVERY_ONE_ALLOWED_COURIER_IDS),
         sql`lower(trim(${couriers.serviceProvider})) = lower(trim(coalesce(${shippingRates.service_provider}, '')))`,
       ),
     )
     .leftJoin(zones, eq(zones.id, shippingRates.zone_id))
-    .where(conditions.length ? and(...conditions) : undefined)
+    .where(
+      and(
+        ...conditions,
+        inArray(shippingRates.courier_id, DELIVERY_ONE_ALLOWED_COURIER_IDS),
+        inArray(sql`lower(trim(coalesce(${shippingRates.service_provider}, '')))`, [
+          ...VISIBLE_SERVICE_PROVIDERS,
+        ]),
+        or(eq(couriers.isEnabled, true), sql`${couriers.id} is null`)!,
+      ),
+    )
     .orderBy(desc(shippingRates.last_updated), desc(shippingRates.created_at))
   const modeFilteredResults = normalizedModeFilter
     ? rawResults.filter((row) => normalizeB2CShippingMode(row.rate.mode) === normalizedModeFilter)

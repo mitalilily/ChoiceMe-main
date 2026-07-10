@@ -141,14 +141,18 @@ function normaliseSlabInput(slab: RateCardSlabInput): ResolvedRateCardSlab {
   const weightFrom = Math.max(0, toNumber(slab.weight_from))
   const rawWeightTo = slab.weight_to === undefined || slab.weight_to === null ? null : toNumber(slab.weight_to)
   const weightTo = rawWeightTo !== null && rawWeightTo < weightFrom ? weightFrom : rawWeightTo
+  const rawExtraWeightUnit = slab.extra_weight_unit as unknown
+  const rawExtraRate = slab.extra_rate as unknown
   const extraWeightUnitRaw =
-    slab.extra_weight_unit === undefined || slab.extra_weight_unit === null
+    rawExtraWeightUnit === undefined || rawExtraWeightUnit === null || rawExtraWeightUnit === ''
       ? null
-      : toNumber(slab.extra_weight_unit)
+      : toNumber(rawExtraWeightUnit)
   const extraWeightUnit =
     extraWeightUnitRaw !== null && extraWeightUnitRaw > 0 ? extraWeightUnitRaw : null
   const extraRateRaw =
-    slab.extra_rate === undefined || slab.extra_rate === null ? null : toNumber(slab.extra_rate)
+    rawExtraRate === undefined || rawExtraRate === null || rawExtraRate === ''
+      ? null
+      : toNumber(rawExtraRate)
   const extraRate = extraRateRaw !== null && extraRateRaw >= 0 ? extraRateRaw : null
 
   return {

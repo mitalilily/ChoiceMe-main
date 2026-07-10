@@ -267,6 +267,42 @@ export const RateCardEditModal = ({
     }))
   }
 
+  const hasValue = (value) => value !== undefined && value !== null && value !== ''
+
+  const sanitizeB2CSlabsForSave = (zoneSlabs = {}) => {
+    const sanitized = {}
+
+    Object.entries(zoneSlabs).forEach(([zoneKey, slabsByType]) => {
+      sanitized[zoneKey] = {}
+
+      ;['forward', 'rto'].forEach((type) => {
+        const slabs = (slabsByType?.[type] || []).filter((slab) => hasValue(slab?.rate))
+        const lastIndex = slabs.length - 1
+
+        sanitized[zoneKey][type] = slabs.map((slab, index) => {
+          const next = {
+            weight_from: slab.weight_from,
+            weight_to: slab.weight_to,
+            rate: slab.rate,
+          }
+
+          const isLastSlab = index === lastIndex
+          const hasExtraRate = hasValue(slab.extra_rate)
+          const hasExtraWeightUnit = hasValue(slab.extra_weight_unit)
+
+          if (isLastSlab && hasExtraRate) {
+            next.extra_rate = slab.extra_rate
+            next.extra_weight_unit = hasExtraWeightUnit ? slab.extra_weight_unit : 1
+          }
+
+          return next
+        })
+      })
+    })
+
+    return sanitized
+  }
+
   const handleSave = () => {
     const resolvedCourierId = form.courier_id || data?.courier_id
     const resolvedMode = String(form.mode || data?.mode || '').trim()
@@ -331,7 +367,7 @@ export const RateCardEditModal = ({
       service_provider: serviceProviderValue, // Always send the service_provider
       previous_service_provider: data?.service_provider || data?.serviceProvider,
       rates,
-      zone_slabs: isB2C ? form.zone_slabs : undefined,
+      zone_slabs: isB2C ? sanitizeB2CSlabsForSave(form.zone_slabs) : undefined,
       cod_slabs: isB2C ? form.cod_slabs || [] : undefined,
       businessType: resolvedBusinessType,
     }
