@@ -15,14 +15,13 @@ const validateCredentials = () => {
   }
 
   if (
-    ADMIN_PASSWORD.length < 12 ||
+    ADMIN_PASSWORD.length < 8 ||
     !/[a-z]/.test(ADMIN_PASSWORD) ||
     !/[A-Z]/.test(ADMIN_PASSWORD) ||
-    !/\d/.test(ADMIN_PASSWORD) ||
-    !/[^A-Za-z\d]/.test(ADMIN_PASSWORD)
+    !/\d/.test(ADMIN_PASSWORD)
   ) {
     throw new Error(
-      'ADMIN_PASSWORD must be at least 12 characters and include upper, lower, number, and symbol',
+      'ADMIN_PASSWORD must be at least 8 characters and include upper, lower, and number',
     )
   }
 }
