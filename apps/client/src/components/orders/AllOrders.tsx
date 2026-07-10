@@ -55,8 +55,10 @@ import B2COrderFormSteps, { type B2CFormData } from './b2c/B2COrderForm'
 import {
   BULK_MANIFEST_LIMIT,
   downloadFile,
+  downloadMergedPdf,
   type DocumentEntry,
   type DocumentType,
+  type ResolvedDocumentEntry,
   getActionableErrorMessage,
   getB2CManifestIdentifier,
   getB2CManifestProvider,
@@ -533,7 +535,7 @@ const AllOrders = () => {
       return entries
     }, [])
 
-  const downloadDocumentEntries = async (documentEntries: DocumentEntry[]) => {
+  const resolveDocumentEntries = async (documentEntries: DocumentEntry[]) => {
     const uniqueEntries = Array.from(
       new Map<string, DocumentEntry>(
         documentEntries.map((entry) => [entry.key || entry.url || entry.fileName, entry]),
@@ -550,13 +552,11 @@ const AllOrders = () => {
       ? await presignDownloads({ keys: keyEntries.map((entry) => String(entry.key)) })
       : []
 
-    let downloadedCount = 0
     let skippedCount = documentEntries.length - uniqueEntries.length
-
-    for (const entry of directEntries) {
-      await downloadFile(String(entry.url), entry.fileName)
-      downloadedCount += 1
-    }
+    const resolvedEntries: ResolvedDocumentEntry[] = directEntries.map((entry) => ({
+      ...entry,
+      url: String(entry.url),
+    }))
 
     for (const [index, entry] of keyEntries.entries()) {
       const resolvedUrl = Array.isArray(presignedUrls) ? presignedUrls[index] : null
@@ -565,7 +565,21 @@ const AllOrders = () => {
         continue
       }
 
-      await downloadFile(resolvedUrl, entry.fileName)
+      resolvedEntries.push({
+        ...entry,
+        url: resolvedUrl,
+      })
+    }
+
+    return { resolvedEntries, skippedCount }
+  }
+
+  const downloadDocumentEntries = async (documentEntries: DocumentEntry[]) => {
+    const { resolvedEntries, skippedCount } = await resolveDocumentEntries(documentEntries)
+    let downloadedCount = 0
+
+    for (const entry of resolvedEntries) {
+      await downloadFile(entry.url, entry.fileName)
       downloadedCount += 1
     }
 
@@ -608,7 +622,22 @@ const AllOrders = () => {
         return
       }
 
-      const { downloadedCount, skippedCount } = await downloadDocumentEntries(documentEntries)
+      const { downloadedCount, skippedCount } =
+        type === 'label'
+          ? await (async () => {
+              const { resolvedEntries, skippedCount: resolveSkippedCount } =
+                await resolveDocumentEntries(documentEntries)
+              const mergeResult = await downloadMergedPdf(
+                resolvedEntries,
+                `labels-${moment().format('YYYYMMDD-HHmmss')}.pdf`,
+              )
+
+              return {
+                downloadedCount: mergeResult.downloadedCount,
+                skippedCount: resolveSkippedCount + mergeResult.skippedCount,
+              }
+            })()
+          : await downloadDocumentEntries(documentEntries)
 
       if (!downloadedCount) {
         const message = `No ${typeLabel.toLowerCase()} files could be downloaded for the selected orders.`
@@ -623,8 +652,12 @@ const AllOrders = () => {
 
       const summaryMessage =
         skippedCount > 0
-          ? `Downloaded ${downloadedCount} ${typeLabel.toLowerCase()} file(s). Skipped ${skippedCount} missing or duplicate file(s).`
-          : `Downloaded ${downloadedCount} ${typeLabel.toLowerCase()} file(s).`
+          ? type === 'label'
+            ? `Downloaded ${downloadedCount} ${typeLabel.toLowerCase()} file(s) in one PDF. Skipped ${skippedCount} missing, duplicate, or unreadable file(s).`
+            : `Downloaded ${downloadedCount} ${typeLabel.toLowerCase()} file(s). Skipped ${skippedCount} missing or duplicate file(s).`
+          : type === 'label'
+            ? `Downloaded ${downloadedCount} ${typeLabel.toLowerCase()} file(s) in one PDF.`
+            : `Downloaded ${downloadedCount} ${typeLabel.toLowerCase()} file(s).`
 
       setBulkFeedback({
         severity: skippedCount > 0 ? 'warning' : 'success',

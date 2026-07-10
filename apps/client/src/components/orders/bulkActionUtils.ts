@@ -1,4 +1,5 @@
 import { saveAs } from 'file-saver'
+import { PDFDocument } from 'pdf-lib'
 import { downloadDocumentThroughProxy } from '../../api/upload.api'
 
 export type DocumentType = 'label' | 'invoice' | 'manifest'
@@ -26,6 +27,10 @@ export type DocumentEntry = {
   key?: string | null
   url?: string | null
   fileName: string
+}
+
+export type ResolvedDocumentEntry = DocumentEntry & {
+  url: string
 }
 
 export {
@@ -117,6 +122,40 @@ export const downloadFile = async (url: string, fileName: string) => {
     console.warn('Falling back to browser download for bulk file:', error)
     triggerBrowserDownload(url, fileName)
   }
+}
+
+export const downloadMergedPdf = async (entries: ResolvedDocumentEntry[], fileName: string) => {
+  const mergedPdf = await PDFDocument.create()
+  let downloadedCount = 0
+  let skippedCount = 0
+
+  for (const entry of entries) {
+    try {
+      const blob = await downloadDocumentThroughProxy(entry.url, {
+        downloadName: entry.fileName,
+        disposition: 'inline',
+        contentType: 'application/pdf',
+      })
+      const pdfBytes = await blob.arrayBuffer()
+      const sourcePdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true })
+      const pages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices())
+
+      pages.forEach((page) => mergedPdf.addPage(page))
+      downloadedCount += 1
+    } catch (error) {
+      console.warn(`Skipping PDF while preparing ${fileName}:`, entry.fileName, error)
+      skippedCount += 1
+    }
+  }
+
+  if (!downloadedCount) {
+    return { downloadedCount, skippedCount }
+  }
+
+  const mergedBytes = await mergedPdf.save()
+  saveAs(new Blob([mergedBytes], { type: 'application/pdf' }), fileName)
+
+  return { downloadedCount, skippedCount }
 }
 
 export const openFileInNewTab = async (url: string, fileName: string) => {
