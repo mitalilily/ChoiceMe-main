@@ -32,6 +32,7 @@
     "verify:smtp": "tsx src/scripts/verifySmtp.ts",
     "preview:shipment-status-email": "tsx src/scripts/sendShipmentStatusPreview.ts",
     "verify:shipment-status-email": "tsx src/scripts/verifyShipmentEmailTemplate.ts",
+    "admin:ensure": "tsx src/scripts/ensureChoiceMeAdmin.ts",
     "verify:delivery-one-api-calls": "tsx src/scripts/verifyDeliveryOneApiCalls.ts",
     "smoke:delivery-one": "tsx src/scripts/smokeDeliveryOneApis.ts",
     "smoke:delivery-one-booking": "tsx src/scripts/smokeDeliveryOneBookingFlow.ts",

@@ -4,10 +4,31 @@ import { v4 as uuidv4 } from 'uuid'
 import { db, pool } from '../models/client'
 import { users } from '../models/schema/users'
 
-const ADMIN_EMAIL = 'admin@choiceme.com'
-const ADMIN_PASSWORD = 'Admin@12345!'
+const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || 'admin@choiceme.com')
+  .trim()
+  .toLowerCase()
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || '')
+
+const validateCredentials = () => {
+  if (!ADMIN_EMAIL || !ADMIN_EMAIL.includes('@')) {
+    throw new Error('ADMIN_EMAIL must be a valid email address')
+  }
+
+  if (
+    ADMIN_PASSWORD.length < 12 ||
+    !/[a-z]/.test(ADMIN_PASSWORD) ||
+    !/[A-Z]/.test(ADMIN_PASSWORD) ||
+    !/\d/.test(ADMIN_PASSWORD) ||
+    !/[^A-Za-z\d]/.test(ADMIN_PASSWORD)
+  ) {
+    throw new Error(
+      'ADMIN_PASSWORD must be at least 12 characters and include upper, lower, number, and symbol',
+    )
+  }
+}
 
 async function ensureChoiceMeAdmin() {
+  validateCredentials()
   const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10)
   const [existing] = await db.select().from(users).where(eq(users.email, ADMIN_EMAIL))
 
@@ -38,7 +59,7 @@ async function ensureChoiceMeAdmin() {
     console.log(`Created admin user ${ADMIN_EMAIL}`)
   }
 
-  console.log(`Admin login: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`)
+  console.log(`ChoiceMee admin is ready: ${ADMIN_EMAIL}`)
 }
 
 ensureChoiceMeAdmin()
