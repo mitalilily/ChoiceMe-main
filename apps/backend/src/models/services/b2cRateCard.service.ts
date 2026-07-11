@@ -3,6 +3,7 @@ import { db } from '../client'
 import { shippingRates, shippingRateCodSlabs, shippingRateSlabs } from '../schema/shippingRates'
 import { calculateFreight } from './pricing/chargeableFreight'
 import { normalizeServiceProviderKey } from '../../utils/courierProviders'
+import { DELHIVERY_COURIER_IDS } from '../../utils/delhiveryCourier'
 
 export interface RateCardSlabInput {
   weight_from: number
@@ -78,6 +79,27 @@ export interface ComputedB2CRateCardCharge {
 
 type RateCardRow = typeof shippingRates.$inferSelect
 
+const isModeScopedDelhiveryProvider = (value: unknown) => {
+  const provider = normalizeB2CServiceProvider(value)
+  return provider === 'deliveryone' || provider === 'delhivery'
+}
+
+const resolveCanonicalRateCardCourierId = (params: {
+  courierId: unknown
+  serviceProvider?: unknown
+  mode?: unknown
+}) => {
+  const courierId = Number(params.courierId)
+  const normalizedMode = normalizeB2CShippingMode(params.mode)
+
+  if (isModeScopedDelhiveryProvider(params.serviceProvider)) {
+    if (normalizedMode === 'surface') return DELHIVERY_COURIER_IDS.SURFACE
+    if (normalizedMode === 'air') return DELHIVERY_COURIER_IDS.EXPRESS
+  }
+
+  return Number.isFinite(courierId) ? courierId : null
+}
+
 export function normalizeB2CShippingMode(value: unknown): string {
   const raw = String(value ?? '')
     .trim()
@@ -109,7 +131,11 @@ function getRateCardDedupeKey(row: RateCardRow) {
   return [
     row.plan_id,
     row.zone_id,
-    row.courier_id,
+    resolveCanonicalRateCardCourierId({
+      courierId: row.courier_id,
+      serviceProvider: row.service_provider,
+      mode: row.mode,
+    }) ?? row.courier_id,
     normalizeB2CServiceProvider(row.service_provider),
     normalizeB2CShippingMode(row.mode),
     String(row.type || '').trim().toLowerCase(),
@@ -303,6 +329,8 @@ export async function fetchResolvedB2CRateCards(filters: {
   mode?: string | null
   type?: 'forward' | 'rto'
 }) {
+  const requestedServiceProvider = normalizeB2CServiceProvider(filters.serviceProvider)
+  const requestedMode = normalizeB2CShippingMode(filters.mode)
   const conditions = [
     eq(shippingRates.plan_id, filters.planId),
     eq(shippingRates.business_type, 'b2c'),
@@ -310,15 +338,17 @@ export async function fetchResolvedB2CRateCards(filters: {
   ]
 
   if (filters.courierId !== undefined) {
-    conditions.push(eq(shippingRates.courier_id, filters.courierId))
+    if (isModeScopedDelhiveryProvider(requestedServiceProvider)) {
+      conditions.push(inArray(shippingRates.courier_id, Object.values(DELHIVERY_COURIER_IDS)))
+    } else {
+      conditions.push(eq(shippingRates.courier_id, filters.courierId))
+    }
   }
 
   if (filters.type) {
     conditions.push(eq(shippingRates.type, filters.type))
   }
 
-  const requestedServiceProvider = normalizeB2CServiceProvider(filters.serviceProvider)
-  const requestedMode = normalizeB2CShippingMode(filters.mode)
   const allRateRows = await db
     .select()
     .from(shippingRates)
@@ -342,7 +372,29 @@ export async function fetchResolvedB2CRateCards(filters: {
         return providerFilteredRows.filter((row) => !normalizeB2CShippingMode(row.mode))
       })()
     : providerFilteredRows
-  const rateRows = pickLatestRateCardRows(modeFilteredRows)
+  const requestedCanonicalCourierId =
+    filters.courierId !== undefined
+      ? resolveCanonicalRateCardCourierId({
+          courierId: filters.courierId,
+          serviceProvider: requestedServiceProvider,
+          mode: requestedMode,
+        })
+      : null
+  const courierFilteredRows =
+    requestedCanonicalCourierId !== null
+      ? modeFilteredRows.filter((row) => {
+          if (Number(row.courier_id) === requestedCanonicalCourierId) return true
+
+          const canonicalRowCourierId = resolveCanonicalRateCardCourierId({
+            courierId: row.courier_id,
+            serviceProvider: row.service_provider,
+            mode: row.mode,
+          })
+
+          return canonicalRowCourierId === requestedCanonicalCourierId
+        })
+      : modeFilteredRows
+  const rateRows = pickLatestRateCardRows(courierFilteredRows)
   const rateIds = rateRows.map((row) => row.id)
   const [slabs, codSlabs] = await Promise.all([
     fetchShippingRateSlabs(rateIds),
@@ -380,7 +432,12 @@ export async function fetchResolvedB2CRateCards(filters: {
   return rateRows.map(
     (row): ResolvedB2CRateCard => ({
       shippingRateId: row.id,
-      courier_id: row.courier_id,
+      courier_id:
+        resolveCanonicalRateCardCourierId({
+          courierId: row.courier_id,
+          serviceProvider: row.service_provider,
+          mode: row.mode,
+        }) ?? row.courier_id,
       service_provider: row.service_provider ?? null,
       zone_id: row.zone_id,
       type: row.type,
