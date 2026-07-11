@@ -35,7 +35,11 @@ import {
   MdVisibility,
 } from 'react-icons/md'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { fetchOrdersForCsvExport, generateManifestService } from '../../../api/order.service'
+import {
+  fetchOrdersForCsvExport,
+  generateManifestService,
+  regenerateOrderDocumentsService,
+} from '../../../api/order.service'
 import {
   useB2COrdersByUser,
   useCancelShipment,
@@ -73,6 +77,7 @@ import {
   getB2CManifestProvider,
   getDocumentReference,
   getDownloadFileName,
+  generateMissingLabels,
   isB2CManifestEligible,
   isB2CCancelledStatus,
   summarizeMessages,
@@ -906,7 +911,40 @@ const B2COrdersList = () => {
     })
 
     try {
-      const documentEntries = getDocumentEntriesForOrders(selectedOrders, type)
+      let targetOrders = selectedOrders
+
+      if (type === 'label') {
+        const { preparedOrders, generatedCount, failures } = await generateMissingLabels(
+          selectedOrders,
+          async (order) => {
+            const response = await regenerateOrderDocumentsService(String(order.id), {
+              regenerateLabel: true,
+              regenerateInvoice: false,
+            })
+            return response.data.label
+          },
+        )
+
+        if (failures.length) {
+          const failedOrders = summarizeOrderNumbers(
+            failures.map(({ order }) => order.order_number || String(order.id)),
+          )
+          throw new Error(
+            `Labels could not be generated for ${failures.length} selected order(s): ${failedOrders}. No partial PDF was downloaded.`,
+          )
+        }
+
+        targetOrders = preparedOrders
+        if (generatedCount) {
+          setBulkFeedback({
+            severity: 'info',
+            title: 'Labels generated',
+            message: `Generated ${generatedCount} missing label(s). Combining all ${selectedOrders.length} selected labels into one PDF.`,
+          })
+        }
+      }
+
+      const documentEntries = getDocumentEntriesForOrders(targetOrders, type)
 
       if (!documentEntries.length) {
         const message = `No ${typeLabel.toLowerCase()} files are available for the selected orders.`

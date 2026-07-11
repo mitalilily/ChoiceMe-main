@@ -399,10 +399,23 @@ export const regenerateOrderDocumentsService = async (
   orderId: string,
   { regenerateLabel = true, regenerateInvoice = true } = {},
 ) => {
-  const res = await axiosInstance.post(`/orders/${orderId}/regenerate-documents`, {
-    regenerateLabel,
-    regenerateInvoice,
-  })
+  const res = await axiosInstance.post<{
+    success: boolean
+    message: string
+    data: {
+      orderId: string
+      orderType: 'b2c' | 'b2b'
+      label: string | null
+      invoice_link: string | null
+    }
+  }>(
+    `/orders/${orderId}/regenerate-documents`,
+    {
+      regenerateLabel,
+      regenerateInvoice,
+    },
+    { timeout: 60000 },
+  )
   return res.data
 }
 

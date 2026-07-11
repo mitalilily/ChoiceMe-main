@@ -35,6 +35,11 @@ export type ResolvedDocumentEntry = DocumentEntry & {
 
 export type MergedPdfLayout = 'single' | 'a4_4up'
 
+export type LabelGenerationFailure<T extends BulkOrderDocumentShape> = {
+  order: T
+  error: unknown
+}
+
 export {
   BULK_MANIFEST_LIMIT,
   getB2CManifestIdentifier,
@@ -264,6 +269,50 @@ export const getDocumentReference = (order: BulkOrderDocumentShape, type: Docume
     key: pickStoredKey(order.invoice_key, order.invoice_link),
     url: pickStoredUrl(order.invoice_url, order.invoice_key, order.invoice_link),
   }
+}
+
+export const generateMissingLabels = async <T extends BulkOrderDocumentShape>(
+  orders: T[],
+  generateLabel: (order: T) => Promise<string | null | undefined>,
+  concurrency = 4,
+) => {
+  const preparedOrders = [...orders]
+  const missingLabels = orders
+    .map((order, index) => ({ order, index }))
+    .filter(({ order }) => {
+      const { key, url } = getDocumentReference(order, 'label')
+      return !key && !url
+    })
+  const failures: Array<LabelGenerationFailure<T>> = []
+  let generatedCount = 0
+  let cursor = 0
+
+  const worker = async () => {
+    while (cursor < missingLabels.length) {
+      const current = missingLabels[cursor]
+      cursor += 1
+      if (!current) continue
+
+      try {
+        const label = String((await generateLabel(current.order)) || '').trim()
+        if (!label) throw new Error('The label service did not return a label file.')
+
+        preparedOrders[current.index] = {
+          ...current.order,
+          label,
+          label_key: label,
+        }
+        generatedCount += 1
+      } catch (error) {
+        failures.push({ order: current.order, error })
+      }
+    }
+  }
+
+  const workerCount = Math.min(Math.max(1, concurrency), missingLabels.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+
+  return { preparedOrders, generatedCount, failures }
 }
 
 export const getDownloadFileName = (
