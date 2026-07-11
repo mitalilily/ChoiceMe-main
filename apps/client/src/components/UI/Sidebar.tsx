@@ -18,6 +18,7 @@ import { FaClipboardList as FaFileAlt, FaMoneyBill, FaToolbox } from 'react-icon
 import { HiDocumentReport } from 'react-icons/hi'
 import {
   MdAccountBalanceWallet,
+  MdAddLink,
   MdApps,
   MdDashboard,
   MdExpandMore,
@@ -116,6 +117,11 @@ const navItems: NavItem[] = [
         text: 'B2C Orders',
         path: '/orders/b2c/list',
         icon: <MdOutlineAddBusiness size={STANDARD_ICON_SIZE} />,
+      },
+      {
+        text: 'Quick Details',
+        path: '/orders/quick-details',
+        icon: <MdAddLink size={STANDARD_ICON_SIZE} />,
       },
       {
         text: 'B2B Orders',

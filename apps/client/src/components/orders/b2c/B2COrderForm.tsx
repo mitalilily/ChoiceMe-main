@@ -101,6 +101,7 @@ type B2COrderFormStepsProps = {
   initialValues?: Partial<B2CFormData>
   mode?: 'create' | 'edit'
   existingOrderId?: string | null
+  submitOverride?: (payload: CreateShipmentParams) => void | Promise<void>
 }
 
 export default function B2COrderFormSteps({
@@ -108,6 +109,7 @@ export default function B2COrderFormSteps({
   initialValues,
   mode = 'create',
   existingOrderId,
+  submitOverride,
 }: B2COrderFormStepsProps) {
   const createShipmentMutation = useCreateShipment(onClose)
   const updateOrderMutation = useUpdateB2COrder(onClose)
@@ -291,6 +293,11 @@ export default function B2COrderFormSteps({
             }
           : {}),
       }
+      if (submitOverride) {
+        await submitOverride(payload)
+        return
+      }
+
       if (isEditMode) {
         if (!existingOrderId) {
           throw new Error('Missing order ID for update')

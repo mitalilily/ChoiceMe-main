@@ -51,6 +51,7 @@ import orderRoutes from './routes/order.routes'
 import paymentOptionsRoutes from './routes/paymentOptions.routes'
 import pickupRoutes from './routes/pickup.routes'
 import pickupAddressesRoutes from './routes/pickupAddresses.route'
+import quickDetailsRoutes from './routes/quickDetails.routes'
 import reportsRoutes from './routes/reports.routes'
 import returnsRoutes from './routes/returns.routes'
 import rtoRoutes from './routes/rto.routes'
@@ -217,6 +218,7 @@ app.use('/api/admin/zones', zoneRoutes)
 app.use('/api/admin/b2b', b2bAdminRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/orders', orderRoutes)
+app.use('/api/quick-details', quickDetailsRoutes)
 app.use('/api', invoicePreferencesRoutes)
 app.use('/api', invoicesRoutes)
 app.use('/api', billingInvoiceRoutes)

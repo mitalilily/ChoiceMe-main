@@ -28,6 +28,8 @@ const B2COrdersList = lazy(() => import('../components/orders/b2c/B2COrdersList'
 const B2bOrders = lazy(() => import('../pages/orders/B2bOrders'))
 const CreateOrderWrapper = lazy(() => import('../components/orders/CreateOrderWrapper'))
 const OrderTracking = lazy(() => import('../pages/orders/OrderTracking'))
+const QuickDetailsPage = lazy(() => import('../pages/quick-details/QuickDetailsPage'))
+const PublicQuickDetailsForm = lazy(() => import('../pages/quick-details/PublicQuickDetailsForm'))
 
 // Settings
 const Settings = lazy(() => import('../pages/settings/Settings'))
@@ -228,6 +230,7 @@ function RoutedApp() {
           <Route path="/app" element={<AppEntry />} />
           <Route path="/preview" element={<ClientPreview />} />
           <Route path="/tracking" element={<TrackingRoute />} />
+          <Route path="/quick-details/:storeSlug/:token" element={<PublicQuickDetailsForm />} />
           <Route path="/rate-calculator" element={<RateCalculator publicView="rate" />} />
           <Route path="/weight-calculator" element={<RateCalculator publicView="weight" />} />
           <Route path="/terms-and-conditions" element={<TermsOfService />} />
@@ -264,6 +267,7 @@ function RoutedApp() {
               }
             />
             <Route path="/orders/b2c/list" element={<B2COrdersList />} />
+            <Route path="/orders/quick-details" element={<QuickDetailsPage />} />
             <Route path="/support/about_us" element={<AboutUs />} />
             <Route path="/orders/b2b/list" element={<B2bOrders />} />
             <Route path="/settings/invoice_preferences" element={<InvoicePreferences />} />
