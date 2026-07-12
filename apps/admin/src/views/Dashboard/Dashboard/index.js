@@ -33,6 +33,7 @@ import {
   FiCalendar,
   FiCheckCircle,
   FiClock,
+  FiDollarSign,
   FiMapPin,
   FiPackage,
   FiRefreshCw,
@@ -45,6 +46,7 @@ const CARD_ACCENTS = {
   ndr: { bg: '#FFF5F5', border: '#FECACA', icon: '#DC2626' },
   delivered: { bg: '#F0FDF4', border: '#BBF7D0', icon: '#15803D' },
   shipped: { bg: '#EFF6FF', border: '#BFDBFE', icon: '#2563EB' },
+  revenue: { bg: '#ECFDF5', border: '#A7F3D0', icon: '#047857' },
   todayOrders: { bg: '#FFF7ED', border: '#FED7AA', icon: '#EA580C' },
   todayManifest: { bg: '#F5F3FF', border: '#DDD6FE', icon: '#7C3AED' },
   todayDelivery: { bg: '#ECFDF5', border: '#A7F3D0', icon: '#059669' },
@@ -55,6 +57,7 @@ const CARD_ICONS = {
   ndr: FiAlertTriangle,
   delivered: FiCheckCircle,
   shipped: FiTruck,
+  revenue: FiDollarSign,
   todayOrders: FiPackage,
   todayManifest: FiTruck,
   todayDelivery: FiCheckCircle,
@@ -258,7 +261,7 @@ function SummaryCard({ item, onNavigate, onOpenGroup }) {
               px={3}
               py={1}
             >
-              Today
+              {item.badgeLabel || 'Today'}
             </Badge>
             <Text fontSize="sm" fontWeight="700" color={textPrimary}>
               {item.title}
@@ -407,6 +410,19 @@ export default function Dashboard() {
   const dashboardHome = stats.dashboardHome || {}
 
   const topCards = dashboardHome.topCards || []
+  const overviewCards = [
+    ...topCards,
+    {
+      key: 'revenue',
+      title: 'Total Revenue',
+      description: 'Net platform revenue across all orders',
+      count: formatCurrency(stats.financial?.totalRevenue),
+      badgeLabel: 'All time',
+      route: '/admin/billing-invoices',
+      sellerGroups: [],
+    },
+  ]
+
   const todayActionCards = dashboardHome.todayActionCards || []
   const onboardingQueue = dashboardHome.onboardingQueue || []
   const upcomingPickups = dashboardHome.upcomingPickups || { sellerGroups: [] }
@@ -508,8 +524,8 @@ export default function Dashboard() {
           </CardBody>
         </Card>
 
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} mb={6}>
-          {topCards.map((item) => (
+        <SimpleGrid columns={{ base: 1, md: 2, xl: 4 }} spacing={4} mb={6}>
+          {overviewCards.map((item) => (
             <SummaryCard
               key={item.key}
               item={item}
