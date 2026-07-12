@@ -593,11 +593,11 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
                     opacity: isBookable ? 1 : 0.72,
                     borderRadius: 4,
                     border: isSelected
-                      ? `2px solid ${alpha(ACCENT, 0.42)}`
+                      ? `3px solid ${ACCENT}`
                       : `1px solid ${alpha(isBookable ? '#102A54' : '#8A1F11', isBookable ? 0.12 : 0.2)}`,
-                    bgcolor: isSelected ? alpha(ACCENT, 0.045) : '#fff',
+                    bgcolor: isSelected ? '#EEF4FF' : '#fff',
                     boxShadow: isSelected
-                      ? '0 18px 36px rgba(13,59,142,0.14)'
+                      ? `0 0 0 4px ${alpha(ACCENT, 0.16)}, 0 20px 42px rgba(13,59,142,0.24)`
                       : '0 8px 22px rgba(16,42,84,0.06)',
                     transition: '0.25s ease',
                     '&:hover': {
@@ -610,6 +610,29 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
                   }}
                 >
                   <Stack spacing={1.75}>
+                    {isSelected && isBookable && (
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        justifyContent="center"
+                        sx={{
+                          mx: -2,
+                          mt: -2,
+                          px: 2,
+                          py: 1.1,
+                          bgcolor: ACCENT,
+                          color: '#fff',
+                          borderRadius: '13px 13px 0 0',
+                          boxShadow: '0 6px 16px rgba(13,59,142,0.22)',
+                        }}
+                      >
+                        <BiCheckCircle size={22} />
+                        <Typography sx={{ fontWeight: 900, letterSpacing: 0.8, color: 'inherit' }}>
+                          SELECTED COURIER
+                        </Typography>
+                      </Stack>
+                    )}
                     <Stack
                       direction={{ xs: 'column', sm: 'row' }}
                       justifyContent="space-between"
