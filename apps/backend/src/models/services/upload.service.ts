@@ -3,6 +3,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import axios from 'axios'
 import { r2 } from '../../config/r2Client'
 import { getBucketName } from '../../utils/functions'
+import { extractStorageObjectKey } from '../../utils/storageObjectKey'
 
 import * as dotenv from 'dotenv'
 import path from 'path'
@@ -162,7 +163,7 @@ export const downloadAndUploadToR2 = async ({
     }
 
     // If it's already an R2 URL, extract the key instead of re-uploading
-    const extractedKey = extractKeyFromUrl(url, bucket)
+    const extractedKey = extractStorageObjectKey(url, bucket)
     if (extractedKey) {
       console.log(`ℹ️ URL is already an R2 URL, using existing key: ${extractedKey}`)
       return extractedKey
@@ -209,41 +210,6 @@ export const downloadAndUploadToR2 = async ({
   }
 }
 
-/**
- * Extract S3/R2 key from a full URL
- * Example: https://xxx.r2.cloudflarestorage.com/bucket-name/folder/file.pdf -> folder/file.pdf
- */
-const extractKeyFromUrl = (url: string, bucket: string): string | null => {
-  try {
-    const urlObj = new URL(url)
-    const pathParts = urlObj.pathname.split('/').filter(Boolean).map((segment) => decodeURIComponent(segment))
-
-    if (!pathParts.length) return null
-
-    // Handle the most common R2 layouts:
-    // - /bucket/key
-    // - /key
-    // - signed URLs that still include the bucket in the path
-    const bucketIndex = pathParts.indexOf(bucket)
-    if (bucketIndex !== -1 && bucketIndex < pathParts.length - 1) {
-      return pathParts.slice(bucketIndex + 1).join('/')
-    }
-
-    if (pathParts.length > 1 && (urlObj.hostname.includes('cloudflarestorage.com') || /(^|\.)r2(\.|$)/i.test(urlObj.hostname))) {
-      return pathParts.slice(1).join('/')
-    }
-
-    if (pathParts.length === 1 && (urlObj.hostname.includes('cloudflarestorage.com') || /(^|\.)r2(\.|$)/i.test(urlObj.hostname))) {
-      return pathParts[0]
-    }
-
-    return null
-  } catch (error) {
-    console.error('Error extracting key from URL:', url, error)
-    return null
-  }
-}
-
 export const presignDownload = async (
   keyOrKeys: string | string[],
   options?: {
@@ -272,7 +238,7 @@ export const presignDownload = async (
 
       // If it's a URL, try to extract the key and re-presign it (URLs expire)
       if (/^https?:\/\//i.test(value)) {
-        const extractedKey = extractKeyFromUrl(value, bucket)
+        const extractedKey = extractStorageObjectKey(value, bucket)
         if (extractedKey) {
           console.log(`🔄 Extracted key from URL: ${extractedKey}, regenerating presigned URL`)
           const command = new GetObjectCommand({
@@ -330,7 +296,7 @@ export const presignDownload = async (
 
         // If it's a URL, try to extract the key and re-presign it
         if (/^https?:\/\//i.test(value)) {
-          const extractedKey = extractKeyFromUrl(value, bucket)
+          const extractedKey = extractStorageObjectKey(value, bucket)
           if (extractedKey) {
             console.log(`🔄 Extracted key from URL: ${extractedKey}, regenerating presigned URL`)
             const command = new GetObjectCommand({
