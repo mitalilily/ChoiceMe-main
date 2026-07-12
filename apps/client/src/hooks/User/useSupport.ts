@@ -1,6 +1,6 @@
 // src/hooks/support.hooks.ts
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createSupportTicket,
   getMySupportTickets,
@@ -39,6 +39,8 @@ export const useMyTickets = ({ page, limit, filters }: UseMyTicketsOptions) =>
     queryKey: ['support-tickets', page, limit, filters],
     queryFn: () => getMySupportTickets(page, limit, filters),
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    staleTime: 45 * 1000,
   })
 
 export const useTicketById = (id: string) =>

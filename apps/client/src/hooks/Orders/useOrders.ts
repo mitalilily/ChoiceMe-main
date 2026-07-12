@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   deleteB2COrder,
   bookB2CCourier,
@@ -210,6 +210,8 @@ export const useB2COrdersByUser = (
     queryKey: ['b2cOrdersByUser', page, limit, filters],
     queryFn: () => fetchB2COrdersByUser({ page, limit, ...filters }),
     enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 45 * 1000,
     refetchInterval: (query) => (shouldPollB2CTracking(query.state.data) ? 30000 : false),
     refetchIntervalInBackground: false,
   })
@@ -225,6 +227,8 @@ export const useB2BOrdersByUser = (
     queryKey: ['b2bOrdersByUser', page, limit, filters],
     queryFn: () => fetchB2BOrdersByUser({ page, limit, ...filters }),
     enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 45 * 1000,
   })
 }
 
@@ -384,6 +388,7 @@ export const useAllOrders = (params: FetchOrdersParams, enabled = true) => {
     queryKey: ['orders', params], // cache key includes all params
     queryFn: () => fetchAllOrders(params), // fetch function
     staleTime: 1000 * 60, // cache data for 1 min
+    placeholderData: keepPreviousData,
     enabled,
   })
 }

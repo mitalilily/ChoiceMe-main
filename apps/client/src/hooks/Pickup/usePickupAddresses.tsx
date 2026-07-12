@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createPickupAddress,
   exportPickupAddresses,
@@ -15,6 +15,8 @@ export const usePickupAddresses = (filters?: PickupAddressFilters) => {
   return useQuery({
     queryKey: ['pickupAddresses', filters],
     queryFn: () => getPickupAddresses(filters),
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
   })
 }
 

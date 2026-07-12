@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   approveQuickDetail,
   fetchQuickDetails,
@@ -22,6 +22,8 @@ export const useQuickDetails = (
   useQuery({
     queryKey: ['quickDetails', page, limit, status],
     queryFn: () => fetchQuickDetails({ page, limit, status }),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   })
 
 export const usePendingQuickDetailsCount = () =>

@@ -1,5 +1,5 @@
 // AppRoutes.tsx
-import { Component, lazy, Suspense, useEffect, type ErrorInfo, type ReactNode } from 'react'
+import { Component, lazy, Suspense, useEffect, useRef, type ErrorInfo, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import RequireAuth from '../components/auth/wrapper/RequireAuth'
 import RequireMerchantReady from '../components/auth/wrapper/RequireMerchantReady'
@@ -107,6 +107,20 @@ const ApiIntegration = lazy(() => import('../pages/settings/ApiIntegration'))
 
 const ROUTE_RELOAD_KEY = 'choicemee-route-asset-reload'
 
+const warmClientRouteChunks = () =>
+  Promise.allSettled([
+    import('../pages/dashboard/Dashboard'),
+    import('../pages/home/Home'),
+    import('../pages/orders/Orders'),
+    import('../components/orders/b2c/B2COrdersList'),
+    import('../pages/orders/B2bOrders'),
+    import('../pages/quick-details/QuickDetailsPage'),
+    import('../pages/billings/WalletTransactions'),
+    import('../pages/pickup-addresses/PickupAddresses'),
+    import('../pages/couriers/Couriers'),
+    import('../pages/settings/Settings'),
+  ])
+
 const isRouteAssetError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? '')
   return /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk/i.test(
@@ -207,9 +221,39 @@ function TrackingRoute() {
 
 function RoutedApp() {
   const location = useLocation()
-  const routeKey = [location.key, location.pathname, location.search, location.hash]
-    .filter(Boolean)
-    .join(':')
+  const { isAuthenticated } = useAuth()
+  const hasWarmedClientRoutes = useRef(false)
+  const routeKey = [location.pathname, location.search, location.hash].filter(Boolean).join(':')
+
+  useEffect(() => {
+    if (!isAuthenticated || hasWarmedClientRoutes.current) return
+
+    hasWarmedClientRoutes.current = true
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const warm = () => {
+      if (!cancelled) void warmClientRouteChunks()
+    }
+
+    const requestIdle = window.requestIdleCallback
+    const cancelIdle = window.cancelIdleCallback
+
+    if (typeof requestIdle === 'function' && typeof cancelIdle === 'function') {
+      const idleId = requestIdle(warm, { timeout: 2500 })
+      return () => {
+        cancelled = true
+        cancelIdle(idleId)
+      }
+    }
+
+    timeoutId = setTimeout(warm, 900)
+
+    return () => {
+      cancelled = true
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [isAuthenticated])
 
   return (
     <>
@@ -218,7 +262,7 @@ function RoutedApp() {
       <RouteAssetRecovery />
       <RouteErrorBoundary resetKey={routeKey}>
         <Suspense fallback={<FullScreenLoader />}>
-          <Routes location={location} key={routeKey}>
+          <Routes location={location}>
           {/* public */}
           <Route path="/" element={<RootRoute />} />
           <Route path="/landing" element={<LandingPage />} />

@@ -120,6 +120,8 @@ export default function DataTable<T extends { id: string | number }>(props: Data
   const page = currentPage ?? localPage
   const rowsPerPage = localRowsPerPage
   const paginationPage = currentPage !== undefined ? Math.max(page - 1, 0) : page
+  const selectedIdSet = React.useMemo(() => new Set(selectedIds), [selectedIds])
+  const visibleRowIds = React.useMemo(() => rows.map((row) => row.id), [rows])
 
   const handleChangePage = (_: unknown, newPage: number) => {
     if (onPageChange) onPageChange(newPage + 1)
@@ -135,14 +137,14 @@ export default function DataTable<T extends { id: string | number }>(props: Data
     }
   }
 
-  const isAllSelected = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id))
+  const isAllSelected = rows.length > 0 && visibleRowIds.every((id) => selectedIdSet.has(id))
 
   useEffect(() => {
     onSelectRowsRef.current = onSelectRows
   }, [onSelectRows])
 
   const handleSelect = (id: T['id']) => {
-    const selected = selectedIds.includes(id)
+    const selected = selectedIdSet.has(id)
       ? selectedIds.filter((i) => i !== id)
       : [...selectedIds, id]
     setSelectedIds(selected)
@@ -150,7 +152,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
   }
 
   const handleSelectAll = (checked: boolean) => {
-    const allIds = checked ? rows.map((r) => r.id) : []
+    const allIds = checked ? visibleRowIds : []
     setSelectedIds(allIds)
     onSelectRows?.(allIds)
   }
@@ -365,7 +367,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                   </Typography>
                 </Stack>
                 <Typography fontSize="12px" sx={{ color: textSecondary }}>
-                  {selectedIds.length} selected
+                  {selectedIdSet.size} selected
                 </Typography>
               </Stack>
             )}
@@ -388,7 +390,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                         <Stack direction="row" alignItems="center" justifyContent="space-between">
                           <Stack direction="row" alignItems="center" spacing={1}>
                             <CustomCheckbox
-                              checked={selectedIds.includes(row.id)}
+                              checked={selectedIdSet.has(row.id)}
                               onChange={() => handleSelect(row.id)}
                             />
                             <Typography fontSize="12px" fontWeight={500} sx={{ color: textPrimary }}>
@@ -640,7 +642,7 @@ export default function DataTable<T extends { id: string | number }>(props: Data
                               }}
                             >
                               <CustomCheckbox
-                                checked={selectedIds.includes(row.id)}
+                                checked={selectedIdSet.has(row.id)}
                                 onChange={() => handleSelect(row.id)}
                                 sx={{ color: primary }}
                               />

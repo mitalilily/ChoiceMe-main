@@ -1,12 +1,26 @@
-import { Box, Container, Drawer, Stack, useMediaQuery, useTheme } from '@mui/material'
+import { Box, CircularProgress, Container, Drawer, Stack, useMediaQuery, useTheme } from '@mui/material'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useLocation, useOutlet } from 'react-router-dom'
 import { brandGradients } from '../../theme/brand'
 import { DRAWER_WIDTH } from '../../utils/constants'
 import Navbar from '../Navbar/Navbar'
 import KeyboardShortcuts from './keyboard/KeyboardShortcuts'
-import FullScreenLoader from './loader/FullScreenLoader'
 import Sidebar, { COLLAPSED_WIDTH } from './Sidebar'
+
+function ContentLoader() {
+  return (
+    <Stack
+      alignItems="center"
+      justifyContent="center"
+      sx={{
+        minHeight: { xs: 220, md: 320 },
+        color: 'primary.main',
+      }}
+    >
+      <CircularProgress size={30} thickness={4.5} />
+    </Stack>
+  )
+}
 
 export default function Layout() {
   const theme = useTheme()
@@ -17,9 +31,7 @@ export default function Layout() {
   const [pinned, setPinned] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
-  const routeContentKey = [location.key, location.pathname, location.search, location.hash]
-    .filter(Boolean)
-    .join(':')
+  const routeContentKey = [location.pathname, location.search, location.hash].filter(Boolean).join(':')
 
   const handleDrawerToggle = () => {
     if (isMobile) setMobileOpen(!mobileOpen)
@@ -150,10 +162,8 @@ export default function Layout() {
                 overflowX: 'visible',
               }}
             >
-              <Suspense fallback={<FullScreenLoader />}>
-                <Box key={routeContentKey} sx={{ display: 'contents' }}>
-                  {outlet}
-                </Box>
+              <Suspense fallback={<ContentLoader />}>
+                <Box sx={{ display: 'contents' }}>{outlet}</Box>
               </Suspense>
             </Container>
           </Box>

@@ -1,10 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getBillingInvoices, raiseInvoiceDispute, recordInvoicePayment, acceptInvoiceCredits, generateManualInvoice, type InvoiceFilters, type BillingInvoiceResponse, type RaiseDisputePayload, type RecordPaymentPayload, type GenerateInvoicePayload } from '../api/invoice.api'
 
 export const useInvoices = (page: number, limit: number, filters: InvoiceFilters = {}) => {
   return useQuery<BillingInvoiceResponse>({
     queryKey: ['billing-invoices', page, limit, filters],
     queryFn: () => getBillingInvoices(page, limit, filters),
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
   })
 }
 

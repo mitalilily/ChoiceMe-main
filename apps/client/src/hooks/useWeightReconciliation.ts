@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   acceptDiscrepancy,
   bulkAcceptDiscrepancies,
@@ -23,6 +23,7 @@ export const useWeightDiscrepancies = (filters?: DiscrepanciesFilters) => {
     queryKey: ['weight-discrepancies', filters],
     queryFn: () => getWeightDiscrepancies(filters),
     staleTime: 30000, // 30 seconds
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -126,6 +127,7 @@ export const useWeightDisputes = (filters?: DisputesFilters) => {
     queryKey: ['weight-disputes', filters],
     queryFn: () => getWeightDisputes(filters),
     staleTime: 30000, // 30 seconds
+    placeholderData: keepPreviousData,
   })
 }
 
