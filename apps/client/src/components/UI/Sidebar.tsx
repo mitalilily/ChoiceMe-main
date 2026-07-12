@@ -1,5 +1,6 @@
 ﻿import {
   alpha,
+  Badge,
   Box,
   Collapse,
   List,
@@ -40,6 +41,7 @@ import BrandLogo from '../brand/BrandLogo'
 import { brand, brandGradients } from '../../theme/brand'
 import { DRAWER_WIDTH } from '../../utils/constants'
 import { isActive } from '../../utils/functions'
+import { usePendingQuickDetailsCount } from '../../hooks/useQuickDetails'
 
 export type Role = 'customer' | 'admin'
 
@@ -252,6 +254,7 @@ export default function Sidebar({
   const location = useLocation()
   const theme = useTheme()
   const isSidebarExpanded = pinned || hovered
+  const { data: pendingQuickDetailsCount = 0 } = usePendingQuickDetailsCount()
 
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
 
@@ -303,6 +306,7 @@ export default function Sidebar({
           item.children?.some((sub) => isActive(location.pathname, sub.path)),
         )
         const showExpanded = isSidebarExpanded && isExpanded
+        const hasPendingQuickDetails = item.text === 'Quick Details' && pendingQuickDetailsCount > 0
 
         const listItem = (
           <ListItemButton
@@ -314,6 +318,17 @@ export default function Sidebar({
               justifyContent: isSidebarExpanded ? 'flex-start' : 'center',
               px: isSidebarExpanded ? 1.4 : 0.95,
               ...(isSelected && !hasChildren ? activeItemSx : {}),
+              ...(hasPendingQuickDetails && !isSelected
+                ? {
+                    bgcolor: alpha(brand.accent, isSidebarExpanded ? 0.09 : 0.14),
+                    color: brand.accent,
+                    borderColor: alpha(brand.accent, 0.24),
+                    boxShadow: isSidebarExpanded
+                      ? `0 8px 18px ${alpha(brand.accent, 0.12)}`
+                      : `0 0 0 3px ${alpha(brand.accent, 0.12)}`,
+                    '& .MuiListItemIcon-root': { color: brand.accent },
+                  }
+                : {}),
               ...(hasChildren && childSelected
                 ? {
                     bgcolor: alpha('#FFFFFF', 0.72),
@@ -331,7 +346,28 @@ export default function Sidebar({
                 transition: 'color 160ms ease',
               }}
             >
-              {item.icon}
+              {hasPendingQuickDetails ? (
+                <Badge
+                  badgeContent={pendingQuickDetailsCount}
+                  max={99}
+                  color="error"
+                  overlap="circular"
+                  sx={{
+                    '& .MuiBadge-badge': {
+                      minWidth: 17,
+                      height: 17,
+                      px: 0.45,
+                      fontSize: '0.61rem',
+                      fontWeight: 900,
+                      boxShadow: '0 0 0 2px #FFFFFF',
+                    },
+                  }}
+                >
+                  {item.icon}
+                </Badge>
+              ) : (
+                item.icon
+              )}
             </ListItemIcon>
             {isSidebarExpanded ? (
               <ListItemText
@@ -360,7 +396,14 @@ export default function Sidebar({
             {isSidebarExpanded ? (
               listItem
             ) : (
-              <Tooltip title={item.text} placement="right">
+              <Tooltip
+                title={
+                  hasPendingQuickDetails
+                    ? `${pendingQuickDetailsCount} customer ${pendingQuickDetailsCount === 1 ? 'response' : 'responses'} awaiting review`
+                    : item.text
+                }
+                placement="right"
+              >
                 <Box>{listItem}</Box>
               </Tooltip>
             )}

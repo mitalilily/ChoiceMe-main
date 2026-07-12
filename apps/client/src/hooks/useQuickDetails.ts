@@ -24,6 +24,15 @@ export const useQuickDetails = (
     queryFn: () => fetchQuickDetails({ page, limit, status }),
   })
 
+export const usePendingQuickDetailsCount = () =>
+  useQuery({
+    queryKey: ['quickDetails', 1, 1, 'submitted'],
+    queryFn: () => fetchQuickDetails({ page: 1, limit: 1, status: 'submitted' }),
+    select: (data) => data.totalCount,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+  })
+
 export const useGenerateQuickDetailLink = () => {
   const queryClient = useQueryClient()
   return useMutation({

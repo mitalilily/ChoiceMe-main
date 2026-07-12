@@ -27,6 +27,7 @@ import TodaysOperationsCard from '../../components/dashboard/TodaysOperationsCar
 import TopDestinationsCard from '../../components/dashboard/TopDestinationsCard'
 import { useMerchantDashboardStats } from '../../hooks/useDashboard'
 import { useDashboardPreferences } from '../../hooks/useDashboardPreferences'
+import { usePendingQuickDetailsCount } from '../../hooks/useQuickDetails'
 import { brand, brandGradients } from '../../theme/brand'
 import { dashboardButtonSx, dashboardCardSx, dashboardPalette } from '../../components/dashboard/dashboardStyles'
 
@@ -53,6 +54,7 @@ export default function Dashboard() {
   const theme = useTheme()
   const { data: stats, isLoading, error, refetch, isRefetching } = useMerchantDashboardStats()
   const { data: preferences } = useDashboardPreferences()
+  const { data: pendingQuickDetailsCount = 0 } = usePendingQuickDetailsCount()
   const [ChartComponent, setChartComponent] = useState<
     typeof import('react-apexcharts').default | null
   >(null)
@@ -180,6 +182,7 @@ export default function Dashboard() {
         lastWeekOrders: 0,
       },
       formatCurrency,
+      pendingQuickDetailsCount,
     },
     quickActions: {},
     insights: {
