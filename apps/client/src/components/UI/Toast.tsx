@@ -87,7 +87,6 @@ const GlassAlert = styled(Alert)<{ severity: AlertColor }>(({ severity }) => ({
 }))
 
 const ToastContainer = styled(Box)(() => ({
-  maxWidth: 420,
   width: '100%',
   '& *': {
     boxSizing: 'border-box',
@@ -102,7 +101,7 @@ export const ToastProvider: React.FC = () => {
     message: '',
     severity: 'info',
     duration: 5000,
-    position: { vertical: 'bottom', horizontal: 'right' },
+    position: { vertical: 'top', horizontal: 'center' },
   })
 
   React.useEffect(() => {
@@ -113,10 +112,9 @@ export const ToastProvider: React.FC = () => {
     }
   }, [])
 
-  const { vertical, horizontal } = opts.position ?? {
-    vertical: 'bottom',
-    horizontal: 'center',
-  }
+  // Keep every user-panel notification in one predictable, highly visible place.
+  const vertical = 'top' as const
+  const horizontal = 'center' as const
 
   return (
     <Snackbar
@@ -127,6 +125,13 @@ export const ToastProvider: React.FC = () => {
       anchorOrigin={{ vertical, horizontal }}
       TransitionComponent={transitionUp}
       sx={{
+        top: '50% !important',
+        right: 'auto !important',
+        bottom: 'auto !important',
+        left: '50% !important',
+        width: { xs: 'calc(100% - 24px)', sm: 'calc(100% - 48px)' },
+        maxWidth: 440,
+        transform: 'translate(-50%, -50%) !important',
         '& .MuiSnackbarContent-root': {
           background: 'transparent',
           boxShadow: 'none',
@@ -141,6 +146,7 @@ export const ToastProvider: React.FC = () => {
           icon={iconMap[opts.severity ?? 'info']}
           action={
             <IconButton
+              aria-label="Close notification"
               size="small"
               onClick={() => setOpen(false)}
               sx={{
