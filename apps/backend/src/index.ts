@@ -4,6 +4,7 @@ import { server } from './app'
 import { testDatabaseConnection } from './models/client'
 import { ensureInsuranceChargeColumns } from './models/migrations/ensureInsuranceChargeColumns'
 import { ensureInvoicePreferencesColumns } from './models/migrations/ensureInvoicePreferencesColumns'
+import { ensureQuickDetailsTable } from './models/migrations/ensureQuickDetailsTable'
 import { ensureShipmentEmailDeliveriesTable } from './models/migrations/ensureShipmentEmailDeliveriesTable'
 
 // Determine environment
@@ -34,6 +35,7 @@ async function startServer() {
 
   await ensureInsuranceChargeColumns()
   await ensureInvoicePreferencesColumns()
+  await ensureQuickDetailsTable()
   await ensureShipmentEmailDeliveriesTable()
 
   // Start scheduled jobs only after the database is reachable. During DB outages,
