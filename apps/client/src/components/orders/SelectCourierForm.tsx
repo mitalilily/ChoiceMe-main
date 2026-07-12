@@ -1,6 +1,6 @@
-import { Box, Chip, CircularProgress, Divider, Grid, Paper, Stack, Typography, alpha } from '@mui/material'
+import { Box, Checkbox, Chip, CircularProgress, Divider, Grid, Paper, Stack, Typography, alpha } from '@mui/material'
 import { useFormContext } from 'react-hook-form'
-import { BiCalendar, BiCheckCircle, BiMap, BiPackage, BiUser } from 'react-icons/bi'
+import { BiCalendar, BiMap, BiPackage, BiUser } from 'react-icons/bi'
 import { TbPlane, TbTruck } from 'react-icons/tb'
 import {
   useAvailableCouriers,
@@ -550,93 +550,73 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
               const finalCourierCharge = getFinalCourierCharge(courier)
               const isBookable = courier?.is_bookable !== false
               const finalChargeLabel = isBookable ? formatCurrency(finalCourierCharge) : 'Unavailable'
+              const selectCourier = () => {
+                if (!isBookable) {
+                  toast.open({
+                    message:
+                      courier?.unavailable_reason ||
+                      'Live courier quote is unavailable. Please retry serviceability.',
+                    severity: 'warning',
+                  })
+                  return
+                }
+
+                setValue('courierPartner', courier?.name ?? '')
+                setValue('courierPartnerId', courier?.id ?? '')
+                setValue('courierOptionKey', courierOptionKey)
+                setValue('selectedMaxSlabWeight', courier?.max_slab_weight ?? null)
+                setValue('courierCod', codCharge)
+                setValue('forwardCharges', freightCharge)
+                setValue('otherCharges', otherCharge)
+                setValue(
+                  'shippingMode',
+                  courier?.shipping_mode ?? courier?.mode ?? local?.forward?.mode ?? '',
+                )
+                setValue(
+                  'courierCost',
+                  providerCost > 0 ? providerCost : null,
+                )
+                setValue('integrationType', courier?.integration_type)
+                setValue('zone', courier?.approxZone?.code ?? courier?.approxZone?.name ?? '')
+                setValue('zoneId', courier?.approxZone?.id ?? '')
+                setValue('chargeableWeight', courier?.chargeable_weight ?? null)
+                setValue('volumetricWeight', courier?.volumetric_weight ?? null)
+                setValue('slabs', courier?.slabs ?? null)
+                clearErrors('courierPartnerId')
+              }
 
               return (
                 <Paper
                   key={courierOptionKey}
-                  onClick={() => {
-                    if (!isBookable) {
-                      toast.open({
-                        message:
-                          courier?.unavailable_reason ||
-                          'Live courier quote is unavailable. Please retry serviceability.',
-                        severity: 'warning',
-                      })
-                      return
-                    }
-                    setValue('courierPartner', courier?.name ?? '')
-                    setValue('courierPartnerId', courier?.id ?? '')
-                    setValue('courierOptionKey', courierOptionKey)
-                    setValue('selectedMaxSlabWeight', courier?.max_slab_weight ?? null)
-                    setValue('courierCod', codCharge)
-                    setValue('forwardCharges', freightCharge)
-                    setValue('otherCharges', otherCharge)
-                    setValue(
-                      'shippingMode',
-                      courier?.shipping_mode ?? courier?.mode ?? local?.forward?.mode ?? '',
-                    )
-                    setValue(
-                      'courierCost',
-                      providerCost > 0 ? providerCost : null,
-                    ) // Estimated courier cost from serviceability
-                    setValue('integrationType', courier?.integration_type)
-                    setValue('zone', courier?.approxZone?.code ?? courier?.approxZone?.name ?? '')
-                    setValue('zoneId', courier?.approxZone?.id ?? '')
-                    setValue('chargeableWeight', courier?.chargeable_weight ?? null)
-                    setValue('volumetricWeight', courier?.volumetric_weight ?? null)
-                    setValue('slabs', courier?.slabs ?? null)
-                    clearErrors('courierPartnerId')
-                  }}
+                  onClick={selectCourier}
                   sx={{
-                    p: 2,
+                    p: { xs: 1.35, sm: 1.6 },
+                    position: 'relative',
                     cursor: isBookable ? 'pointer' : 'not-allowed',
                     opacity: isBookable ? 1 : 0.72,
-                    borderRadius: 4,
+                    borderRadius: '10px',
                     border: isSelected
-                      ? `3px solid ${ACCENT}`
+                      ? `2px solid ${ACCENT}`
                       : `1px solid ${alpha(isBookable ? '#102A54' : '#8A1F11', isBookable ? 0.12 : 0.2)}`,
-                    bgcolor: isSelected ? '#EEF4FF' : '#fff',
+                    bgcolor: isSelected ? '#F2F7FF' : '#fff',
                     boxShadow: isSelected
-                      ? `0 0 0 4px ${alpha(ACCENT, 0.16)}, 0 20px 42px rgba(13,59,142,0.24)`
-                      : '0 8px 22px rgba(16,42,84,0.06)',
-                    transition: '0.25s ease',
+                      ? `0 0 0 4px ${alpha(ACCENT, 0.14)}, 0 14px 30px rgba(13,59,142,0.18)`
+                      : '0 6px 16px rgba(16,42,84,0.055)',
+                    transition: 'border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease, transform 180ms ease',
                     '&:hover': {
                       borderColor: alpha(isBookable ? ACCENT : '#8A1F11', isBookable ? 0.38 : 0.2),
                       boxShadow: isBookable
-                        ? '0 18px 36px rgba(13,59,142,0.12)'
-                        : '0 8px 22px rgba(16,42,84,0.06)',
+                        ? '0 12px 28px rgba(13,59,142,0.13)'
+                        : '0 6px 16px rgba(16,42,84,0.055)',
                       transform: isBookable ? 'translateY(-1px)' : 'none',
                     },
                   }}
                 >
-                  <Stack spacing={1.75}>
-                    {isSelected && isBookable && (
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        alignItems="center"
-                        justifyContent="center"
-                        sx={{
-                          mx: -2,
-                          mt: -2,
-                          px: 2,
-                          py: 1.1,
-                          bgcolor: ACCENT,
-                          color: '#fff',
-                          borderRadius: '13px 13px 0 0',
-                          boxShadow: '0 6px 16px rgba(13,59,142,0.22)',
-                        }}
-                      >
-                        <BiCheckCircle size={22} />
-                        <Typography sx={{ fontWeight: 900, letterSpacing: 0.8, color: 'inherit' }}>
-                          SELECTED COURIER
-                        </Typography>
-                      </Stack>
-                    )}
+                  <Stack spacing={1.35}>
                     <Stack
                       direction={{ xs: 'column', sm: 'row' }}
                       justifyContent="space-between"
-                      alignItems={{ xs: 'flex-start', sm: 'center' }}
+                      alignItems={{ xs: 'stretch', sm: 'center' }}
                       spacing={1.5}
                     >
                       <Stack direction="row" spacing={1.5} alignItems="center">
@@ -685,13 +665,52 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
                         </Box>
                       </Stack>
 
-                      <Stack alignItems={{ xs: 'flex-start', sm: 'flex-end' }} spacing={0.25}>
-                        <Typography sx={{ fontSize: 12, color: TEXT_SECONDARY }}>
-                          Courier Charge
-                        </Typography>
-                        <Typography sx={{ fontSize: 28, fontWeight: 900, color: TEXT_PRIMARY }}>
-                          {finalChargeLabel}
-                        </Typography>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent={{ xs: 'space-between', sm: 'flex-end' }}
+                        spacing={1.25}
+                        sx={{ minWidth: { sm: 210 } }}
+                      >
+                        <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                          <Typography sx={{ fontSize: 12, color: TEXT_SECONDARY }}>
+                            Courier Charge
+                          </Typography>
+                          <Typography sx={{ fontSize: { xs: 24, sm: 28 }, fontWeight: 900, color: TEXT_PRIMARY }}>
+                            {finalChargeLabel}
+                          </Typography>
+                        </Box>
+                        <Checkbox
+                          checked={isSelected && isBookable}
+                          disabled={!isBookable}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={selectCourier}
+                          inputProps={{ 'aria-label': `Select ${getCourierDisplayName(courier)}` }}
+                          sx={{
+                            p: 0,
+                            width: 42,
+                            height: 42,
+                            borderRadius: '8px',
+                            border: isSelected
+                              ? `2px solid ${ACCENT}`
+                              : `1px solid ${alpha(TEXT_SECONDARY, 0.28)}`,
+                            bgcolor: isSelected ? ACCENT : '#fff',
+                            color: isSelected ? '#fff' : alpha(TEXT_SECONDARY, 0.45),
+                            boxShadow: isSelected ? `0 8px 18px ${alpha(ACCENT, 0.28)}` : 'none',
+                            '&:hover': {
+                              bgcolor: isSelected ? ACCENT : alpha(ACCENT, 0.06),
+                            },
+                            '&.Mui-checked': {
+                              color: '#fff',
+                            },
+                            '&.Mui-disabled': {
+                              opacity: 0.48,
+                            },
+                            '& .MuiSvgIcon-root': {
+                              fontSize: 28,
+                            },
+                          }}
+                        />
                       </Stack>
                     </Stack>
 
@@ -731,15 +750,6 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
                         <Chip size="small" variant="outlined" color="warning" label="Live rate unavailable" />
                       )}
                     </Stack>
-
-                    {isSelected && isBookable && (
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <BiCheckCircle size={20} color={ACCENT} />
-                        <Typography sx={{ fontWeight: 800, color: ACCENT }}>
-                          Selected for booking
-                        </Typography>
-                      </Stack>
-                    )}
                   </Stack>
                 </Paper>
               )
