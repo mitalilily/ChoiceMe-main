@@ -49,6 +49,8 @@ const ADMIN_EDITABLE_ORDER_STATUSES = new Set([
 ])
 
 const ADMIN_RTO_STATUSES = new Set(['rto', 'rto_in_transit', 'rto_delivered'])
+const DASHBOARD_MANIFEST_STATUSES = new Set(['pickup_initiated', 'manifest_generated'])
+const DASHBOARD_SHIPPED_STATUSES = new Set(['shipment_created'])
 
 const getOrderStatus = (order: any) => String(order?.order_status || '').trim().toLowerCase()
 
@@ -168,7 +170,7 @@ export const getAllOrdersServiceAdmin = async ({
           return getOrderCreatedDateKey(order) === dashboardDateKey
         case 'todayManifest':
           return (
-            status !== 'cancelled' &&
+            DASHBOARD_MANIFEST_STATUSES.has(status) &&
             isManifestedOrder(order) &&
             getOrderActivityDateKey(order) === dashboardDateKey
           )
@@ -176,9 +178,8 @@ export const getAllOrdersServiceAdmin = async ({
           return status === 'delivered' && getDeliveredDateKey(order) === dashboardDateKey
         case 'todayShipped':
           return (
-            ['booked', 'pickup_initiated', 'shipment_created', 'in_transit', 'out_for_delivery'].includes(
-              status,
-            ) && getOrderActivityDateKey(order) === dashboardDateKey
+            DASHBOARD_SHIPPED_STATUSES.has(status) &&
+            getOrderActivityDateKey(order) === dashboardDateKey
           )
         case 'upcomingPickup': {
           const pickupStatus = String(order.pickup_status || '').trim().toLowerCase()

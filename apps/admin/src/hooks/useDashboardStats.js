@@ -5,9 +5,10 @@ export const useDashboardStats = () => {
   return useQuery({
     queryKey: ['admin-dashboard-stats'],
     queryFn: () => getAdminDashboardStats(),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    refetchOnMount: 'always',
+    refetchInterval: 60 * 1000,
   })
 }
 

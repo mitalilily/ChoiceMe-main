@@ -20,13 +20,17 @@ import {
   getFirstBusinessDateKey,
 } from '../../utils/businessDate'
 
-const SHIPPING_STATUSES = new Set([
-  'booked',
-  'pickup_initiated',
-  'shipment_created',
-  'in_transit',
-  'out_for_delivery',
-])
+const MANIFEST_STATUSES = new Set(['pickup_initiated', 'manifest_generated'])
+const SHIPPED_STATUSES = new Set(['shipment_created'])
+const IN_TRANSIT_STATUSES = new Set(['in_transit', 'out_for_delivery'])
+const NDR_STATUS_KEYWORDS = [
+  'ndr',
+  'undelivered',
+  'delivery_attempt_failed',
+  'door_closed',
+  'address_issue',
+]
+const NDR_STATUSES = new Set(NDR_STATUS_KEYWORDS)
 
 const numberValue = (value: unknown) => {
   const parsed = Number(value)
@@ -74,6 +78,9 @@ const getDeliveredBusinessDateKey = (order: any) =>
   getFirstBusinessDateKey(order.delivered_at, order.deliveredAt, order.updated_at, order.updatedAt)
 
 const getOrderStatus = (order: any) => String(order.order_status || order.orderStatus || '').toLowerCase()
+
+const isNdrStatus = (status: string) =>
+  NDR_STATUSES.has(status) || NDR_STATUS_KEYWORDS.some((keyword) => status.includes(keyword))
 
 const getCourierName = (order: any) =>
   order.courier_partner || order.courierPartner || order.integration_type || order.integrationType || 'Unknown'
@@ -426,39 +433,39 @@ export const getAdminDashboardStats = async () => {
   const todayPendingOrders = todayOrders.filter((order) =>
     ['pending', 'booked', 'pickup_initiated'].includes(getOrderStatus(order)),
   )
-  const todayInTransitOrders = todayOrders.filter((order) =>
-    ['shipment_created', 'in_transit', 'out_for_delivery'].includes(getOrderStatus(order)),
-  )
+  const todayInTransitOrders = todayOrders.filter((order) => {
+    const status = getOrderStatus(order)
+    return SHIPPED_STATUSES.has(status) || IN_TRANSIT_STATUSES.has(status)
+  })
   const deliveredToday = ordersWithSellerContext.filter(
     (order) => getOrderStatus(order) === 'delivered' && getDeliveredBusinessDateKey(order) === todayKey,
   )
   const todayShippedOrders = ordersWithSellerContext.filter(
     (order) =>
-      SHIPPING_STATUSES.has(getOrderStatus(order)) &&
+      SHIPPED_STATUSES.has(getOrderStatus(order)) &&
       getOrderActivityBusinessDateKey(order) === todayKey,
   )
   const todayManifestOrders = ordersWithSellerContext.filter(
     (order) =>
-      getOrderStatus(order) !== 'cancelled' &&
+      MANIFEST_STATUSES.has(getOrderStatus(order)) &&
       isManifestedOrder(order) &&
       getOrderActivityBusinessDateKey(order) === todayKey,
   )
   const activeNdrOrders = ordersWithSellerContext.filter((order) => {
     const status = getOrderStatus(order)
-    return (
-      ndrOrderIds.has(String(order.id)) ||
-      ['ndr', 'undelivered', 'delivery_attempt_failed', 'door_closed', 'address_issue'].some(
-        (keyword) => status.includes(keyword),
-      )
-    )
+    return ndrOrderIds.has(String(order.id)) || isNdrStatus(status)
   })
   const rtoOrders = ordersWithSellerContext.filter((order) => {
     const status = getOrderStatus(order)
     return rtoOrderIds.has(String(order.id)) || status.includes('rto') || status === 'returned_to_origin'
   })
-  const todayNdrOrders = ordersWithSellerContext.filter((order) =>
-    todayNdrOrderIds.has(String(order.id)),
-  )
+  const todayNdrOrders = ordersWithSellerContext.filter((order) => {
+    const status = getOrderStatus(order)
+    return (
+      todayNdrOrderIds.has(String(order.id)) ||
+      (isNdrStatus(status) && getOrderActivityBusinessDateKey(order) === todayKey)
+    )
+  })
   const todayStuckOrders = todayOrders.filter((order) => {
     const status = getOrderStatus(order)
     const orderDateKey = getOrderBusinessDateKey(order)
