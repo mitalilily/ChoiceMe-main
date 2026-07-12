@@ -119,16 +119,17 @@ const navItems: NavItem[] = [
         icon: <MdOutlineAddBusiness size={STANDARD_ICON_SIZE} />,
       },
       {
-        text: 'Quick Details',
-        path: '/orders/quick-details',
-        icon: <MdAddLink size={STANDARD_ICON_SIZE} />,
-      },
-      {
         text: 'B2B Orders',
         path: '/orders/b2b/list',
         icon: <MdOutlineAddBusiness size={STANDARD_ICON_SIZE} />,
       },
     ],
+  },
+  {
+    text: 'Quick Details',
+    icon: <MdAddLink size={STANDARD_ICON_SIZE} />,
+    path: '/orders/quick-details',
+    roles: ['customer', 'admin'],
   },
   {
     text: 'Couriers',
@@ -295,8 +296,8 @@ export default function Sidebar({
   const renderNavList = (items: NavItem[]) => (
     <List disablePadding>
       {items.map((item) => {
-        const isSelected = isActive(location.pathname, item.path)
         const hasChildren = Boolean(item.children?.length)
+        const isSelected = !hasChildren && isActive(location.pathname, item.path)
         const isExpanded = expandedItems[item.text]
         const childSelected = Boolean(
           item.children?.some((sub) => isActive(location.pathname, sub.path)),
