@@ -112,8 +112,8 @@ export const ToastProvider: React.FC = () => {
     }
   }, [])
 
-  // Keep every user-panel notification in one predictable, highly visible place.
-  const vertical = 'top' as const
+  // Keep every user-panel notification bottom-centred, including narrow screens.
+  const vertical = 'bottom' as const
   const horizontal = 'center' as const
 
   return (
@@ -125,13 +125,17 @@ export const ToastProvider: React.FC = () => {
       anchorOrigin={{ vertical, horizontal }}
       TransitionComponent={transitionUp}
       sx={{
-        top: '50% !important',
+        top: 'auto !important',
         right: 'auto !important',
-        bottom: 'auto !important',
+        bottom: {
+          xs: 'calc(12px + env(safe-area-inset-bottom, 0px)) !important',
+          sm: '24px !important',
+        },
         left: '50% !important',
         width: { xs: 'calc(100% - 24px)', sm: 'calc(100% - 48px)' },
         maxWidth: 440,
-        transform: 'translate(-50%, -50%) !important',
+        margin: 0,
+        transform: 'translateX(-50%) !important',
         '& .MuiSnackbarContent-root': {
           background: 'transparent',
           boxShadow: 'none',
