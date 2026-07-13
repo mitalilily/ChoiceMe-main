@@ -76,6 +76,7 @@ export default function PublicQuickDetailsForm() {
 
   const canSubmit = linkQuery.data?.data?.canSubmit
   const storeName = linkQuery.data?.data?.storeName || 'ChoiceMee Store'
+  const sellerPhone = linkQuery.data?.data?.sellerPhone || ''
   const fieldSx = {
     '& .MuiOutlinedInput-root': {
       minHeight: 58,
@@ -312,10 +313,33 @@ export default function PublicQuickDetailsForm() {
               {storeName}
             </Typography>
             <Stack direction="row" justifyContent="center" alignItems="center" gap={0.8} mt={1.5}>
-              <MdVerified color="#7535BC" size={20} />
-              <Typography sx={{ color: '#6B5A76', fontSize: '.82rem', fontWeight: 700 }}>
-                Shared securely by the seller
-              </Typography>
+              {sellerPhone ? (
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 2.2,
+                    py: 1,
+                    borderRadius: '999px',
+                    bgcolor: '#fff',
+                    border: '1px solid rgba(117, 53, 188, .16)',
+                    boxShadow: '0 8px 22px rgba(75, 33, 125, .08)',
+                  }}
+                >
+                  <MdPhone color="#7535BC" size={20} />
+                  <Typography sx={{ color: '#4A225F', fontSize: '.95rem', fontWeight: 900 }}>
+                    {sellerPhone}
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <MdVerified color="#7535BC" size={20} />
+                  <Typography sx={{ color: '#6B5A76', fontSize: '.82rem', fontWeight: 700 }}>
+                    Shared securely by the seller
+                  </Typography>
+                </>
+              )}
             </Stack>
           </Box>
         </Stack>

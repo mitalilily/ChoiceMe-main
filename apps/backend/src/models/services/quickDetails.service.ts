@@ -9,6 +9,7 @@ import {
   type QuickDetailStatus,
 } from '../schema/quickDetails'
 import { stores } from '../schema/stores'
+import { userProfiles } from '../schema/userProfile'
 import { users } from '../schema/users'
 import { createB2CDraftOrderService, type ShipmentParams } from './shiprocket.service'
 import { createWalletTransaction, getOrCreateWalletForUser } from './wallet.service'
@@ -36,26 +37,44 @@ const publicPathFor = (storeSlug: string, token: string) => `/quick-details/${st
 const buildPublicUrl = (storeSlug: string, token: string) =>
   `${getFrontendBaseUrl()}${publicPathFor(storeSlug, token)}`
 
+const firstNonEmpty = (...values: unknown[]) =>
+  values.map((value) => String(value || '').trim()).find(Boolean) || ''
+
 async function getSellerStoreIdentity(userId: string) {
-  const [store] = await db
-    .select({ name: stores.name, domain: stores.domain })
-    .from(stores)
-    .where(eq(stores.userId, userId))
-    .limit(1)
+  const [[profile], [store], [user]] = await Promise.all([
+    db
+      .select({ companyInfo: userProfiles.companyInfo })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
+      .limit(1),
+    db
+      .select({ name: stores.name, domain: stores.domain })
+      .from(stores)
+      .where(eq(stores.userId, userId))
+      .limit(1),
+    db
+      .select({ phone: users.phone })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
+  ])
 
-  if (store) {
-    const name = String(store.name || store.domain || 'ChoiceMee Store').trim()
-    return { storeName: name, storeSlug: slugify(name) }
-  }
+  const companyInfo = (profile?.companyInfo || {}) as unknown as Record<string, unknown>
+  const storeName = firstNonEmpty(
+    companyInfo.brandName,
+    companyInfo.businessName,
+    companyInfo.companyName,
+    store?.name,
+    store?.domain,
+    'ChoiceMee Store',
+  )
+  const sellerPhone = firstNonEmpty(
+    companyInfo.companyContactNumber,
+    companyInfo.contactNumber,
+    user?.phone,
+  )
 
-  const [user] = await db
-    .select({ email: users.email, phone: users.phone })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1)
-
-  const fallbackName = String(user?.email || user?.phone || 'ChoiceMee Store').trim()
-  return { storeName: fallbackName, storeSlug: slugify(fallbackName.split('@')[0] || fallbackName) }
+  return { storeName, storeSlug: slugify(storeName), sellerPhone }
 }
 
 export async function generateQuickDetailLinkService(userId: string) {
@@ -121,6 +140,7 @@ export async function getQuickDetailLinkPublicService(token: string, storeSlug: 
       status: quickDetails.status,
       createdAt: quickDetails.createdAt,
       submittedAt: quickDetails.submittedAt,
+      userId: quickDetails.userId,
     })
     .from(quickDetails)
     .where(and(eq(quickDetails.token, token), eq(quickDetails.storeSlug, storeSlug)))
@@ -128,8 +148,13 @@ export async function getQuickDetailLinkPublicService(token: string, storeSlug: 
 
   if (!link) throw new HttpError(404, 'Quick details link not found.')
 
+  const { userId, ...publicLink } = link
+  const seller = await getSellerStoreIdentity(userId)
+
   return {
-    ...link,
+    ...publicLink,
+    storeName: seller.storeName,
+    sellerPhone: seller.sellerPhone,
     canSubmit: link.status === 'generated',
   }
 }

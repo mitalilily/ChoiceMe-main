@@ -70,6 +70,7 @@ export const fetchPublicQuickDetail = async (storeSlug: string, token: string) =
       id: string
       token: string
       storeName: string
+      sellerPhone: string
       storeSlug: string
       status: QuickDetailStatus
       canSubmit: boolean
