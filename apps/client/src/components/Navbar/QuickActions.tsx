@@ -13,7 +13,7 @@ import { useRef, useState } from 'react'
 import { AiTwotoneThunderbolt } from 'react-icons/ai'
 import { CgCalculator, CgTrack } from 'react-icons/cg'
 import { FaTicket } from 'react-icons/fa6'
-import { MdLockOutline } from 'react-icons/md'
+import { MdLockOutline, MdOutlineContactPage } from 'react-icons/md'
 import { TbTruckDelivery } from 'react-icons/tb'
 import { useNavigate } from 'react-router-dom'
 import { useMerchantReadiness } from '../../hooks/useMerchantReadiness'
@@ -55,6 +55,14 @@ const QuickActions = () => {
       path: '/tools/order_tracking',
       color: SKY,
       bg: alpha(SKY, 0.12),
+    },
+    {
+      icon: <MdOutlineContactPage size={19} />,
+      name: 'Quick Details',
+      caption: 'Create a customer details link',
+      path: '/orders/quick-details',
+      color: '#7C3AED',
+      bg: alpha('#7C3AED', 0.12),
     },
     {
       icon: <FaTicket size={17} />,
