@@ -125,8 +125,8 @@ export default function B2COrderFormSteps({
   // Determine default order type based on enabled payment options
   const getDefaultOrderType = (): 'prepaid' | 'cod' => {
     if (!paymentOptions) return 'prepaid' // Default fallback
-    if (paymentOptions.codEnabled) return 'cod'
     if (paymentOptions.prepaidEnabled) return 'prepaid'
+    if (paymentOptions.codEnabled) return 'cod'
     return 'prepaid' // Final fallback
   }
 
@@ -179,10 +179,10 @@ export default function B2COrderFormSteps({
         (orderType === 'prepaid' && paymentOptions.prepaidEnabled)
 
       if (!isCurrentTypeEnabled) {
-        const newOrderType = paymentOptions.codEnabled
-          ? 'cod'
-          : paymentOptions.prepaidEnabled
+        const newOrderType = paymentOptions.prepaidEnabled
           ? 'prepaid'
+          : paymentOptions.codEnabled
+          ? 'cod'
           : 'prepaid'
         setValue('orderType', newOrderType)
       }
