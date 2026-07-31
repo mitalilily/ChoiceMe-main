@@ -1,6 +1,52 @@
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm'
 import { db } from '../client'
 import { codRemittances } from '../schema/codRemittance'
+import { userProfiles } from '../schema/userProfile'
+import { users } from '../schema/users'
+import { sendCodRemittanceSettledEmail } from '../../utils/emailSender'
+
+const getSellerDisplayName = (profile?: { companyInfo?: any } | null, email?: string | null) => {
+  const companyInfo = profile?.companyInfo || {}
+  return (
+    companyInfo.businessName ||
+    companyInfo.brandName ||
+    companyInfo.companyName ||
+    companyInfo.displayName ||
+    companyInfo.contactPerson ||
+    email ||
+    'Seller'
+  )
+}
+
+const notifySellerCodRemittanceSettled = async (remittance: any, utrNumber?: string) => {
+  const [seller] = await db
+    .select({
+      email: users.email,
+      companyInfo: userProfiles.companyInfo,
+    })
+    .from(users)
+    .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
+    .where(eq(users.id, remittance.userId))
+    .limit(1)
+
+  if (!seller?.email) {
+    console.warn('[COD Remittance] Skipping settlement email because seller email is missing', {
+      remittanceId: remittance.id,
+      userId: remittance.userId,
+    })
+    return
+  }
+
+  await sendCodRemittanceSettledEmail({
+    to: seller.email,
+    sellerName: getSellerDisplayName({ companyInfo: seller.companyInfo }, seller.email),
+    amount: Number(remittance.remittableAmount || 0),
+    orderNumber: remittance.orderNumber,
+    awbNumber: remittance.awbNumber,
+    settledAt: remittance.creditedAt,
+    utrNumber,
+  })
+}
 
 /**
  * Create a COD remittance entry when an order is delivered with COD
@@ -106,7 +152,7 @@ export async function markCodRemittanceSettledOffline(params: {
   const normalizedUtrNumber = String(utrNumber || '').trim()
   const normalizedNotes = String(notes || '').trim()
 
-  return await db
+  const updatedRemittance = await db
     .transaction(async (tx) => {
       // 1. Get the remittance
       const [remittance] = await tx
@@ -157,6 +203,19 @@ export async function markCodRemittanceSettledOffline(params: {
 
       return updatedRemittance
     })
+
+  try {
+    await notifySellerCodRemittanceSettled(updatedRemittance, normalizedUtrNumber)
+  } catch (emailError) {
+    console.error('[COD Remittance] Failed to send settlement email', {
+      remittanceId: updatedRemittance?.id,
+      userId: updatedRemittance?.userId,
+      orderNumber: updatedRemittance?.orderNumber,
+      error: emailError instanceof Error ? emailError.message : String(emailError),
+    })
+  }
+
+  return updatedRemittance
 }
 
 // Backward-compatible alias for older imports. The workflow marks offline settlement;

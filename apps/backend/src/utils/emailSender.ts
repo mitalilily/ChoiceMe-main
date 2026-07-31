@@ -1979,6 +1979,138 @@ export const sendInvoiceReminderEmail = async (opts: {
   await sendEmail(to, `Payment Reminder: Invoice ${invoiceNo}`, html)
 }
 
+export const sendCodRemittanceSettledEmail = async (opts: {
+  to: string
+  sellerName?: string
+  amount: number | string
+  orderNumber?: string | null
+  awbNumber?: string | null
+  settledAt?: Date | string | null
+  utrNumber?: string | null
+}) => {
+  const { to, sellerName, amount, orderNumber, awbNumber, settledAt, utrNumber } = opts
+  const safeSellerName = escapeHtml(sellerName || 'Seller')
+  const numericAmount = Number(amount)
+  const amountText = Number.isFinite(numericAmount)
+    ? numericAmount.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : String(amount)
+  const safeAmountText = escapeHtml(amountText)
+  const safeOrderNumber = escapeHtml(String(orderNumber || '').trim())
+  const safeAwbNumber = escapeHtml(String(awbNumber || '').trim())
+  const safeUtrNumber = escapeHtml(String(utrNumber || '').trim())
+  const settledDateText = settledAt ? formatDisplayDateTime(settledAt) : formatDisplayDateTime(new Date())
+  const safeSettledDateText = escapeHtml(settledDateText)
+  const referenceRows = [
+    safeOrderNumber ? ['Order Number', safeOrderNumber] : null,
+    safeAwbNumber ? ['AWB Number', safeAwbNumber] : null,
+    safeUtrNumber ? ['UTR / Reference', safeUtrNumber] : null,
+    safeSettledDateText ? ['Processed On', safeSettledDateText] : null,
+  ].filter(Boolean) as string[][]
+
+  const html = `
+    <div style="margin:0; padding:24px 12px; background:#f4f7fb;">
+      <div style="
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        max-width: 620px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #dbe4f0;
+        border-radius: 18px;
+        overflow: hidden;
+        color: #102033;
+      ">
+        <div style="padding: 24px 28px; background:#0D3B8E; color:#ffffff;">
+          <p style="margin:0; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; font-weight:700;">
+            ChoiceMee Logistics
+          </p>
+          <h1 style="margin:12px 0 0; font-size:24px; line-height:1.25;">
+            COD remittance processed
+          </h1>
+        </div>
+
+        <div style="padding:28px;">
+          <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:#334155;">
+            Dear ${safeSellerName},
+          </p>
+          <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:#334155;">
+            Greetings from ChoiceMee Logistics.
+          </p>
+          <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:#334155;">
+            We have processed your COD remittance of
+            <strong style="color:#0D3B8E;">&#8377;${safeAmountText}</strong>
+            to your registered bank account.
+          </p>
+
+          <div style="
+            margin: 22px 0;
+            padding: 18px 20px;
+            border-radius: 14px;
+            background: #f0f6ff;
+            border: 1px solid #c7dcfb;
+          ">
+            <p style="margin:0; font-size:14px; line-height:1.7; color:#24415f;">
+              The amount is expected to reflect in your bank account within the next
+              <strong>4 hours</strong>. If it is not received within this timeframe,
+              please contact ChoiceMee Support for assistance.
+            </p>
+          </div>
+
+          ${
+            referenceRows.length
+              ? `<table style="width:100%; border-collapse:collapse; margin:0 0 20px;">
+                  ${referenceRows
+                    .map(
+                      ([label, value]) => `
+                        <tr>
+                          <td style="padding:9px 0; font-size:13px; color:#64748b; border-bottom:1px solid #edf2f7; width:42%;">
+                            ${label}
+                          </td>
+                          <td style="padding:9px 0; font-size:13px; color:#102033; border-bottom:1px solid #edf2f7; font-weight:700;">
+                            ${value}
+                          </td>
+                        </tr>
+                      `,
+                    )
+                    .join('')}
+                </table>`
+              : ''
+          }
+
+          <p style="margin:22px 0 0; font-size:15px; line-height:1.7; color:#334155;">
+            Regards,<br/>
+            <strong>Team ChoiceMee</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+  `
+
+  const text = [
+    `Dear ${sellerName || 'Seller'},`,
+    '',
+    'Greetings from ChoiceMee Logistics.',
+    '',
+    `We have processed your COD remittance of Rs. ${amountText} to your registered bank account.`,
+    '',
+    'The amount is expected to reflect in your bank account within the next 4 hours. If it is not received within this timeframe, please contact ChoiceMee Support for assistance.',
+    '',
+    orderNumber ? `Order Number: ${orderNumber}` : '',
+    awbNumber ? `AWB Number: ${awbNumber}` : '',
+    utrNumber ? `UTR / Reference: ${utrNumber}` : '',
+    settledDateText ? `Processed On: ${settledDateText}` : '',
+    '',
+    'Regards,',
+    'Team ChoiceMee',
+  ]
+    .filter((line, index, lines) => line || lines[index - 1])
+    .join('\n')
+
+  await sendEmail(to, 'Your COD remittance has been processed', html, undefined, text)
+}
+
 export const sendKycStatusEmail = async (opts: {
   to: string
   userName?: string
