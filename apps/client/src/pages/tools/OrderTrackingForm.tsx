@@ -77,6 +77,7 @@ const formatTrackingDate = (value?: string | null) => {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+    timeZone: 'Asia/Kolkata',
   }).format(date)
 }
 
@@ -89,6 +90,7 @@ const formatTrackingTime = (value?: string | null) => {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
+    timeZone: 'Asia/Kolkata',
   }).format(date)
 }
 

@@ -48,7 +48,7 @@ import { downloadAndUploadToR2, presignDownload, presignUpload } from './upload.
 import { createWalletTransaction } from './wallet.service'
 import { walletOfUser } from './walletTopupService'
 import { resolveInvoiceNumber } from './invoiceNumber.service'
-import { logTrackingEvent } from './trackingEvents.service'
+import { logTrackingEvent, parseCourierTrackingDate } from './trackingEvents.service'
 
 import * as dotenv from 'dotenv'
 import { PgTransaction } from 'drizzle-orm/pg-core'
@@ -9392,7 +9392,7 @@ const normalizeStatusText = (value: unknown) =>
 
 const toIsoString = (value: unknown, fallback?: string): string => {
   if (value) {
-    const date = value instanceof Date ? value : new Date(value as string)
+    const date = value instanceof Date ? value : parseCourierTrackingDate(String(value)) ?? new Date(value as string)
     if (!Number.isNaN(date.getTime())) {
       return date.toISOString()
     }
@@ -9422,6 +9422,175 @@ const sortHistoryDescending = (history: TrackingHistoryItem[]) => {
   history.sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime())
 }
 
+const firstTrackingValue = (...values: unknown[]) => {
+  for (const value of values) {
+    const text = sanitizeString(value)
+    if (text) return text
+  }
+
+  return ''
+}
+
+const getScanStatusCode = (detail: any) =>
+  firstTrackingValue(
+    detail?.ScanType,
+    detail?.StatusCode,
+    detail?.StatusType,
+    detail?.status_code,
+    detail?.statusCode,
+    detail?.scan_status_code,
+    detail?.Scan,
+    detail?.Status,
+    detail?.status,
+  )
+
+const getScanMessage = (detail: any) =>
+  firstTrackingValue(
+    detail?.ScanStatus,
+    detail?.Status,
+    detail?.Instructions,
+    detail?.Remarks,
+    detail?.scan_status,
+    detail?.status,
+    detail?.status_text,
+    detail?.statusText,
+    detail?.message,
+    detail?.description,
+    detail?.remark,
+  )
+
+const getScanLocation = (detail: any) =>
+  firstTrackingValue(
+    detail?.ScanLocation,
+    detail?.ScannedLocation,
+    detail?.StatusLocation,
+    detail?.StatusLocationName,
+    detail?.Location,
+    detail?.location,
+    detail?.scan_location,
+    detail?.scanLocation,
+    detail?.city,
+    detail?.hub,
+    detail?.hub_name,
+    detail?.hubName,
+  )
+
+const getScanTime = (detail: any) =>
+  firstTrackingValue(
+    detail?.ScanDateTime,
+    detail?.StatusDateTime,
+    detail?.scan_date_time,
+    detail?.scanDateTime,
+    detail?.event_time,
+    detail?.eventTime,
+    detail?.timestamp,
+    detail?.updated_at,
+    detail?.ScanDate,
+    detail?.ScanTime,
+    detail?.StatusDate,
+    detail?.scan_date,
+    detail?.scanDate,
+  )
+
+const hasScanSignal = (detail: any) =>
+  Boolean(getScanStatusCode(detail) || getScanMessage(detail) || getScanLocation(detail) || getScanTime(detail))
+
+const collectScanDetails = (value: any, output: any[] = [], depth = 0) => {
+  if (!value || depth > 8) return output
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectScanDetails(item, output, depth + 1))
+    return output
+  }
+
+  if (typeof value !== 'object') return output
+
+  if (value.ScanDetail) {
+    collectScanDetails(value.ScanDetail, output, depth + 1)
+    return output
+  }
+
+  if (hasScanSignal(value)) {
+    output.push(value)
+  }
+
+  for (const key of ['Scans', 'scans', 'ScanDetails', 'scanDetails', 'tracking', 'history', 'events']) {
+    if (value[key]) collectScanDetails(value[key], output, depth + 1)
+  }
+
+  return output
+}
+
+const makeTrackingEventKey = (event: {
+  status_code?: string | null
+  status_text?: string | null
+  location?: string | null
+  created_at?: Date | string | null
+}) =>
+  [
+    normalizeStatusToken(event.status_code),
+    normalizeStatusText(event.status_text),
+    normalizeStatusText(event.location),
+    toIsoString(event.created_at),
+  ].join('|')
+
+const persistProviderTrackingHistoryEvents = async (
+  order: OrderSummary,
+  providerData: ProviderNormalizedTracking,
+) => {
+  if (!order.user_id || !providerData.history?.length) return
+
+  const existingEvents = await db
+    .select({
+      status_code: tracking_events.status_code,
+      status_text: tracking_events.status_text,
+      location: tracking_events.location,
+      created_at: tracking_events.created_at,
+    })
+    .from(tracking_events)
+    .where(
+      or(
+        eq(tracking_events.awb_number, order.awb_number),
+        eq(tracking_events.order_id, order.id),
+      ),
+    )
+    .limit(300)
+
+  const seen = new Set(existingEvents.map(makeTrackingEventKey))
+  const courier =
+    providerData.courier_name ??
+    order.courier_partner ??
+    getDelhiveryCourierDisplayName(order.courier_id)
+
+  for (const event of providerData.history) {
+    const key = makeTrackingEventKey({
+      status_code: event.status_code,
+      status_text: event.message,
+      location: event.location,
+      created_at: event.event_time,
+    })
+
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    await logTrackingEvent({
+      orderId: order.id,
+      userId: order.user_id,
+      awbNumber: order.awb_number,
+      courier,
+      statusCode: event.status_code,
+      statusText: event.message,
+      location: event.location,
+      eventTime: event.event_time,
+      raw: {
+        source: 'live_tracking_history',
+        event,
+        providerStatus: providerData.status,
+      },
+    })
+  }
+}
+
 const mapDeliveryOneTracking = (
   raw: any,
   order: OrderSummary,
@@ -9434,30 +9603,15 @@ const mapDeliveryOneTracking = (
   const shipment = shipmentWrapper?.Shipment ?? shipmentWrapper ?? {}
   const statusObj = shipment?.Status ?? shipment?.status ?? {}
 
-  const scans = shipment?.Scans
-  if (Array.isArray(scans)) {
-    scans.forEach((scanEntry: any) => {
-      const detail = scanEntry?.ScanDetail ?? scanEntry
-      if (detail) {
-        pushHistoryEvent(history, {
-          statusCode: detail?.ScanType ?? detail?.StatusCode ?? detail?.Status,
-          message: detail?.ScanStatus ?? detail?.Status ?? detail?.Instructions ?? detail?.Remarks,
-          location: detail?.ScanLocation ?? detail?.Location,
-          time: detail?.ScanDateTime ?? detail?.ScanDate ?? detail?.ScanTime,
-        })
-      }
+  const scanDetails = collectScanDetails(shipment?.Scans ?? shipment?.scans ?? shipment)
+  scanDetails.forEach((detail: any) => {
+    pushHistoryEvent(history, {
+      statusCode: getScanStatusCode(detail),
+      message: getScanMessage(detail),
+      location: getScanLocation(detail),
+      time: getScanTime(detail),
     })
-  } else if (scans?.ScanDetail) {
-    const scanDetails = Array.isArray(scans.ScanDetail) ? scans.ScanDetail : [scans.ScanDetail]
-    scanDetails.forEach((detail: any) => {
-      pushHistoryEvent(history, {
-        statusCode: detail?.ScanType ?? detail?.StatusCode ?? detail?.Status,
-        message: detail?.ScanStatus ?? detail?.Status ?? detail?.Instructions ?? detail?.Remarks,
-        location: detail?.ScanLocation ?? detail?.Location,
-        time: detail?.ScanDateTime ?? detail?.ScanDate ?? detail?.ScanTime,
-      })
-    })
-  }
+  })
 
   if (Object.keys(statusObj).length) {
     pushHistoryEvent(history, {
@@ -9772,6 +9926,7 @@ const persistB2CTrackingStatus = async (
       statusCode: nextStatus,
       statusText: providerData.status ?? latestEvent?.message ?? nextStatus,
       location: latestEvent?.location ?? '',
+      eventTime: latestEvent?.event_time ?? null,
       raw: providerData.raw ?? providerData,
     })
 
@@ -9878,6 +10033,8 @@ export const syncB2COrderTrackingById = async (
   if (!providerData) {
     throw new HttpError(400, 'Live tracking is not configured for this courier.')
   }
+
+  await persistProviderTrackingHistoryEvents(order, providerData)
 
   const previousStatus = normalizeStatusToken(order.order_status)
   const nextStatus = mapTrackingToOrderStatus(providerData, order.order_status)
@@ -10225,6 +10382,7 @@ export const trackByAwbService = async (awb: string): Promise<TrackingServiceRes
     const liveProviderData = await fetchLiveTrackingForOrder(order)
     if (liveProviderData) {
       providerData = liveProviderData
+      await persistProviderTrackingHistoryEvents(order, providerData)
       const synced = await persistB2CTrackingStatus(order, providerData)
       if (synced?.order_status) order.order_status = synced.order_status
       if (synced?.edd) order.edd = synced.edd
