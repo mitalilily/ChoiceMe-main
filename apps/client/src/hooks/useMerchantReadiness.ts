@@ -45,7 +45,9 @@ export const useMerchantReadiness = () => {
   const { data: paymentOptions, isLoading: paymentOptionsLoading } = usePaymentOptions()
 
   const walletBalance = Number(walletData?.data?.balance || 0)
+  const hasSuccessfulWalletTopup = Boolean(walletData?.data?.hasSuccessfulTopup)
   const requiredWalletBalance = Math.max(Number(paymentOptions?.minWalletRecharge || 0), 1)
+  const walletReady = hasSuccessfulWalletTopup || walletBalance >= requiredWalletBalance
   const hasPickupAddress =
     Number(pickupData?.totalCount || 0) > 0 || (pickupData?.pickupAddresses?.length || 0) > 0
   const hasCompanyInfo = hasRequiredCompanyInfo(user?.companyInfo)
@@ -96,14 +98,16 @@ export const useMerchantReadiness = () => {
       },
       {
         key: 'wallet',
-        title: 'Wallet Balance Ready',
-        description: `Keep at least Rs ${requiredWalletBalance.toLocaleString('en-IN')} available for first-order charges.`,
-        done: walletBalance >= requiredWalletBalance,
+        title: hasSuccessfulWalletTopup ? 'Wallet Recharge Completed' : 'First Wallet Recharge',
+        description: hasSuccessfulWalletTopup
+          ? 'Your first wallet recharge is complete. Keep enough balance available for shipment charges.'
+          : `Recharge at least Rs ${requiredWalletBalance.toLocaleString('en-IN')} once to unlock order creation.`,
+        done: walletReady,
         path: '/billing/wallet_transactions',
         actionLabel: 'Recharge Wallet',
       },
     ],
-    [hasCompanyInfo, hasPickupAddress, requiredWalletBalance, user, walletBalance],
+    [hasCompanyInfo, hasPickupAddress, hasSuccessfulWalletTopup, requiredWalletBalance, user, walletReady],
   )
 
   const completedCount = checklist.filter((item) => item.done).length
@@ -121,6 +125,7 @@ export const useMerchantReadiness = () => {
     firstIncompleteStep,
     walletBalance,
     requiredWalletBalance,
+    hasSuccessfulWalletTopup,
     assignedPlanName,
     assignedPlanId,
     isLoading: authLoading || pickupLoading || walletLoading || paymentOptionsLoading,

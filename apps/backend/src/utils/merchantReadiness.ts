@@ -4,7 +4,7 @@ import { getPaymentOptions } from '../models/services/paymentOptions.service'
 import { kyc } from '../models/schema/kyc'
 import { pickupAddresses } from '../models/schema/pickupAddresses'
 import { userProfiles } from '../models/schema/userProfile'
-import { wallets } from '../models/schema/wallet'
+import { wallets, walletTopups } from '../models/schema/wallet'
 import { CompanyInfo } from '../types/profileBlocks.types'
 import { HttpError } from './classes'
 
@@ -48,7 +48,7 @@ export async function getMerchantOrderReadiness(userId: string) {
         and(eq(pickupAddresses.userId, userId), eq(pickupAddresses.isPickupEnabled, true)),
       ),
     db
-      .select({ balance: wallets.balance })
+      .select({ id: wallets.id, balance: wallets.balance })
       .from(wallets)
       .where(eq(wallets.userId, userId))
       .limit(1),
@@ -58,8 +58,17 @@ export async function getMerchantOrderReadiness(userId: string) {
   const profileRow = profile[0]
   const kycRow = kycRecord[0]
   const walletBalance = Number(wallet[0]?.balance ?? 0)
+  const walletId = wallet[0]?.id
   const pickupCount = Number(pickupCountResult[0]?.count ?? 0)
   const requiredWalletBalance = Math.max(Number(paymentSettings?.minWalletRecharge ?? 0), 1)
+  const [successfulTopupCountResult] = walletId
+    ? await db
+        .select({ count: count() })
+        .from(walletTopups)
+        .where(and(eq(walletTopups.walletId, walletId), eq(walletTopups.status, 'success')))
+    : [{ count: 0 }]
+  const hasSuccessfulWalletTopup = Number(successfulTopupCountResult?.count ?? 0) > 0
+  const walletReady = hasSuccessfulWalletTopup || walletBalance >= requiredWalletBalance
 
   return {
     onboardingComplete: Boolean(profileRow?.onboardingComplete),
@@ -67,9 +76,11 @@ export async function getMerchantOrderReadiness(userId: string) {
     hasCompanyInfo: hasRequiredCompanyInfo(profileRow?.companyInfo as CompanyInfo | null | undefined),
     kycVerified: kycRow?.status === 'verified',
     hasPickupAddress: pickupCount > 0,
-    walletReady: walletBalance >= requiredWalletBalance,
+    walletReady,
     walletBalance,
     requiredWalletBalance,
+    hasSuccessfulWalletTopup,
+    firstWalletRechargeRequired: !hasSuccessfulWalletTopup,
   }
 }
 
@@ -114,7 +125,7 @@ export async function requireMerchantOrderReadiness(userId: string): Promise<voi
   if (!readiness.walletReady) {
     throw new HttpError(
       403,
-      `Add wallet balance before creating orders. Minimum required balance is Rs ${readiness.requiredWalletBalance}.`,
+      `Complete your first wallet recharge before creating orders. Minimum required balance is Rs ${readiness.requiredWalletBalance}.`,
     )
   }
 }

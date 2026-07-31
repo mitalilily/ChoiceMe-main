@@ -1,4 +1,7 @@
 import { Request, Response } from 'express'
+import { and, count, eq } from 'drizzle-orm'
+import { db } from '../models/client'
+import { walletTopups } from '../models/schema/wallet'
 import { getUserWalletTransactions } from '../models/services/wallet.service'
 import { walletOfUser } from '../models/services/walletTopupService'
 
@@ -8,8 +11,13 @@ export const getUserWalletBalance = async (req: Request, res: Response): Promise
     if (!userId) return res.status(401).json({ error: 'Unauthorized' })
 
     const balance = await walletOfUser(userId)
+    const [successfulTopupCountResult] = await db
+      .select({ count: count() })
+      .from(walletTopups)
+      .where(and(eq(walletTopups.walletId, balance.id), eq(walletTopups.status, 'success')))
+    const hasSuccessfulTopup = Number(successfulTopupCountResult?.count ?? 0) > 0
 
-    res.status(200).json({ message: 'success', data: { ...balance } })
+    res.status(200).json({ message: 'success', data: { ...balance, hasSuccessfulTopup } })
   } catch (error) {
     console.error('Wallet balance error:', error)
     const message = error instanceof Error ? error.message : ''

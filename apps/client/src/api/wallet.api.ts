@@ -29,7 +29,7 @@ export async function confirmRecharge({
 }
 
 export const fetchWalletBalance = async (): Promise<{
-  data: { balance: number }
+  data: { balance: number; hasSuccessfulTopup?: boolean }
 }> => {
   const response = await axiosInstance.get('/payments/wallet/balance')
   return response.data
