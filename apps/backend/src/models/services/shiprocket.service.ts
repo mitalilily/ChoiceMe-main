@@ -1309,6 +1309,31 @@ const computeB2CInsuranceChargeBasis = (params: B2CInsuranceChargeBasisParams) =
   )
 }
 
+const computeB2CCustomerOrderTotal = (params: {
+  order_amount?: unknown
+  shipping_charges?: unknown
+  other_charges?: unknown
+  transaction_fee?: unknown
+  gift_wrap?: unknown
+  discount?: unknown
+  prepaid_amount?: unknown
+}) => {
+  const orderAmount = Number(params.order_amount ?? 0)
+  const shippingCharges = Number(params.shipping_charges ?? 0)
+  const otherCharges = Number(params.other_charges ?? 0)
+  const transactionFee = Number(params.transaction_fee ?? 0)
+  const giftWrap = Number(params.gift_wrap ?? 0)
+  const discount = Number(params.discount ?? 0)
+  const prepaidAmount = Number(params.prepaid_amount ?? 0)
+
+  return roundMoneyValue(
+    Math.max(
+      orderAmount + shippingCharges + otherCharges + transactionFee + giftWrap - discount - prepaidAmount,
+      0,
+    ),
+  )
+}
+
 const computeB2BInsuranceChargeBasis = (params: ShipmentParams) => {
   const invoiceTotal = Array.isArray((params as any).invoices)
     ? (params as any).invoices.reduce(
@@ -4592,6 +4617,28 @@ export const createB2CShipmentService = async (
       }
     }
 
+    const customerOrderTotal = computeB2CCustomerOrderTotal({
+      order_amount: orderAmount,
+      shipping_charges: shippingCharges,
+      other_charges: otherCharges,
+      transaction_fee: transactionFee,
+      gift_wrap: giftWrap,
+      discount,
+      prepaid_amount: prepaidAmt,
+    })
+    const shipmentProviderParams = {
+      ...params,
+      order_amount: isReverseShipment ? params.order_amount : customerOrderTotal,
+      invoice_amount: isReverseShipment ? params.invoice_amount : customerOrderTotal,
+      cod_amount: isCodOrder && !isReverseShipment ? customerOrderTotal : 0,
+      collectable_amount: isCodOrder && !isReverseShipment ? customerOrderTotal : 0,
+      mps_amount: isCodOrder && !isReverseShipment ? customerOrderTotal : params.mps_amount,
+    } as ShipmentParams & {
+      cod_amount?: number
+      collectable_amount?: number
+      mps_amount?: number | string
+    }
+
     let manifestFailure: DelhiveryManifestError | null = null
     let shipmentSuccessPackage: any = null
     let providerCourierCost: number | null = null
@@ -4646,7 +4693,7 @@ export const createB2CShipmentService = async (
           orderNumber: params.order_number,
         })
 
-        shipmentData = await delhivery.createShipment(params)
+        shipmentData = await delhivery.createShipment(shipmentProviderParams)
       }
 
       if (isReverseShipment) {
@@ -4745,7 +4792,7 @@ export const createB2CShipmentService = async (
         })
       }
 
-      shipmentData = await deliveryOne.createShipment(params)
+      shipmentData = await deliveryOne.createShipment(shipmentProviderParams)
       const rawDeliveryOnePackages = shipmentData?.packages
       const deliveryOnePackages: any[] =
         Array.isArray(rawDeliveryOnePackages)
@@ -4804,7 +4851,7 @@ export const createB2CShipmentService = async (
 
       console.log('→ Using Ekart API...')
       const ekart = new EkartService()
-      shipmentData = await ekart.createShipment(params)
+      shipmentData = await ekart.createShipment(shipmentProviderParams)
 
       const ekartWaybill =
         shipmentData?.awb_number ??
@@ -4853,7 +4900,7 @@ export const createB2CShipmentService = async (
       )
 
       const xpressbees = new XpressbeesService()
-      const xpressParams = params as ShipmentParams & {
+      const xpressParams = shipmentProviderParams as ShipmentParams & {
         collectable_amount?: number
         categories?: string
         qccheck?: string | number

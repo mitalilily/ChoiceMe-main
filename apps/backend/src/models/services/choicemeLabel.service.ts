@@ -307,6 +307,20 @@ const normalizeLineItem = (item: any) => {
   return { productId, productName, unitPrice, quantity, lineTotal }
 }
 
+const resolveCustomerFacingTotal = (order: any, itemTotal: number) => {
+  const productAmount = normalizeNumber(order?.order_amount)
+  const baseAmount = productAmount > 0 ? productAmount : itemTotal
+  const total =
+    baseAmount +
+    normalizeNumber(order?.shipping_charges) +
+    normalizeNumber(order?.transaction_fee) +
+    normalizeNumber(order?.gift_wrap) -
+    normalizeNumber(order?.discount) -
+    normalizeNumber(order?.prepaid_amount)
+
+  return Math.max(0, total)
+}
+
 const resolveProviderKey = (order: any) => {
   const integration = String(order?.integration_type ?? '').trim().toLowerCase()
   const courierPartner = String(order?.courier_partner ?? '').trim().toLowerCase()
@@ -409,7 +423,8 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
 
   const awb = normalizeText(order?.awb_number ?? order?.awbNumber, '-')
   const providerLabel = resolveProviderKey(order) === 'delhivery' ? 'DELHIVERY' : 'DELIVERYONE'
-  const totalAmount = normalizedItems.reduce((sum, item) => sum + Math.max(0, item.lineTotal), 0)
+  const itemTotal = normalizedItems.reduce((sum, item) => sum + Math.max(0, item.lineTotal), 0)
+  const totalAmount = resolveCustomerFacingTotal(order, itemTotal)
   const rows: any[] = normalizedItems.slice(0, 4).map((item) => [
     { text: item.productId || '-', fontSize: 6.3, color: '#4b5563' },
     { text: item.productName || '-', fontSize: 6.3, color: '#111111' },
@@ -485,7 +500,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
               {
                 text:
                   paymentMethod === 'COD'
-                    ? `Collect ${formatMoney(normalizedItems.reduce((sum, item) => sum + Math.max(0, item.lineTotal), 0))}`
+                    ? `Collect ${formatMoney(totalAmount)}`
                     : 'No amount to be collected',
                 bold: true,
                 fontSize: 10,
