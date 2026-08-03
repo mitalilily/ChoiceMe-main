@@ -103,6 +103,28 @@ type BulkFeedback = {
   message: string
 }
 
+const toMoneyNumber = (value: unknown) => {
+  const amount = Number(value ?? 0)
+  return Number.isFinite(amount) ? amount : 0
+}
+
+const getCustomerPaymentTotal = (order: Order) => {
+  const orderType = String(order.type || '').toLowerCase()
+  if (orderType && orderType !== 'b2c') {
+    return toMoneyNumber(order.order_amount)
+  }
+
+  return Math.max(
+    0,
+    toMoneyNumber(order.order_amount) +
+      toMoneyNumber(order.shipping_charges) +
+      toMoneyNumber(order.transaction_fee) +
+      toMoneyNumber(order.gift_wrap) -
+      toMoneyNumber(order.discount) -
+      toMoneyNumber(order.prepaid_amount),
+  )
+}
+
 const documentButtonMeta: Record<DocumentType, { label: string; icon: ReactNode }> = {
   label: { label: 'Label', icon: <MdLocalOffer /> },
   invoice: { label: 'Invoice', icon: <MdReceipt /> },
@@ -1061,10 +1083,11 @@ const AllOrders = () => {
       truncate: false,
       render: (_value, row) => {
         const isCod = String(row.order_type || '').toLowerCase() === 'cod'
+        const paymentTotal = getCustomerPaymentTotal(row)
         return (
           <Stack spacing={0.45} alignItems="flex-start">
             <Typography sx={{ fontSize: 12.1, color: 'text.primary', fontWeight: 500 }} noWrap>
-              {formatCurrency(row.order_amount, 0)}
+              {formatCurrency(paymentTotal, 0)}
             </Typography>
             <Chip
               label={isCod ? 'COD' : 'Prepaid'}
