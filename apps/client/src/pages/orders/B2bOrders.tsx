@@ -6,16 +6,21 @@ import { fetchOrdersForCsvExport } from '../../api/order.service'
 import { FilterBar, type FilterField } from '../../components/FilterBar'
 import { toast } from '../../components/UI/Toast'
 import CustomDrawer from '../../components/UI/drawer/CustomDrawer'
-import B2BOrderForm from '../../components/orders/b2b/B2BOrderForm'
+import B2BOrderForm, { type B2BFormData } from '../../components/orders/b2b/B2BOrderForm'
 import B2BOrdersList from '../../components/orders/b2b/B2bOrdersList'
+import { getB2BOrderFormDefaults } from '../../components/orders/b2b/orderFormDefaults'
 import { statusColorMap } from '../../components/orders/b2c/B2COrdersList'
 import { useKycVerification } from '../../hooks/User/useKycVerification'
+import type { B2BOrder } from '../../types/generic.types'
 import { downloadClientOrdersCsv } from '../../utils/orderCsvExport'
 
 const B2bOrders = () => {
   const location = useLocation()
   const [page, setPage] = useState(1)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerTitle, setDrawerTitle] = useState('Create New B2B Order')
+  const [formDefaults, setFormDefaults] = useState<Partial<B2BFormData> | null>(null)
+  const [formKey, setFormKey] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [exportingCsv, setExportingCsv] = useState(false)
   const [filters, setFilters] = useState<{
@@ -65,10 +70,24 @@ const B2bOrders = () => {
 
   useEffect(() => {
     setDrawerOpen(false)
+    setDrawerTitle('Create New B2B Order')
+    setFormDefaults(null)
   }, [location.pathname, location.search, location.hash])
 
   const handleCreateB2BOrder = () => {
     checkKycBeforeAction(() => {
+      setDrawerTitle('Create New B2B Order')
+      setFormDefaults(null)
+      setFormKey((current) => current + 1)
+      setDrawerOpen(true)
+    })
+  }
+
+  const handleCloneB2BOrder = (order: B2BOrder) => {
+    checkKycBeforeAction(() => {
+      setDrawerTitle(`Clone Order ${order.order_number || ''}`.trim())
+      setFormDefaults(getB2BOrderFormDefaults(order))
+      setFormKey((current) => current + 1)
       setDrawerOpen(true)
     })
   }
@@ -131,15 +150,30 @@ const B2bOrders = () => {
         setPage={setPage}
         setRowsPerPage={setRowsPerPage}
         filters={filters}
+        onCloneOrder={handleCloneB2BOrder}
       />
 
       <CustomDrawer
         width={isMobile ? '100%' : 1400}
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title="Create New B2B Order"
+        onClose={() => {
+          setDrawerOpen(false)
+          setDrawerTitle('Create New B2B Order')
+          setFormDefaults(null)
+          setFormKey((current) => current + 1)
+        }}
+        title={drawerTitle}
       >
-        <B2BOrderForm onClose={() => setDrawerOpen(false)} />
+        <B2BOrderForm
+          key={formKey}
+          initialValues={formDefaults || undefined}
+          onClose={() => {
+            setDrawerOpen(false)
+            setDrawerTitle('Create New B2B Order')
+            setFormDefaults(null)
+            setFormKey((current) => current + 1)
+          }}
+        />
       </CustomDrawer>
     </Stack>
   )

@@ -23,6 +23,7 @@ import moment from 'moment'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   MdAssignment,
+  MdContentCopy,
   MdDelete,
   MdDownload,
   MdEdit,
@@ -623,6 +624,23 @@ const B2COrdersList = () => {
     setEditingOrder(order)
     setOrderFormKey((current) => current + 1)
     setDrawerOpen(true)
+  }
+
+  const handleCloneB2COrder = (order: B2COrder) => {
+    const defaults = getB2COrderFormDefaults(order)
+    checkKycBeforeAction(() => {
+      setOrderDrawerTitle(`Clone Order ${order.order_number || ''}`.trim())
+      setOrderFormDefaults({
+        ...defaults,
+        orderId: '',
+        courierPartner: '',
+        courierPartnerId: '',
+        courierOptionKey: '',
+      })
+      setEditingOrder(null)
+      setOrderFormKey((current) => current + 1)
+      setDrawerOpen(true)
+    })
   }
 
   const handleDeleteB2COrder = async (order: B2COrder) => {
@@ -1550,6 +1568,12 @@ const B2COrdersList = () => {
                   label: 'Edit Order',
                   onClick: () => handleEditB2COrder(row),
                 })}
+              {renderActionItem({
+                key: 'clone-order',
+                icon: <MdContentCopy />,
+                label: 'Clone Order',
+                onClick: () => handleCloneB2COrder(row),
+              })}
               {canEditDraft &&
                 renderActionItem({
                   key: 'delete-order',

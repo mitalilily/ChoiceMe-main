@@ -21,6 +21,7 @@ import moment from 'moment'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   MdAssignment,
+  MdContentCopy,
   MdDelete,
   MdFileDownload,
   MdEdit,
@@ -57,6 +58,7 @@ import DataTable, { type Column } from '../UI/table/DataTable'
 import TableSkeleton from '../UI/table/TableSkeleton'
 import { statusColorMap } from './b2c/B2COrdersList'
 import B2COrderFormSteps, { type B2CFormData } from './b2c/B2COrderForm'
+import B2BOrderForm, { type B2BFormData } from './b2b/B2BOrderForm'
 import {
   BULK_MANIFEST_LIMIT,
   downloadFile,
@@ -82,6 +84,7 @@ import OrderDetailsDialog from './OrderDetailsDialog'
 import B2CSelectCourierDialog from './b2c/B2CSelectCourierDialog'
 import { isB2CCancelEligible, isB2CPreShipmentDraft } from './b2c/orderActionRules'
 import { getB2COrderFormDefaults } from './b2c/orderFormDefaults'
+import { getB2BOrderFormDefaults } from './b2b/orderFormDefaults'
 
 interface Order {
   id: string | number
@@ -217,7 +220,11 @@ const AllOrders = () => {
   const [selectCourierOrder, setSelectCourierOrder] = useState<Order | null>(null)
   const [orderDetailsOrder, setOrderDetailsOrder] = useState<Order | null>(null)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
+  const [orderDrawerOpen, setOrderDrawerOpen] = useState(false)
+  const [orderDrawerType, setOrderDrawerType] = useState<'b2c' | 'b2b'>('b2c')
+  const [orderDrawerTitle, setOrderDrawerTitle] = useState('Create Order')
   const [orderFormDefaults, setOrderFormDefaults] = useState<Partial<B2CFormData> | null>(null)
+  const [b2bOrderFormDefaults, setB2BOrderFormDefaults] = useState<Partial<B2BFormData> | null>(null)
   const [orderFormKey, setOrderFormKey] = useState(0)
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null)
   const [activeActionOrderId, setActiveActionOrderId] = useState<Order['id'] | null>(null)
@@ -276,7 +283,11 @@ const AllOrders = () => {
     setSelectCourierOrder(null)
     setOrderDetailsOrder(null)
     setEditingOrder(null)
+    setOrderDrawerOpen(false)
+    setOrderDrawerType('b2c')
+    setOrderDrawerTitle('Create Order')
     setOrderFormDefaults(null)
+    setB2BOrderFormDefaults(null)
     setActionMenuAnchor(null)
     setActiveActionOrderId(null)
     setDocumentGenerationRef(null)
@@ -950,7 +961,38 @@ const AllOrders = () => {
 
     setEditingOrder(order)
     setOrderFormDefaults(getB2COrderFormDefaults(order as any))
+    setB2BOrderFormDefaults(null)
+    setOrderDrawerType('b2c')
+    setOrderDrawerTitle(`Edit Order ${order.order_number || ''}`.trim())
     setOrderFormKey((current) => current + 1)
+    setOrderDrawerOpen(true)
+  }
+
+  const handleCloneOrder = (order: Order) => {
+    if (order.type === 'b2b') {
+      setEditingOrder(null)
+      setOrderFormDefaults(null)
+      setB2BOrderFormDefaults(getB2BOrderFormDefaults(order as any))
+      setOrderDrawerType('b2b')
+      setOrderDrawerTitle(`Clone Order ${order.order_number || ''}`.trim())
+      setOrderFormKey((current) => current + 1)
+      setOrderDrawerOpen(true)
+      return
+    }
+
+    setEditingOrder(null)
+    setOrderFormDefaults({
+      ...getB2COrderFormDefaults(order as any),
+      orderId: '',
+      courierPartner: '',
+      courierPartnerId: '',
+      courierOptionKey: '',
+    })
+    setB2BOrderFormDefaults(null)
+    setOrderDrawerType('b2c')
+    setOrderDrawerTitle(`Clone Order ${order.order_number || ''}`.trim())
+    setOrderFormKey((current) => current + 1)
+    setOrderDrawerOpen(true)
   }
 
   const handleDeleteB2COrder = async (order: Order) => {
@@ -1298,6 +1340,12 @@ const AllOrders = () => {
                   label: 'Edit Order',
                   onClick: () => handleEditB2COrder(row),
                 })}
+              {renderActionItem({
+                key: 'clone-order',
+                icon: <MdContentCopy />,
+                label: 'Clone Order',
+                onClick: () => handleCloneOrder(row),
+              })}
               {canEditDraft &&
                 renderActionItem({
                   key: 'delete-order',
@@ -1688,23 +1736,45 @@ const AllOrders = () => {
 
       <CustomDrawer
         width={1200}
-        open={Boolean(editingOrder)}
+        open={orderDrawerOpen}
         onClose={() => {
           setEditingOrder(null)
           setOrderFormDefaults(null)
+          setB2BOrderFormDefaults(null)
+          setOrderDrawerOpen(false)
+          setOrderDrawerType('b2c')
+          setOrderDrawerTitle('Create Order')
           setOrderFormKey((current) => current + 1)
         }}
-        title={editingOrder?.order_number ? `Edit Order ${editingOrder.order_number}` : 'Edit Order'}
+        title={orderDrawerTitle}
       >
-        {editingOrder && (
-          <B2COrderFormSteps
+        {orderDrawerType === 'b2b' ? (
+          <B2BOrderForm
             key={orderFormKey}
-            initialValues={orderFormDefaults || undefined}
-            mode="edit"
-            existingOrderId={String(editingOrder.id)}
+            initialValues={b2bOrderFormDefaults || undefined}
             onClose={() => {
               setEditingOrder(null)
               setOrderFormDefaults(null)
+              setB2BOrderFormDefaults(null)
+              setOrderDrawerOpen(false)
+              setOrderDrawerType('b2c')
+              setOrderDrawerTitle('Create Order')
+              setOrderFormKey((current) => current + 1)
+            }}
+          />
+        ) : (
+          <B2COrderFormSteps
+            key={orderFormKey}
+            initialValues={orderFormDefaults || undefined}
+            mode={editingOrder ? 'edit' : 'create'}
+            existingOrderId={editingOrder ? String(editingOrder.id) : null}
+            onClose={() => {
+              setEditingOrder(null)
+              setOrderFormDefaults(null)
+              setB2BOrderFormDefaults(null)
+              setOrderDrawerOpen(false)
+              setOrderDrawerType('b2c')
+              setOrderDrawerTitle('Create Order')
               setOrderFormKey((current) => current + 1)
             }}
           />

@@ -30,6 +30,7 @@ interface B2BOrdersListProps {
   setRowsPerPage: (rows: number) => void
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   filters: any
+  onCloneOrder?: (order: B2BOrder) => void
 }
 
 const B2BOrdersList = ({
@@ -38,6 +39,7 @@ const B2BOrdersList = ({
   setPage,
   setRowsPerPage,
   filters,
+  onCloneOrder,
 }: B2BOrdersListProps) => {
   const location = useLocation()
   const { data, isLoading, isError } = useB2BOrdersByUser(page, rowsPerPage, filters)
@@ -172,6 +174,22 @@ const B2BOrdersList = ({
         const canManifest = !!row.awb_number && !row.manifest && (isXpressbees || isEkart)
 
         const actions: ReactNode[] = []
+
+        if (onCloneOrder) {
+          actions.push(
+            <Button
+              key="clone"
+              size="small"
+              variant="outlined"
+              onClick={(e) => {
+                e.stopPropagation()
+                onCloneOrder(row)
+              }}
+            >
+              Clone
+            </Button>,
+          )
+        }
 
         if (canManifest) {
           const isThisManifesting = isGeneratingManifest && manifestingAwb === row.awb_number

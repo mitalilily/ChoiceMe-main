@@ -108,7 +108,12 @@ export type B2BFormData = {
   zoneId?: string
 }
 
-export default function B2BOrderForm({ onClose }: { onClose?: () => void }) {
+type B2BOrderFormProps = {
+  onClose?: () => void
+  initialValues?: Partial<B2BFormData>
+}
+
+export default function B2BOrderForm({ onClose, initialValues }: B2BOrderFormProps) {
   const createShipmentMutation = useCreateB2BShipment(onClose)
   const navigate = useNavigate()
   const location = useLocation()
@@ -147,6 +152,7 @@ export default function B2BOrderForm({ onClose }: { onClose?: () => void }) {
       breadth: 0,
       height: 0,
       orderType: getDefaultOrderType(),
+      ...initialValues,
     },
   })
 
@@ -156,7 +162,17 @@ export default function B2BOrderForm({ onClose }: { onClose?: () => void }) {
     handleSubmit,
     trigger,
     formState: { errors },
+    reset,
   } = methods
+
+  useEffect(() => {
+    if (initialValues) {
+      reset((currentValues) => ({
+        ...currentValues,
+        ...initialValues,
+      }))
+    }
+  }, [initialValues, reset])
 
   const transactionFee = Number(watch('transactionFee') || 0)
   const discount = Number(watch('discount') || 0)
