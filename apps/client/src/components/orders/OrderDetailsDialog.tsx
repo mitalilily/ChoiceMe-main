@@ -63,6 +63,11 @@ const formatCurrency = (value?: string | number | null, decimals = 0) => {
   return `Rs ${numericValue.toFixed(decimals)}`
 }
 
+const toMoneyNumber = (value: unknown) => {
+  const amount = Number(value ?? 0)
+  return Number.isFinite(amount) ? amount : 0
+}
+
 const normalizeKgValue = (value?: string | number | null) => {
   const numericValue = Number(value ?? 0)
   if (!Number.isFinite(numericValue) || numericValue <= 0) return 0
@@ -167,6 +172,29 @@ const getOrderValue = (order: OrderDetailsDialogProps['order'], products: Produc
   if (Number.isFinite(rawOrderValue) && rawOrderValue > 0) return rawOrderValue
 
   return products.reduce((sum, product) => sum + product.price * product.quantity, 0)
+}
+
+const getChargeBreakdown = (order: OrderDetailsDialogProps['order'], productValue: number) => {
+  const shippingCharges = toMoneyNumber(order?.shipping_charges)
+  const otherCharges = toMoneyNumber(order?.other_charges)
+  const transactionFee = toMoneyNumber(order?.transaction_fee)
+  const giftWrap = toMoneyNumber(order?.gift_wrap)
+  const discount = toMoneyNumber(order?.discount)
+  const prepaidAmount = toMoneyNumber(order?.prepaid_amount)
+  const totalPayable = Math.max(
+    0,
+    productValue + shippingCharges + transactionFee + giftWrap - discount - prepaidAmount,
+  )
+
+  return {
+    shippingCharges,
+    otherCharges,
+    transactionFee,
+    giftWrap,
+    discount,
+    prepaidAmount,
+    totalPayable,
+  }
 }
 
 const IconBubble = ({ children }: { children: ReactNode }) => (
@@ -351,6 +379,37 @@ const TrackingDetails = ({ order }: { order: OrderDetailsDialogProps['order'] })
   )
 }
 
+const ChargeBreakdown = ({
+  productValue,
+  breakdown,
+}: {
+  productValue: number
+  breakdown: ReturnType<typeof getChargeBreakdown>
+}) => {
+  const rows = [
+    { label: 'Product Value', value: productValue, emphasized: false, show: true },
+    { label: 'Shipping Charges', value: breakdown.shippingCharges, emphasized: false, show: breakdown.shippingCharges > 0 },
+    { label: 'Other Charges', value: breakdown.otherCharges, emphasized: false, show: breakdown.otherCharges > 0 },
+    { label: 'Transaction Fee', value: breakdown.transactionFee, emphasized: false, show: breakdown.transactionFee > 0 },
+    { label: 'Gift Wrap', value: breakdown.giftWrap, emphasized: false, show: breakdown.giftWrap > 0 },
+    { label: 'Discount', value: -breakdown.discount, emphasized: false, show: breakdown.discount > 0 },
+    { label: 'Prepaid Amount', value: -breakdown.prepaidAmount, emphasized: false, show: breakdown.prepaidAmount > 0 },
+  ].filter((row) => row.show)
+
+  return (
+    <Stack spacing={1.05}>
+      {rows.map((row) => (
+        <OrderDetailLine
+          key={row.label}
+          label={row.label}
+          value={formatCurrency(row.value)}
+          emphasized={row.emphasized}
+        />
+      ))}
+    </Stack>
+  )
+}
+
 const ProductDetails = ({ products }: { products: ProductRow[] }) => (
   <Table size="small" sx={{ tableLayout: 'fixed' }}>
     <TableHead>
@@ -431,6 +490,7 @@ const OrderDetailsDialog = ({ open, order, onClose }: OrderDetailsDialogProps) =
   const pickup = getPickupDetails(order)
   const products = getProductRows(order)
   const orderValue = getOrderValue(order, products)
+  const chargeBreakdown = getChargeBreakdown(order, orderValue)
   const statusLabel = getStatusLabel(order?.order_status)
 
   const senderItems: DetailItem[] = [
@@ -570,11 +630,12 @@ const OrderDetailsDialog = ({ open, order, onClose }: OrderDetailsDialogProps) =
                     )}
                   />
                   <OrderDetailLine
-                    label="Order Value"
-                    value={formatCurrency(orderValue)}
+                    label="Final Payable"
+                    value={formatCurrency(chargeBreakdown.totalPayable)}
                     emphasized
                   />
                 </Stack>
+                <ChargeBreakdown productValue={orderValue} breakdown={chargeBreakdown} />
                 <OrderDetailLine label="GSTIN" value={getSenderGstin(order)} />
               </Stack>
             </SectionCard>

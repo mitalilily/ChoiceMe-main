@@ -321,6 +321,38 @@ const resolveCustomerFacingTotal = (order: any, itemTotal: number) => {
   return Math.max(0, total)
 }
 
+const buildLabelAmountRows = (order: any, itemTotal: number, totalAmount: number) => {
+  const chargeRows = [
+    { label: 'Product', value: itemTotal, show: true },
+    { label: 'Shipping', value: normalizeNumber(order?.shipping_charges), show: normalizeNumber(order?.shipping_charges) > 0 },
+    { label: 'Txn Fee', value: normalizeNumber(order?.transaction_fee), show: normalizeNumber(order?.transaction_fee) > 0 },
+    { label: 'Gift Wrap', value: normalizeNumber(order?.gift_wrap), show: normalizeNumber(order?.gift_wrap) > 0 },
+    { label: 'Discount', value: -normalizeNumber(order?.discount), show: normalizeNumber(order?.discount) > 0 },
+    { label: 'Prepaid', value: -normalizeNumber(order?.prepaid_amount), show: normalizeNumber(order?.prepaid_amount) > 0 },
+  ].filter((row) => row.show)
+
+  return [
+    ...chargeRows,
+    { label: 'Total', value: totalAmount, show: true },
+  ].map((row, index, rows) => [
+    {
+      text: row.label,
+      fontSize: row.label === 'Total' ? 6.6 : 6.0,
+      bold: row.label === 'Total',
+      color: '#111111',
+      margin: index === rows.length - 1 ? [0, 1, 0, 0] : [0, 0, 0, 0],
+    },
+    {
+      text: formatMoney(row.value),
+      fontSize: row.label === 'Total' ? 6.6 : 6.0,
+      bold: row.label === 'Total',
+      alignment: 'right',
+      color: '#111111',
+      margin: index === rows.length - 1 ? [0, 1, 0, 0] : [0, 0, 0, 0],
+    },
+  ])
+}
+
 const resolveProviderKey = (order: any) => {
   const integration = String(order?.integration_type ?? '').trim().toLowerCase()
   const courierPartner = String(order?.courier_partner ?? '').trim().toLowerCase()
@@ -425,6 +457,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
   const providerLabel = resolveProviderKey(order) === 'delhivery' ? 'DELHIVERY' : 'DELIVERYONE'
   const itemTotal = normalizedItems.reduce((sum, item) => sum + Math.max(0, item.lineTotal), 0)
   const totalAmount = resolveCustomerFacingTotal(order, itemTotal)
+  const amountRows = buildLabelAmountRows(order, itemTotal, totalAmount)
   const rows: any[] = normalizedItems.slice(0, 4).map((item) => [
     { text: item.productId || '-', fontSize: 6.3, color: '#4b5563' },
     { text: item.productName || '-', fontSize: 6.3, color: '#111111' },
@@ -645,12 +678,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
             width: 84,
             table: {
               widths: ['*', 'auto'],
-              body: [
-                [
-                  { text: 'Total', fontSize: 6.6, bold: true, color: '#111111' },
-                  { text: formatMoney(totalAmount), fontSize: 6.6, bold: true, alignment: 'right', color: '#111111' },
-                ],
-              ],
+              body: amountRows,
             },
             layout: {
               hLineColor: () => '#d1d5db',

@@ -1334,6 +1334,23 @@ const computeB2CCustomerOrderTotal = (params: {
   )
 }
 
+const computeB2COrderRowCustomerTotal = (order: {
+  order_amount?: unknown
+  shipping_charges?: unknown
+  transaction_fee?: unknown
+  gift_wrap?: unknown
+  discount?: unknown
+  prepaid_amount?: unknown
+}) =>
+  computeB2CCustomerOrderTotal({
+    order_amount: order.order_amount,
+    shipping_charges: order.shipping_charges,
+    transaction_fee: order.transaction_fee,
+    gift_wrap: order.gift_wrap,
+    discount: order.discount,
+    prepaid_amount: order.prepaid_amount,
+  })
+
 const computeB2BInsuranceChargeBasis = (params: ShipmentParams) => {
   const invoiceTotal = Array.isArray((params as any).invoices)
     ? (params as any).invoices.reduce(
@@ -7389,11 +7406,13 @@ export const generateManifestService = async (params: {
             if (order.awb_number) continue
 
             const pickupDetails = normalizeDetails(order.pickup_details)
+            const customerOrderTotal = computeB2COrderRowCustomerTotal(order)
             const manifestParams: ShipmentParams = {
               order_number: order.order_number,
               order_date: new Date(order.order_date || order.created_at || new Date()),
               payment_type: order.order_type === 'cod' ? 'cod' : 'prepaid',
-              order_amount: Number(order.order_amount ?? 0),
+              order_amount: customerOrderTotal,
+              invoice_amount: customerOrderTotal,
               package_weight: Number(order.weight ?? 0),
               package_length: Number(order.length ?? 0),
               package_breadth: Number(order.breadth ?? 0),
@@ -8210,6 +8229,7 @@ export const generateManifestService = async (params: {
         const buildDeliveryOneManifestParams = (order: any): ShipmentParams => {
           const pickupDetails = normalizePickupDetails(order.pickup_details) as any
           const rtoDetails = normalizePickupDetails(order.rto_details) as any
+          const customerOrderTotal = computeB2COrderRowCustomerTotal(order)
           const pickupWarehouseName = String(
             pickupDetails?.warehouse_name || order.pickup_location_id || '',
           ).trim()
@@ -8222,7 +8242,7 @@ export const generateManifestService = async (params: {
             order_number: order.order_number,
             order_date: new Date(order.order_date || order.created_at || new Date()),
             payment_type: String(order.order_type || '').toLowerCase() === 'cod' ? 'cod' : 'prepaid',
-            order_amount: Number(order.order_amount ?? 0),
+            order_amount: customerOrderTotal,
             package_weight: Number(order.weight ?? 0),
             package_length: Number(order.length ?? 0),
             package_breadth: Number(order.breadth ?? 0),
@@ -8233,7 +8253,7 @@ export const generateManifestService = async (params: {
             integration_type: 'deliveryone',
             invoice_number: order.invoice_number ?? undefined,
             invoice_date: order.invoice_date ?? undefined,
-            invoice_amount: order.invoice_amount ?? undefined,
+            invoice_amount: customerOrderTotal,
             pickup_location_id: order.pickup_location_id ?? pickupWarehouseName,
             is_rto_different: order.is_rto_different ? 'yes' : 'no',
             company: {},
