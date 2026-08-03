@@ -118,6 +118,22 @@ type PendingManifestRequest =
   | { mode: 'bulk' }
   | null
 
+const toMoneyNumber = (value: unknown) => {
+  const amount = Number(value ?? 0)
+  return Number.isFinite(amount) ? amount : 0
+}
+
+const getB2CCustomerPaymentTotal = (order: B2COrder) =>
+  Math.max(
+    0,
+    toMoneyNumber(order.order_amount) +
+      toMoneyNumber(order.shipping_charges) +
+      toMoneyNumber(order.transaction_fee) +
+      toMoneyNumber(order.gift_wrap) -
+      toMoneyNumber(order.discount) -
+      toMoneyNumber(order.prepaid_amount),
+  )
+
 const orderStatusFilterTabs = [
   { label: 'New', value: 'new', statuses: ['pending'] },
   { label: 'Ready To Ship', value: 'ready_to_ship', statuses: ['booked', 'shipment_created'] },
@@ -1317,10 +1333,11 @@ const B2COrdersList = () => {
       truncate: false,
       render: (_value, row) => {
         const isCod = String(row.order_type || '').toLowerCase() === 'cod'
+        const paymentTotal = getB2CCustomerPaymentTotal(row)
         return (
           <Stack spacing={0.45} alignItems="flex-start">
             <Typography sx={{ fontSize: 12.1, color: 'text.primary', fontWeight: 500 }} noWrap>
-              {formatCurrency(row.order_amount, 0)}
+              {formatCurrency(paymentTotal, 0)}
             </Typography>
             <Chip
               label={isCod ? 'COD' : 'Prepaid'}
