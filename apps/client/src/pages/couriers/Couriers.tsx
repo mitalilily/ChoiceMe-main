@@ -6,6 +6,7 @@ import { FilterBar, type FilterField } from '../../components/FilterBar'
 import PageHeading from '../../components/UI/heading/PageHeading'
 import CourierList from '../../components/integrations/couriers/CourierList'
 import CourierSummaryCard from '../../components/integrations/couriers/CourierSummaryCard'
+import XpressbeesCredentialsCard from '../../components/integrations/couriers/XpressbeesCredentialsCard'
 import { useCouriers } from '../../hooks/Integrations/useCouriers'
 
 const filterFields: FilterField[] = [
@@ -105,6 +106,8 @@ const Couriers = () => {
           }
         }
       />
+
+      <XpressbeesCredentialsCard />
 
       <FilterBar
         fields={filterFields}

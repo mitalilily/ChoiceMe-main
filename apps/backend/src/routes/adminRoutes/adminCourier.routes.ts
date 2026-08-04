@@ -24,6 +24,7 @@ import {
   updateDeliveryOneCredentialsController,
   updateDeliveryOneEWaybillController,
   updateDeliveryOneWarehouseController,
+  updateXpressbeesCredentialsController,
   updateShippingRateController,
 } from '../../controllers/admin/courier.controller'
 import { isAdminMiddleware } from '../../middlewares/isAdmin'
@@ -55,6 +56,12 @@ router.put(
   requireAuth,
   isAdminMiddleware,
   updateDeliveryOneCredentialsController,
+)
+router.put(
+  '/credentials/xpressbees',
+  requireAuth,
+  isAdminMiddleware,
+  updateXpressbeesCredentialsController,
 )
 router.get(
   '/delivery-one/waybills',

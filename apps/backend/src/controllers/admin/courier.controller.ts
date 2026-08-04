@@ -16,6 +16,7 @@ import {
   type DeliveryOneCourierCatalogItem,
 } from '../../models/services/deliveryOneCourierCatalog.service'
 import { DeliveryOneService } from '../../models/services/couriers/deliveryone.service'
+import { XpressbeesService } from '../../models/services/couriers/xpressbees.service'
 import { fetchAvailableCouriersWithRatesAdmin } from '../../models/services/shiprocket.service'
 import { courier_credentials } from '../../models/schema/courierCredentials'
 import { couriers } from '../../models/schema/couriers'
@@ -472,6 +473,13 @@ export const updateServiceProviderStatusController = async (req: Request, res: R
 
 export const getCourierCredentialsController = async (req: Request, res: Response) => {
   try {
+    const maskSecret = (value?: string | null) => {
+      const text = String(value || '').trim()
+      if (!text) return ''
+      if (text.length <= 8) return `${text.slice(0, 2)}${'*'.repeat(Math.max(text.length - 2, 0))}`
+      return `${text.slice(0, 4)}${'*'.repeat(Math.max(text.length - 8, 0))}${text.slice(-4)}`
+    }
+
     const rows = await db
       .select({
         provider: courier_credentials.provider,
@@ -484,9 +492,7 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
         webhookSecret: courier_credentials.webhookSecret,
       })
       .from(courier_credentials)
-      .where(
-        inArray(courier_credentials.provider, ['delhivery', 'deliveryone']),
-      )
+      .where(inArray(courier_credentials.provider, ['delhivery', 'deliveryone', 'xpressbees']))
 
     const defaults = {
       deliveryOne: {
@@ -499,12 +505,24 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
         hasPassword: false,
         hasWebhookSecret: false,
       },
+      xpressbees: {
+        provider: 'xpressbees',
+        apiBase: 'https://shipment.xpressbees.com',
+        username: '',
+        hasPassword: false,
+        hasApiKey: false,
+        apiKeyMasked: '',
+      },
     }
 
     const activeCredential =
       rows.find((row) => String(row.provider || '').toLowerCase() === 'deliveryone') ||
       rows.find((row) => String(row.provider || '').toLowerCase() === 'delhivery')
     const apiKey = activeCredential?.apiKey || ''
+    const xpressbeesCredential = rows.find(
+      (row) => String(row.provider || '').toLowerCase() === 'xpressbees',
+    )
+    const xpressbeesApiKey = xpressbeesCredential?.apiKey || ''
     const data = {
       ...defaults,
       ...(activeCredential
@@ -523,6 +541,18 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
             },
           }
         : {}),
+      ...(xpressbeesCredential
+        ? {
+            xpressbees: {
+              provider: 'xpressbees',
+              apiBase: xpressbeesCredential.apiBase || 'https://shipment.xpressbees.com',
+              username: xpressbeesCredential.username || '',
+              hasPassword: Boolean((xpressbeesCredential.password || '').trim()),
+              hasApiKey: Boolean(xpressbeesApiKey.trim()),
+              apiKeyMasked: maskSecret(xpressbeesApiKey),
+            },
+          }
+        : {}),
     }
 
     res.json({
@@ -532,6 +562,88 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
   } catch (err) {
     console.error(err)
     res.status(500).json({ success: false, message: 'Failed to fetch courier credentials' })
+  }
+}
+
+export const updateXpressbeesCredentialsController = async (req: Request, res: Response) => {
+  const { apiBase, username, password, apiKey } = req.body || {}
+  const credentialsProvider = 'xpressbees'
+
+  try {
+    const nextApiBase = typeof apiBase === 'string' ? apiBase.trim() : undefined
+    const nextUsername = typeof username === 'string' ? username.trim() : undefined
+    const nextPassword = typeof password === 'string' ? password.trim() : undefined
+    const nextApiKey = typeof apiKey === 'string' ? apiKey.trim() : undefined
+    const hasPassword = typeof nextPassword === 'string' && nextPassword.length > 0
+    const hasApiKey = typeof nextApiKey === 'string' && nextApiKey.length > 0
+
+    const [existing] = await db
+      .select({ id: courier_credentials.id })
+      .from(courier_credentials)
+      .where(eq(courier_credentials.provider, credentialsProvider))
+      .limit(1)
+
+    if (existing) {
+      const updatePayload: Record<string, any> = {
+        updatedAt: new Date(),
+      }
+      if (nextApiBase !== undefined) {
+        updatePayload.apiBase = nextApiBase || 'https://shipment.xpressbees.com'
+      }
+      if (nextUsername !== undefined) {
+        updatePayload.username = nextUsername
+      }
+      if (hasPassword) {
+        updatePayload.password = nextPassword
+      }
+      if (hasApiKey) {
+        updatePayload.apiKey = nextApiKey
+      }
+
+      await db
+        .update(courier_credentials)
+        .set(updatePayload)
+        .where(eq(courier_credentials.provider, credentialsProvider))
+    } else {
+      await db.insert(courier_credentials).values({
+        provider: credentialsProvider,
+        apiBase: nextApiBase || 'https://shipment.xpressbees.com',
+        clientName: '',
+        apiKey: hasApiKey ? nextApiKey : '',
+        clientId: '',
+        username: nextUsername || '',
+        password: hasPassword ? nextPassword : '',
+        webhookSecret: '',
+      })
+    }
+
+    XpressbeesService.clearCachedConfig()
+
+    const [saved] = await db
+      .select({
+        apiBase: courier_credentials.apiBase,
+        username: courier_credentials.username,
+        password: courier_credentials.password,
+        apiKey: courier_credentials.apiKey,
+      })
+      .from(courier_credentials)
+      .where(eq(courier_credentials.provider, credentialsProvider))
+      .limit(1)
+
+    res.json({
+      success: true,
+      message: 'Xpressbees credentials updated successfully',
+      data: {
+        provider: credentialsProvider,
+        apiBase: saved?.apiBase || 'https://shipment.xpressbees.com',
+        username: saved?.username || '',
+        hasPassword: Boolean((saved?.password || '').trim()),
+        hasApiKey: Boolean((saved?.apiKey || '').trim()),
+      },
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ success: false, message: 'Failed to update Xpressbees credentials' })
   }
 }
 
