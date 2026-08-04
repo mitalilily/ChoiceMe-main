@@ -9714,6 +9714,67 @@ const mapDeliveryOneTracking = (
   }
 }
 
+const mapXpressbeesTracking = (raw: any, order: OrderSummary): ProviderNormalizedTracking => {
+  const data = raw?.data ?? raw ?? {}
+  const history: TrackingHistoryItem[] = []
+  const fallbackTime = toIsoString(order.updated_at ?? order.created_at ?? new Date())
+
+  const explicitHistory = Array.isArray(data?.history)
+    ? data.history
+    : Array.isArray(raw?.history)
+      ? raw.history
+      : []
+
+  explicitHistory.forEach((detail: any) => {
+    pushHistoryEvent(
+      history,
+      {
+        statusCode: detail?.status_code ?? detail?.statusCode ?? detail?.code,
+        message: detail?.message ?? detail?.status_text ?? detail?.statusText ?? detail?.status,
+        location: detail?.location ?? detail?.scan_location ?? detail?.scanLocation,
+        time: detail?.event_time ?? detail?.eventTime ?? detail?.timestamp,
+      },
+      fallbackTime,
+    )
+  })
+
+  if (!history.length) {
+    collectScanDetails(data).forEach((detail: any) => {
+      pushHistoryEvent(
+        history,
+        {
+          statusCode: getScanStatusCode(detail),
+          message: getScanMessage(detail),
+          location: getScanLocation(detail),
+          time: getScanTime(detail),
+        },
+        fallbackTime,
+      )
+    })
+  }
+
+  sortHistoryDescending(history)
+
+  const latestEvent = history[0]
+  const status = sanitizeString(
+    data?.status ?? raw?.status_text ?? latestEvent?.message ?? order.order_status,
+    order.order_status ?? 'In Transit',
+  )
+
+  return {
+    history,
+    status,
+    status_type: sanitizeString(data?.status_code ?? latestEvent?.status_code ?? ''),
+    edd: sanitizeString(data?.edd ?? data?.expected_delivery_date ?? data?.expectedDeliveryDate ?? ''),
+    courier_name: sanitizeString(
+      data?.courier_name ?? raw?.courier_name ?? order.courier_partner ?? 'Xpressbees',
+      'Xpressbees',
+    ),
+    shipment_info: sanitizeString(data?.shipment_info ?? raw?.shipment_info ?? ''),
+    raw,
+  }
+}
+
 const getTrackingProviderKey = (order: {
   integration_type?: string | null
   courier_partner?: string | null
@@ -9723,11 +9784,13 @@ const getTrackingProviderKey = (order: {
     .replace(/[\s_-]+/g, '')
   let providerKey = normalizeServiceProviderKey(order.integration_type)
 
-  if (!['delhivery', 'deliveryone'].includes(providerKey)) {
+  if (!['delhivery', 'deliveryone', 'xpressbees'].includes(providerKey)) {
     if (courierPartner.includes('deliveryone') || courierPartner.includes('delhiveryone')) {
       providerKey = 'deliveryone'
     } else if (courierPartner.includes('delhivery')) {
       providerKey = 'deliveryone'
+    } else if (courierPartner.includes('xpressbees')) {
+      providerKey = 'xpressbees'
     }
   }
 
@@ -9749,6 +9812,12 @@ const fetchLiveTrackingForOrder = async (
     const delhiveryService = new DelhiveryService()
     const raw = await delhiveryService.trackShipment(order.awb_number)
     return mapDeliveryOneTracking(raw, order)
+  }
+
+  if (providerKey === 'xpressbees') {
+    const xpressbeesService = new XpressbeesService()
+    const raw = await xpressbeesService.trackShipment(order.awb_number)
+    return mapXpressbeesTracking(raw, order)
   }
 
   console.warn('[Tracking] Live courier tracking is not configured for this provider', {
@@ -9901,7 +9970,7 @@ const shouldSyncB2CTrackingStatus = (order: any) => {
   if (TRACKING_SYNC_TERMINAL_STATUSES.has(currentStatus)) return false
 
   const providerKey = getTrackingProviderKey(order)
-  return providerKey === 'deliveryone'
+  return providerKey === 'deliveryone' || providerKey === 'xpressbees'
 }
 
 const toB2COrderSummary = (order: any): OrderSummary => ({
@@ -10066,7 +10135,7 @@ export const syncB2COrderTrackingById = async (
   orderId: string,
   options: {
     userId?: string
-    provider?: 'delhivery' | 'deliveryone'
+    provider?: 'delhivery' | 'deliveryone' | 'xpressbees'
     emitEvents?: boolean
   } = {},
 ) => {
@@ -10089,7 +10158,7 @@ export const syncB2COrderTrackingById = async (
   const providerKey = getTrackingProviderKey(order)
 
   if (options.provider && providerKey !== options.provider) {
-    throw new HttpError(400, 'Tracking sync is available for Delhivery orders only.')
+    throw new HttpError(400, 'Tracking sync is not available for this courier.')
   }
 
   if (!sanitizeString(order.awb_number)) {

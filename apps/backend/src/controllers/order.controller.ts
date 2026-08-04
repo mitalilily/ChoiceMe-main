@@ -862,7 +862,6 @@ export const syncB2CTrackingController = async (req: any, res: Response) => {
 
     const result = await syncB2COrderTrackingById(orderId, {
       userId,
-      provider: 'deliveryone',
       emitEvents: true,
     })
 
