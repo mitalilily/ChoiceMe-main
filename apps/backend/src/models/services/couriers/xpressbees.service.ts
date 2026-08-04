@@ -256,63 +256,86 @@ export class XpressbeesService {
     logPayload?: boolean
   }): Promise<T> {
     await this.ensureConfigLoaded()
-    const token = await this.getApiToken()
+    let token = await this.getApiToken()
     const baseCandidates = this.getBaseCandidates()
     const dedupedPaths = Array.from(new Set(pathCandidates.filter(Boolean)))
     let lastError: any = null
     const attemptedUrls: string[] = []
+    let refreshedAfterUnauthorized = false
 
     for (const baseCandidate of baseCandidates) {
-      const http = this.createHttpClient(baseCandidate, token)
       for (const pathCandidate of dedupedPaths) {
         const requestPath = this.buildEndpointForBase(baseCandidate, pathCandidate)
         const requestUrl = `${baseCandidate}${requestPath}`
         attemptedUrls.push(requestUrl)
-        try {
-          this.log('API attempt', {
-            method,
-            url: requestUrl,
-            payload: logPayload ? this.sanitizeForLogs(data) : undefined,
-          })
-          const response = await http.request<T>({
-            method,
-            url: requestPath,
-            data,
-          })
 
-          if (baseCandidate !== this.baseApi) {
-            this.log('Resolved alternate Xpressbees base URL', {
-              previousBaseApi: this.baseApi,
-              resolvedBaseApi: baseCandidate,
+        for (let authAttempt = 0; authAttempt < 2; authAttempt += 1) {
+          const http = this.createHttpClient(baseCandidate, token)
+
+          try {
+            this.log('API attempt', {
+              method,
+              url: requestUrl,
+              payload: logPayload ? this.sanitizeForLogs(data) : undefined,
             })
-            this.baseApi = baseCandidate
-          }
+            const response = await http.request<T>({
+              method,
+              url: requestPath,
+              data,
+            })
 
-          this.log('API response', {
-            method,
-            url: requestUrl,
-            payload: logPayload ? this.sanitizeForLogs(data) : undefined,
-            response: this.sanitizeForLogs(response.data),
-          })
+            if (baseCandidate !== this.baseApi) {
+              this.log('Resolved alternate Xpressbees base URL', {
+                previousBaseApi: this.baseApi,
+                resolvedBaseApi: baseCandidate,
+              })
+              this.baseApi = baseCandidate
+            }
 
-          return response.data
-        } catch (err: any) {
-          lastError = err
-          this.log('API attempt failed', {
-            method,
-            url: requestUrl,
-            payload: logPayload ? this.sanitizeForLogs(data) : undefined,
-            status: err?.response?.status || null,
-            statusText: err?.response?.statusText || null,
-            response:
-              typeof err?.response?.data === 'string'
-                ? err.response.data.slice(0, 300)
-                : this.sanitizeForLogs(err?.response?.data) || null,
-            message: err?.message || err,
-          })
+            this.log('API response', {
+              method,
+              url: requestUrl,
+              payload: logPayload ? this.sanitizeForLogs(data) : undefined,
+              response: this.sanitizeForLogs(response.data),
+            })
 
-          if (!this.isRetryableEndpointError(err)) {
-            throw err
+            return response.data
+          } catch (err: any) {
+            lastError = err
+            this.log('API attempt failed', {
+              method,
+              url: requestUrl,
+              payload: logPayload ? this.sanitizeForLogs(data) : undefined,
+              status: err?.response?.status || null,
+              statusText: err?.response?.statusText || null,
+              response:
+                typeof err?.response?.data === 'string'
+                  ? err.response.data.slice(0, 300)
+                  : this.sanitizeForLogs(err?.response?.data) || null,
+              message: err?.message || err,
+            })
+
+            if (
+              Number(err?.response?.status || 0) === 401 &&
+              !refreshedAfterUnauthorized &&
+              this.username &&
+              this.password
+            ) {
+              refreshedAfterUnauthorized = true
+              this.apiToken = ''
+              token = await this.getApiToken(true)
+              this.log('Refreshed Xpressbees token after unauthorized response', {
+                method,
+                url: requestUrl,
+              })
+              continue
+            }
+
+            if (!this.isRetryableEndpointError(err)) {
+              throw err
+            }
+
+            break
           }
         }
       }
