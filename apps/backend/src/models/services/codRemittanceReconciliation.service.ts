@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '../client'
 import { b2c_orders } from '../schema/b2cOrders'
 import { codRemittances } from '../schema/codRemittance'
@@ -54,7 +54,19 @@ export async function findMissingDeliveredCodOrders(limit = 250) {
       buyerName: b2c_orders.buyer_name,
       buyerPhone: b2c_orders.buyer_phone,
       courierPartner: b2c_orders.courier_partner,
-      collectedAt: b2c_orders.created_at,
+      collectedAt: sql<Date | null>`COALESCE(
+        (
+          SELECT MAX(te.created_at)
+          FROM tracking_events te
+          WHERE te.awb_number = ${b2c_orders.awb_number}
+            AND (
+              LOWER(COALESCE(te.status_text, '')) LIKE '%deliver%'
+              OR LOWER(COALESCE(te.status_code, '')) LIKE '%deliver%'
+            )
+        ),
+        ${b2c_orders.updated_at},
+        ${b2c_orders.created_at}
+      )`,
     })
     .from(b2c_orders)
     .leftJoin(

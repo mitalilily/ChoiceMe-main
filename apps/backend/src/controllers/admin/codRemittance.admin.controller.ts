@@ -96,7 +96,7 @@ export const getAllCodRemittances = async (req: any, res: Response): Promise<any
       .leftJoin(users, eq(codRemittances.userId, users.id))
       .leftJoin(userProfiles, eq(codRemittances.userId, userProfiles.userId))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(codRemittances.createdAt))
+      .orderBy(desc(codRemittances.collectedAt), desc(codRemittances.createdAt))
       .limit(parseInt(limit as string))
       .offset(offset)
 
@@ -323,7 +323,7 @@ export const getUserCodRemittances = async (req: any, res: Response): Promise<an
       .select()
       .from(codRemittances)
       .where(and(...conditions))
-      .orderBy(desc(codRemittances.createdAt))
+      .orderBy(desc(codRemittances.collectedAt), desc(codRemittances.createdAt))
       .limit(parsedLimit)
       .offset(offset)
 
@@ -516,7 +516,7 @@ export const exportAllCodRemittances = async (req: any, res: Response): Promise<
       .leftJoin(users, eq(codRemittances.userId, users.id))
       .leftJoin(userProfiles, eq(codRemittances.userId, userProfiles.userId))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(codRemittances.createdAt))
+      .orderBy(desc(codRemittances.collectedAt), desc(codRemittances.createdAt))
       .limit(10000)
 
     const headers = [

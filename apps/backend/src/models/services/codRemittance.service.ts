@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, lte, or, sql } from 'drizzle-orm'
 import { db } from '../client'
 import { codRemittances } from '../schema/codRemittance'
 import { userProfiles } from '../schema/userProfile'
@@ -85,17 +85,16 @@ export async function createCodRemittance(params: {
   const deductions = 0
   const remittableAmount = Number(codAmount)
 
-  // Idempotency guard: delivered webhooks can be retried.
+  // Idempotency guard: delivered webhooks and reconciliation jobs can be retried.
+  const duplicateChecks = [and(eq(codRemittances.orderId, orderId), eq(codRemittances.orderType, orderType))]
+  if (awbNumber) {
+    duplicateChecks.push(eq(codRemittances.awbNumber, awbNumber))
+  }
+
   const [existingRemittance] = await db
     .select()
     .from(codRemittances)
-    .where(
-      and(
-        eq(codRemittances.userId, userId),
-        eq(codRemittances.orderId, orderId),
-        eq(codRemittances.orderType, orderType),
-      ),
-    )
+    .where(and(eq(codRemittances.userId, userId), or(...duplicateChecks)))
     .limit(1)
 
   if (existingRemittance) {
@@ -256,7 +255,7 @@ export async function getCodRemittances(
     .select()
     .from(codRemittances)
     .where(and(...conditions))
-    .orderBy(desc(codRemittances.createdAt))
+    .orderBy(desc(codRemittances.collectedAt), desc(codRemittances.createdAt))
     .limit(limit)
     .offset(offset)
 
@@ -342,7 +341,7 @@ export async function getCodDashboardSummary(userId: string) {
     .select()
     .from(codRemittances)
     .where(eq(codRemittances.userId, userId))
-    .orderBy(desc(codRemittances.createdAt))
+    .orderBy(desc(codRemittances.collectedAt), desc(codRemittances.createdAt))
     .limit(10)
 
   return {
