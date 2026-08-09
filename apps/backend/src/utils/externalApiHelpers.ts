@@ -9,7 +9,7 @@ import {
 } from './courierProviders'
 
 // Map integration types to opaque codes that don't reveal the provider
-const PROVIDER_CODE_MAP: Record<IntegratedServiceProvider, string> = {
+const PROVIDER_CODE_MAP: Record<string, string> = {
   deliveryone: 'QH8L2',
   delhivery: 'QH8L2',
   xpressbees: 'XB9K3',
