@@ -39,6 +39,14 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+const toDateOrNull = (value: unknown) => {
+  if (!value) return null
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
+
+  const parsed = new Date(String(value))
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 export async function findMissingDeliveredCodOrders(limit = 250) {
   const rows = await db
     .select({
@@ -96,7 +104,7 @@ export async function findMissingDeliveredCodOrders(limit = 250) {
     buyerName: row.buyerName,
     buyerPhone: row.buyerPhone || null,
     courierPartner: row.courierPartner || null,
-    collectedAt: row.collectedAt || null,
+    collectedAt: toDateOrNull(row.collectedAt),
   }))
 }
 
