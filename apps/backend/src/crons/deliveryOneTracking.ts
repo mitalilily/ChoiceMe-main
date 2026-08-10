@@ -1,4 +1,4 @@
-import { and, eq, isNull, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, notInArray, or, sql } from 'drizzle-orm'
 import { db } from '../models/client'
 import { b2c_orders } from '../models/schema/b2cOrders'
 import { syncB2COrderTrackingById } from '../models/services/shiprocket.service'
@@ -12,8 +12,8 @@ const isDeliveryOneOrder = or(
   sql`lower(coalesce(${b2c_orders.courier_partner}, '')) like ${'%delhivery express%'}`,
 )!
 
-export async function pollDeliveryOneTracking(batchSize = 50) {
-  const pending = await db
+export async function pollDeliveryOneTracking(batchSize = 0) {
+  const query = db
     .select({
       id: b2c_orders.id,
       order_number: b2c_orders.order_number,
@@ -27,7 +27,9 @@ export async function pollDeliveryOneTracking(batchSize = 50) {
         or(notInArray(b2c_orders.order_status, terminalStatuses), isNull(b2c_orders.order_status)),
       ),
     )
-    .limit(batchSize)
+    .orderBy(asc(b2c_orders.created_at), asc(b2c_orders.id))
+
+  const pending = batchSize > 0 ? await query.limit(batchSize) : await query
 
   const stats = {
     checked: pending.length,

@@ -15,6 +15,7 @@ import { retryFailedShipmentStatusEmails } from '../models/services/shipmentNoti
 
 let isReconcilingCodRemittances = false
 let isRetryingShipmentEmails = false
+let isPollingDeliveryOneTracking = false
 
 const runCodRemittanceReconciliation = async () => {
   if (isReconcilingCodRemittances) {
@@ -88,12 +89,20 @@ cron.schedule('*/15 * * * *', async () => {
 })
 
 cron.schedule('*/3 * * * *', async () => {
+  if (isPollingDeliveryOneTracking) {
+    console.log('[Cron] Skipping Delhivery tracking poll: previous run still active')
+    return
+  }
+
+  isPollingDeliveryOneTracking = true
   console.log('[Cron] Delhivery tracking poll')
   try {
     const stats = await pollDeliveryOneTracking()
     console.log('[Cron] Delhivery tracking poll finished', stats)
   } catch (err) {
     console.error('[Cron] Delhivery tracking poll failed:', err)
+  } finally {
+    isPollingDeliveryOneTracking = false
   }
 })
 
