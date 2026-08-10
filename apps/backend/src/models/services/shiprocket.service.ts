@@ -9839,6 +9839,10 @@ const mapTrackingToOrderStatus = (
   const providerStatusText = normalizeStatusText(providerData.status)
   const providerStatusType = normalizeStatusText(providerData.status_type)
 
+  if (normalizedProviderStatus === 'rto' && providerStatusType === 'dl') {
+    return 'rto_delivered'
+  }
+
   if (TRACKING_SYNC_INTERNAL_STATUSES.has(normalizedProviderStatus)) {
     return normalizedProviderStatus
   }
