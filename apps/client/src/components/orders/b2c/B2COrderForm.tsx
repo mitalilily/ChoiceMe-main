@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { FormProvider, useFieldArray, useForm, type FieldErrors } from 'react-hook-form'
 import { BiRupee } from 'react-icons/bi'
 import { FaBox, FaUser } from 'react-icons/fa'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { fetchLocations } from '../../../api/locations'
 import type { CreateShipmentParams } from '../../../api/order.service'
 import { useCreateShipment, useUpdateB2COrder } from '../../../hooks/Orders/useOrders'
@@ -114,7 +114,6 @@ export default function B2COrderFormSteps({
   const createShipmentMutation = useCreateShipment(onClose)
   const updateOrderMutation = useUpdateB2COrder(onClose)
   const navigate = useNavigate()
-  const location = useLocation()
   const [currentStep, setCurrentStep] = useState(0)
   const steps = ['Order & Delivery', 'Pickup Location']
   const { data: paymentOptions } = usePaymentOptions()
@@ -309,9 +308,7 @@ export default function B2COrderFormSteps({
 
       createShipmentMutation.mutate(payload, {
         onSuccess: () => {
-          if (location.pathname === '/orders/create') {
-            navigate('/orders/list?status=pending')
-          }
+          navigate('/orders/b2c/list')
         },
       })
     } catch (error) {

@@ -95,7 +95,7 @@ const normalizeStatus = (status?: string | null) =>
 
 const getStatusLabel = (status?: string | null) => {
   const normalizedStatus = normalizeStatus(status)
-  if (!normalizedStatus || normalizedStatus === 'pending') return 'NEW'
+  if (!normalizedStatus || normalizedStatus === 'pending') return 'DRAFT'
   return normalizedStatus.replace(/_/g, ' ').toUpperCase()
 }
 

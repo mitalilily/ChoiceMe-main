@@ -136,7 +136,7 @@ const getB2CCustomerPaymentTotal = (order: B2COrder) =>
   )
 
 const orderStatusFilterTabs = [
-  { label: 'New', value: 'new', statuses: ['pending'] },
+  { label: 'Drafts', value: 'new', statuses: ['pending'] },
   { label: 'Ready To Ship', value: 'ready_to_ship', statuses: ['booked', 'shipment_created'] },
   {
     label: 'Pickup & Manifests',
@@ -237,7 +237,7 @@ export const statusColorMap: Record<string, 'success' | 'pending' | 'error' | 'i
 
 /* ───────────── Shipping Statuses ───────────── */
 const shippingStatusMap: Record<string, string> = {
-  pending: 'Pending',
+  pending: 'Draft',
   booked: 'Booked',
   manifest_failed: 'Manifest Failed',
   pickup_initiated: 'Scheduled for Pickup',
@@ -1206,7 +1206,7 @@ const B2COrdersList = () => {
 
   const getDisplayStatusLabel = (status?: string | null) => {
     const normalizedStatus = String(status || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
-    if (normalizedStatus === 'pending') return 'NEW'
+    if (normalizedStatus === 'pending') return 'DRAFT'
     return shippingStatusMap[normalizedStatus] || status || 'Unknown'
   }
 

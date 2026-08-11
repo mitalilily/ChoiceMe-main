@@ -180,7 +180,7 @@ const documentGenerationStatuses = new Set([
 ])
 
 const shippingStatusMap: Record<string, string> = {
-  pending: 'NEW',
+  pending: 'Draft',
   booked: 'Booked',
   manifest_failed: 'Manifest Failed',
   pickup_initiated: 'Scheduled for Pickup',
