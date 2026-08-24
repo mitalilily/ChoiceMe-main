@@ -27,6 +27,7 @@ import { BsCreditCard2Back } from 'react-icons/bs'
 import { CiCalculator1 } from 'react-icons/ci'
 import { IoLocation } from 'react-icons/io5'
 import { MdGavel } from 'react-icons/md'
+import AdminUsersPage from 'views/AdminUsers/AdminUsersPage'
 import { AdminRoute } from 'views/Auth/AdminRoute'
 import SignIn from 'views/Auth/SignIn'
 import AdminBillingInvoices from 'views/Billing/AdminBillingInvoices'
@@ -71,6 +72,7 @@ const dashRoutes = [
   {
     path: '/dashboard',
     name: 'Dashboard',
+    permissionKey: 'dashboard',
     icon: <IconDashboard size={20} />,
     component: () => (
       <AdminRoute>
@@ -85,6 +87,7 @@ const dashRoutes = [
   {
     path: '/orders',
     name: 'Orders',
+    permissionKey: 'orders',
     icon: <IconPackageExport />,
     component: () => (
       <AdminRoute>
@@ -96,6 +99,7 @@ const dashRoutes = [
   {
     path: '/manual-booking',
     name: 'Manual Booking',
+    permissionKey: 'manual_booking',
     icon: <IconTruck />,
     component: () => (
       <AdminRoute>
@@ -116,6 +120,7 @@ const dashRoutes = [
       {
         path: '/ops/ndr',
         name: 'NDR',
+        permissionKey: 'ops_ndr',
         icon: <IconAlertTriangle />,
         component: () => (
           <AdminRoute>
@@ -127,6 +132,7 @@ const dashRoutes = [
       {
         path: '/ops/rto',
         name: 'RTO',
+        permissionKey: 'ops_rto',
         icon: <IconArrowBackUp />,
         component: () => (
           <AdminRoute>
@@ -144,6 +150,7 @@ const dashRoutes = [
   {
     path: '/users-management/:id',
     name: 'User Details',
+    permissionKey: 'users_management',
     component: () => (
       <AdminRoute>
         <UserDetails />
@@ -155,6 +162,7 @@ const dashRoutes = [
   {
     path: '/users-management',
     name: 'Users Management',
+    permissionKey: 'users_management',
     icon: <IconUser size={20} />,
     component: () => (
       <AdminRoute>
@@ -164,8 +172,21 @@ const dashRoutes = [
     layout: '/admin',
   },
   {
+    path: '/admin-users',
+    name: 'Admin Users',
+    icon: <IconUser size={20} />,
+    permissionKey: 'admin_users',
+    component: () => (
+      <AdminRoute>
+        <AdminUsersPage />
+      </AdminRoute>
+    ),
+    layout: '/admin',
+  },
+  {
     path: '/notifications',
     name: 'Notifications',
+    permissionKey: 'notifications',
     icon: <IconBell size={20} />,
     component: () => (
       <AdminRoute>
@@ -180,6 +201,7 @@ const dashRoutes = [
   {
     path: '/plans',
     name: 'Plan Management',
+    permissionKey: 'plans',
     icon: <IconStar size={19} />,
     component: () => (
       <AdminRoute>
@@ -200,6 +222,7 @@ const dashRoutes = [
       {
         path: '/couriers',
         name: 'Couriers',
+        permissionKey: 'couriers',
         icon: <IconTruck />,
         component: () => (
           <AdminRoute>
@@ -211,6 +234,7 @@ const dashRoutes = [
       {
         path: '/courier-credentials',
         name: 'Courier Credentials',
+        permissionKey: 'courier_credentials',
         icon: <IconKey />,
         component: () => (
           <AdminRoute>
@@ -222,6 +246,7 @@ const dashRoutes = [
       {
         path: '/service-providers',
         name: 'Service Providers',
+        permissionKey: 'service_providers',
         icon: <IconTruck />,
         component: () => (
           <AdminRoute>
@@ -233,6 +258,7 @@ const dashRoutes = [
       {
         path: '/zones-mappings/:zoneId',
         name: 'Zone Mappings',
+        permissionKey: 'serviceability',
         component: () => (
           <AdminRoute>
             <ZoneMappingsPage />
@@ -244,6 +270,7 @@ const dashRoutes = [
       {
         path: '/serviceability',
         name: 'Serviceability',
+        permissionKey: 'serviceability',
         icon: <IoLocation />,
         component: () => (
           <AdminRoute>
@@ -256,6 +283,7 @@ const dashRoutes = [
       {
         path: '/pricing/b2b',
         name: 'B2B',
+        permissionKey: 'pricing_b2b',
         icon: <BsCreditCard2Back />,
         component: () => (
           <AdminRoute>
@@ -269,6 +297,7 @@ const dashRoutes = [
       {
         path: '/pricing/b2c',
         name: 'B2C',
+        permissionKey: 'pricing_b2c',
         icon: <BsCreditCard2Back />,
         component: () => (
           <AdminRoute>
@@ -295,6 +324,7 @@ const dashRoutes = [
       {
         path: '/billing-invoices',
         name: 'Invoices',
+        permissionKey: 'billing_invoices',
         icon: <MdAccountBalanceWallet />,
         component: () => (
           <AdminRoute>
@@ -306,6 +336,7 @@ const dashRoutes = [
       {
         path: '/billing-preferences',
         name: 'Billing Preferences',
+        permissionKey: 'billing_preferences',
         icon: <IconAdjustments />,
         component: () => (
           <AdminRoute>
@@ -317,6 +348,7 @@ const dashRoutes = [
       {
         path: '/cod-remittance',
         name: 'COD Remittance',
+        permissionKey: 'cod_remittance',
         icon: <MdAccountBalanceWallet />,
         component: () => (
           <AdminRoute>
@@ -328,6 +360,7 @@ const dashRoutes = [
       {
         path: '/wallet',
         name: 'Wallet',
+        permissionKey: 'wallets',
         icon: <IconCoinRupee />,
         component: () => (
           <AdminRoute>
@@ -350,6 +383,7 @@ const dashRoutes = [
       {
         path: '/weight-reconciliation',
         name: 'Weight Discrepancies',
+        permissionKey: 'weight_reconciliation',
         icon: <RiScales3Line />,
         component: () => (
           <AdminRoute>
@@ -361,6 +395,7 @@ const dashRoutes = [
       {
         path: '/dispute-management',
         name: 'Dispute Management',
+        permissionKey: 'dispute_management',
         icon: <MdGavel />,
         component: () => (
           <AdminRoute>
@@ -385,6 +420,7 @@ const dashRoutes = [
       {
         path: '/rate-calculator',
         name: 'Rate Calculator',
+        permissionKey: 'rate_calculator',
         icon: <CiCalculator1 />,
         component: () => (
           <AdminRoute>
@@ -396,6 +432,7 @@ const dashRoutes = [
       {
         path: '/order-tracking',
         name: 'Order Tracking',
+        permissionKey: 'order_tracking',
         icon: <IconTrack />,
         component: () => (
           <AdminRoute>
@@ -407,6 +444,7 @@ const dashRoutes = [
       {
         path: '/api-integration',
         name: 'API Integration',
+        permissionKey: 'api_integration',
         icon: <IconKey size={20} />,
         component: () => (
           <AdminRoute>
@@ -467,6 +505,7 @@ const dashRoutes = [
   {
     path: '/about-us',
     name: 'About Us Page',
+    permissionKey: 'about_us',
     icon: <IconInfoCircle />,
     component: () => (
       <AdminRoute>
@@ -479,6 +518,7 @@ const dashRoutes = [
   {
     path: '/support',
     name: 'Support',
+    permissionKey: 'support',
     icon: <IconHelpCircle />,
     component: () => (
       <AdminRoute>
@@ -492,6 +532,7 @@ const dashRoutes = [
   {
     path: '/settings/payment-options',
     name: 'Payment Options',
+    permissionKey: 'payment_options',
     icon: <IconSettings />,
     component: () => (
       <AdminRoute>
@@ -503,6 +544,7 @@ const dashRoutes = [
   {
     path: '/settings/change-password',
     name: 'Change Password',
+    permissionKey: 'change_password',
     icon: <IconKey />,
     component: () => (
       <AdminRoute>
@@ -515,6 +557,7 @@ const dashRoutes = [
   {
     path: '/developer',
     name: 'Developer',
+    permissionKey: 'developer',
     icon: <IconTools size={20} />,
     component: () => (
       <AdminRoute>

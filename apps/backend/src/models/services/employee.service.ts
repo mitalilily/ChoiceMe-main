@@ -55,7 +55,7 @@ export const createEmployeeService = async (data: IEmployeePayload, adminId: str
       .values({
         email: data.email,
         phone: data.phone,
-        role: data.role,
+        role: 'employee',
         passwordHash: hashedPassword,
         accountVerified: true,
         emailVerified: !!data.email, // true if email provided
@@ -349,7 +349,6 @@ export const updateEmployeeService = async (
         .set({
           email: updates.email ?? employee.email,
           phone: updates.phone ?? employee.phone,
-          role: updates.role ?? employee.role,
           ...(updates.password ? { passwordHash: await bcrypt.hash(updates.password, 10) } : {}),
         })
         .where(eq(users.id, linkedUser.id)) // update the correct user

@@ -4,6 +4,7 @@ import Footer from 'components/Footer/Footer.js'
 import AdminNavbar from 'components/Navbars/AdminNavbar.js'
 import { RouteAssetRecovery, RouteErrorBoundary } from 'components/RouteRecovery/RouteErrorBoundary'
 import Sidebar from 'components/Sidebar'
+import { useAdminAccess } from 'hooks/useAdminEmployees'
 import { useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'react-router-dom'
 import routes from 'routes.js'
@@ -13,6 +14,7 @@ import MainPanel from '../components/Layout/MainPanel'
 import PanelContainer from '../components/Layout/PanelContainer'
 import PanelContent from '../components/Layout/PanelContent'
 import { brandIdentity } from '../theme/brand'
+import { filterRoutesByAccess } from '../utils/adminPermissions'
 
 export default function Dashboard(props) {
   const { ...rest } = props
@@ -21,6 +23,8 @@ export default function Dashboard(props) {
   const [fixed, setFixed] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(292)
   const [isResizing, setIsResizing] = useState(false)
+  const { data: adminAccess } = useAdminAccess()
+  const allowedRoutes = filterRoutesByAccess(routes, adminAccess)
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -86,7 +90,7 @@ export default function Dashboard(props) {
     <ChakraProvider theme={theme} resetCss={false}>
       <RouteAssetRecovery />
       <Sidebar
-        routes={routes}
+        routes={allowedRoutes}
         logoText={brandIdentity.name}
         sidebarVariant={sidebarVariant}
         sidebarWidth={sidebarWidth}
@@ -104,10 +108,11 @@ export default function Dashboard(props) {
           <AdminNavbar
             onOpen={onOpen}
             logoText={brandIdentity.name}
-            brandText={getActiveRoute(routes)}
-            secondary={getActiveNavbar(routes)}
+            brandText={getActiveRoute(allowedRoutes)}
+            secondary={getActiveNavbar(allowedRoutes)}
             fixed={fixed}
             sidebarWidth={sidebarWidth}
+            routes={allowedRoutes}
             {...rest}
           />
         </Portal>
@@ -116,8 +121,8 @@ export default function Dashboard(props) {
             <PanelContainer>
               <RouteErrorBoundary resetKey={`${location.pathname}${location.search}`}>
                 <Switch>
-                  {getRoutes(routes)}
-                  <Redirect from="/admin" to="/admin/dashboard" />
+                  {getRoutes(allowedRoutes)}
+                  <Redirect from="/admin" to={allowedRoutes[0]?.layout + allowedRoutes[0]?.path || '/auth/signin'} />
                 </Switch>
               </RouteErrorBoundary>
             </PanelContainer>

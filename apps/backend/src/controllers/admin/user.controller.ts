@@ -1,4 +1,6 @@
 import { Request, Response } from 'express'
+import { eq } from 'drizzle-orm'
+import { db } from '../../models/client'
 import {
   getBankAccountsByUserId,
   updateBankAccountStatusById,
@@ -8,7 +10,15 @@ import {
   updateDocumentStatus,
   updateKycStatus,
 } from '../../models/services/kyc.service'
-import { deleteEmployeeService, getEmployeesByAdminService, toggleEmployeeStatusService, createEmployeeService } from '../../models/services/employee.service'
+import {
+  createEmployeeService,
+  deleteEmployeeService,
+  getEmployeesByAdminService,
+  toggleEmployeeStatusService,
+  updateEmployeeService,
+} from '../../models/services/employee.service'
+import { employees } from '../../models/schema/employees'
+import { users } from '../../models/schema/users'
 import { deleteUser, findUserById, getAllUsersWithRoleUser, resetUserPassword, updateUserApprovalStatus } from '../../models/services/userService'
 import { sendKycStatusEmail } from '../../utils/emailSender'
 
@@ -54,6 +64,169 @@ export async function listUsers(req: any, res: Response) {
   } catch (error) {
     console.error('Error fetching users with role customer:', error)
     res.status(500).json({ success: false, message: 'Server error fetching users' })
+  }
+}
+
+export async function getAdminEmployeeAccess(req: any, res: Response) {
+  try {
+    const userId = req.user?.sub
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' })
+
+    const [user] = await db
+      .select({ id: users.id, email: users.email, role: users.role })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' })
+
+    if (user.role !== 'employee') {
+      return res.status(200).json({
+        success: true,
+        user,
+        employee: null,
+        moduleAccess: null,
+        isSuperAdmin: true,
+      })
+    }
+
+    const [employee] = await db.select().from(employees).where(eq(employees.userId, userId)).limit(1)
+    if (!employee?.isActive) {
+      return res.status(403).json({ success: false, message: 'Employee account is inactive' })
+    }
+
+    return res.status(200).json({
+      success: true,
+      user,
+      employee,
+      moduleAccess: employee.moduleAccess || {},
+      isSuperAdmin: false,
+    })
+  } catch (error: any) {
+    console.error('Error fetching admin employee access:', error)
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to fetch access',
+    })
+  }
+}
+
+export async function listAdminEmployees(req: any, res: Response) {
+  try {
+    const adminId = req.user?.sub
+    if (!adminId) return res.status(400).json({ success: false, message: 'Admin ID is required' })
+
+    const page = parseInt(req.query.page as string, 10) || 1
+    const limit = parseInt(req.query.limit as string, 10) || 20
+    const search = (req.query.search as string) || ''
+    const statusQuery = (req.query.status as string) || ''
+    const status =
+      statusQuery === 'active' || statusQuery === 'inactive'
+        ? (statusQuery as 'active' | 'inactive')
+        : undefined
+
+    const data = await getEmployeesByAdminService(adminId, page, limit, search, status)
+    return res.status(200).json({ success: true, ...data })
+  } catch (error: any) {
+    console.error('Error fetching admin employees:', error)
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to fetch employees',
+    })
+  }
+}
+
+export async function createAdminEmployee(req: any, res: Response) {
+  try {
+    const adminId = req.user?.sub
+    if (!adminId) return res.status(400).json({ success: false, message: 'Admin ID is required' })
+
+    const { name, email, phone, role, password, moduleAccess } = req.body || {}
+    if (!name?.trim() || !email?.trim()) {
+      return res.status(400).json({ success: false, message: 'Name and email are required' })
+    }
+    if (!password || String(password).trim().length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' })
+    }
+
+    const { employee, user } = await createEmployeeService(
+      {
+        adminId,
+        name: String(name).trim(),
+        email: String(email).trim().toLowerCase(),
+        phone: typeof phone === 'string' ? phone.trim() : undefined,
+        role: role || 'employee',
+        password,
+        moduleAccess: typeof moduleAccess === 'object' && moduleAccess ? moduleAccess : {},
+      },
+      adminId,
+    )
+
+    return res.status(201).json({ success: true, employee, user })
+  } catch (error: any) {
+    console.error('Error creating admin employee:', error)
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to create employee',
+    })
+  }
+}
+
+export async function updateAdminEmployee(req: any, res: Response) {
+  try {
+    const adminId = req.user?.sub
+    const memberId = req.params.memberId
+    if (!adminId || !memberId) {
+      return res.status(400).json({ success: false, message: 'Invalid employee reference' })
+    }
+
+    const employee = await updateEmployeeService(memberId, adminId, req.body || {})
+    return res.status(200).json({ success: true, employee })
+  } catch (error: any) {
+    console.error('Error updating admin employee:', error)
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to update employee',
+    })
+  }
+}
+
+export async function updateAdminEmployeeStatus(req: any, res: Response) {
+  try {
+    const adminId = req.user?.sub
+    const memberId = req.params.memberId
+    const { isActive } = req.body || {}
+    if (!adminId || !memberId || typeof isActive !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Invalid employee status payload' })
+    }
+
+    const employee = await toggleEmployeeStatusService(memberId, adminId, isActive)
+    return res.status(200).json({ success: true, employee })
+  } catch (error: any) {
+    console.error('Error updating admin employee status:', error)
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to update employee status',
+    })
+  }
+}
+
+export async function deleteAdminEmployee(req: any, res: Response) {
+  try {
+    const adminId = req.user?.sub
+    const memberId = req.params.memberId
+    if (!adminId || !memberId) {
+      return res.status(400).json({ success: false, message: 'Invalid employee reference' })
+    }
+
+    const employee = await deleteEmployeeService(memberId, adminId)
+    return res.status(200).json({ success: true, employee })
+  } catch (error: any) {
+    console.error('Error deleting admin employee:', error)
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to delete employee',
+    })
   }
 }
 

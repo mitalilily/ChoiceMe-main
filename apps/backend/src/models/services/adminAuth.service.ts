@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { signAccessToken, signRefreshToken } from "../../utils/jwt";
 import { db } from "../client";
+import { employees } from "../schema/employees";
 import { users } from "../schema/users";
 import { findUserByEmail, findUserById, saveRefreshToken } from "./userService";
 
@@ -11,8 +12,21 @@ const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 export const loginAdmin = async (email: string, password: string) => {
   const user = await findUserByEmail(email);
 
-  if (!user || user.role !== "admin") {
+  const role = user?.role || "";
+  if (!user || !["admin", "employee"].includes(role)) {
     throw new Error("Unauthorized");
+  }
+
+  if (role === "employee") {
+    const [employee] = await db
+      .select({ isActive: employees.isActive })
+      .from(employees)
+      .where(eq(employees.userId, user.id))
+      .limit(1);
+
+    if (!employee?.isActive) {
+      throw new Error("Unauthorized");
+    }
   }
 
   const isMatch = await bcrypt.compare(password, user.passwordHash!);
@@ -20,8 +34,8 @@ export const loginAdmin = async (email: string, password: string) => {
     throw new Error("Invalid credentials");
   }
 
-  const accessToken = signAccessToken(user.id, "admin");
-  const { token: refreshToken } = signRefreshToken(user.id, "admin");
+  const accessToken = signAccessToken(user.id, role);
+  const { token: refreshToken } = signRefreshToken(user.id, role);
 
   await saveRefreshToken(user.id, refreshToken, ONE_WEEK_MS);
 

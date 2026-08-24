@@ -4,18 +4,24 @@ import {
   approveDocument,
   approveKyc,
   approveUser,
+  createAdminEmployee,
   createTeamMemberForUser,
+  deleteAdminEmployee,
   deleteTeamMember,
   deleteUserController,
+  getAdminEmployeeAccess,
   getKycDetailsByUserId,
   getTeamMembersForUser,
   getUserBankAccounts,
+  listAdminEmployees,
   listUsers,
   rejectDocument,
   rejectKyc,
   revokeKyc,
   resetUserPasswordController,
   searchSellers,
+  updateAdminEmployee,
+  updateAdminEmployeeStatus,
   updateTeamMemberStatus,
   updateUserBankAccountStatus,
 } from '../../controllers/admin/user.controller'
@@ -26,6 +32,12 @@ const router = Router()
 
 // Update ticket (status, due date)
 router.get('/users-management', requireAuth, isAdminMiddleware, listUsers)
+router.get('/employees/me', requireAuth, isAdminMiddleware, getAdminEmployeeAccess)
+router.get('/employees', requireAuth, isAdminMiddleware, listAdminEmployees)
+router.post('/employees', requireAuth, isAdminMiddleware, createAdminEmployee)
+router.patch('/employees/:memberId', requireAuth, isAdminMiddleware, updateAdminEmployee)
+router.patch('/employees/:memberId/status', requireAuth, isAdminMiddleware, updateAdminEmployeeStatus)
+router.delete('/employees/:memberId', requireAuth, isAdminMiddleware, deleteAdminEmployee)
 router.get('/search-sellers', requireAuth, isAdminMiddleware, searchSellers)
 router.patch('/:id/approve', requireAuth, isAdminMiddleware, approveUser)
 router.post('/:id/reset-password', requireAuth, isAdminMiddleware, resetUserPasswordController)
