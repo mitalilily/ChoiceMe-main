@@ -20,58 +20,132 @@ export interface IEmployeePayload {
 }
 export const createEmployeeService = async (data: IEmployeePayload, adminId: string) => {
   return await db.transaction(async (tx) => {
-    // ✅ 1. Validate uniqueness in USERS table
-    if (data.email || data.phone) {
-      const existingUser = await tx.query.users.findFirst({
-        where: or(
-          data.email ? eq(users.email, data.email) : undefined,
-          data.phone ? eq(users.phone, data.phone) : undefined,
-        ),
-      })
-      if (existingUser) {
-        throw new Error('User with this email or phone already exists')
-      }
-    }
-
-    // ✅ 2. Validate uniqueness in EMPLOYEES table
-    if (data.email || data.phone) {
-      const existingEmployee = await tx.query.employees.findFirst({
-        where: or(
-          data.email ? eq(employees.email, data.email) : undefined,
-          data.phone ? eq(employees.phone, data.phone) : undefined,
-        ),
-      })
-      if (existingEmployee) {
-        throw new Error('Employee with this email or phone already exists')
-      }
-    }
-
-    // ✅ 3. Hash password
+    const email = data.email.trim().toLowerCase()
+    const phone = data.phone?.trim() || undefined
     const hashedPassword = await bcrypt.hash(data.password, 10)
 
-    // ✅ 4. Create USER record
-    const [user] = await tx
-      .insert(users)
-      .values({
-        email: data.email,
-        phone: data.phone,
-        role: 'employee',
-        passwordHash: hashedPassword,
-        accountVerified: true,
-        emailVerified: !!data.email, // true if email provided
-        phoneVerified: !!data.phone, // true if phone provided
-      })
-      .returning()
+    const existingEmployee = await tx.query.employees.findFirst({
+      where: or(
+        email ? eq(employees.email, email) : undefined,
+        phone ? eq(employees.phone, phone) : undefined,
+      ),
+    })
 
-    // ✅ 5. Create EMPLOYEE record
+    if (existingEmployee) {
+      let linkedUser = await tx.query.users.findFirst({
+        where: eq(users.id, existingEmployee.userId),
+      })
+
+      if (!linkedUser) {
+        const existingLoginUser = await tx.query.users.findFirst({
+          where: or(email ? eq(users.email, email) : undefined, phone ? eq(users.phone, phone) : undefined),
+        })
+
+        if (existingLoginUser && existingLoginUser.role !== 'employee') {
+          throw new Error(
+            `An account with this email or phone already exists as ${existingLoginUser.role || 'a user'}. Use a different email.`,
+          )
+        }
+
+        if (existingLoginUser) {
+          linkedUser = existingLoginUser
+        } else {
+          ;[linkedUser] = await tx
+            .insert(users)
+            .values({
+              email,
+              phone,
+              role: 'employee',
+              passwordHash: hashedPassword,
+              accountVerified: true,
+              emailVerified: true,
+              phoneVerified: Boolean(phone),
+            })
+            .returning()
+        }
+      }
+
+      if (linkedUser) {
+        ;[linkedUser] = await tx
+          .update(users)
+          .set({
+            email,
+            phone,
+            role: 'employee',
+            passwordHash: hashedPassword,
+            accountVerified: true,
+            emailVerified: true,
+            phoneVerified: Boolean(phone),
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, linkedUser.id))
+          .returning()
+      }
+
+      const [employee] = await tx
+        .update(employees)
+        .set({
+          adminId,
+          name: data.name,
+          email,
+          phone,
+          role: data.role,
+          moduleAccess: data.moduleAccess ?? existingEmployee.moduleAccess ?? {},
+          isActive: data.isActive ?? true,
+          isOnline: existingEmployee.isOnline ?? false,
+        })
+        .where(eq(employees.id, existingEmployee.id))
+        .returning()
+
+      return { user: linkedUser, employee }
+    }
+
+    const existingUser = await tx.query.users.findFirst({
+      where: or(email ? eq(users.email, email) : undefined, phone ? eq(users.phone, phone) : undefined),
+    })
+
+    if (existingUser && existingUser.role !== 'employee') {
+      throw new Error(
+        `An account with this email or phone already exists as ${existingUser.role || 'a user'}. Use a different email.`,
+      )
+    }
+
+    const [user] = existingUser
+      ? await tx
+          .update(users)
+          .set({
+            email,
+            phone,
+            role: 'employee',
+            passwordHash: hashedPassword,
+            accountVerified: true,
+            emailVerified: true,
+            phoneVerified: Boolean(phone),
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, existingUser.id))
+          .returning()
+      : await tx
+          .insert(users)
+          .values({
+            email,
+            phone,
+            role: 'employee',
+            passwordHash: hashedPassword,
+            accountVerified: true,
+            emailVerified: true,
+            phoneVerified: Boolean(phone),
+          })
+          .returning()
+
     const [employee] = await tx
       .insert(employees)
       .values({
-        userId: user?.id,
+        userId: user.id,
         adminId,
         name: data.name,
-        email: data.email,
-        phone: data.phone,
+        email,
+        phone,
         role: data.role,
         moduleAccess: data.moduleAccess ?? {},
         isActive: data.isActive ?? true,
@@ -79,7 +153,6 @@ export const createEmployeeService = async (data: IEmployeePayload, adminId: str
       })
       .returning()
 
-    // ✅ 6. Clone admin profile
     const adminProfile = await tx.query.userProfiles.findFirst({
       where: eq(userProfiles.userId, adminId),
     })
@@ -103,11 +176,10 @@ export const createEmployeeService = async (data: IEmployeePayload, adminId: str
       })
     }
 
-    // ✅ 7. Send credentials email (async fire-and-forget)
-    if (data.email) {
+    if (email) {
       sendEmployeeCredentials(
-        data.email,
-        data.email,
+        email,
+        email,
         data.password,
         adminProfile?.companyInfo?.contactPerson || 'ChoiceMee Admin',
       ).catch((err) => console.error('Failed to send employee credentials email:', err))

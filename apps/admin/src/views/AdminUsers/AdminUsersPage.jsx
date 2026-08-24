@@ -407,8 +407,9 @@ const AdminUsersPage = () => {
                       onChange={(e) => setField('password', e.target.value)}
                       pr="44px"
                     />
-                    <InputRightElement>
+                    <InputRightElement pointerEvents="auto">
                       <IconButton
+                        type="button"
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                         icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
                         size="sm"
