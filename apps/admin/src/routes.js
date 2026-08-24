@@ -41,6 +41,7 @@ import ApiIntegration from 'views/Integrations/ApiIntegration'
 import AdminNdr from 'views/Ops/AdminNdr'
 import AdminRto from 'views/Ops/AdminRto'
 import AdminNotificationsPage from 'views/Notifications/AdminNotificationsPage'
+import ManualBooking from 'views/Orders/ManualBooking'
 import Orders from 'views/Orders/Orders'
 import PlanManagement from 'views/PlanManagement/PlanManagement'
 import ServiceabilityPage from 'views/Serviceability/ServiceabilityPage'
@@ -88,6 +89,17 @@ const dashRoutes = [
     component: () => (
       <AdminRoute>
         <Orders />
+      </AdminRoute>
+    ),
+    layout: '/admin',
+  },
+  {
+    path: '/manual-booking',
+    name: 'Manual Booking',
+    icon: <IconTruck />,
+    component: () => (
+      <AdminRoute>
+        <ManualBooking />
       </AdminRoute>
     ),
     layout: '/admin',

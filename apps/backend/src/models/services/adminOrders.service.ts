@@ -149,6 +149,10 @@ export const getAllOrdersServiceAdmin = async ({
     combinedOrders = combinedOrders.filter((o) => o.user_id === filters.userId)
   }
 
+  if (filters.type) {
+    combinedOrders = combinedOrders.filter((o) => o.type === filters.type)
+  }
+
   if (filters.status) {
     combinedOrders = combinedOrders.filter((o) => o.order_status === filters.status)
   }

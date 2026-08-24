@@ -31,6 +31,41 @@ export async function fetchAllOrders(page, limit = 10, filters = {}) {
   }
 }
 
+export async function fetchManualBookingUsers({ search = '', limit = 30 } = {}) {
+  const response = await api.get('/admin/orders/manual-booking/users', {
+    params: { search, limit },
+  })
+  return response.data
+}
+
+export async function fetchManualBookingWarehouses(userId) {
+  const response = await api.get(`/admin/orders/manual-booking/users/${userId}/warehouses`)
+  return response.data
+}
+
+export async function createAdminManualB2COrder(payload) {
+  const response = await api.post('/admin/orders/manual-booking/b2c/create', payload, {
+    timeout: 210000,
+  })
+  return response.data
+}
+
+export async function fetchAdminManualB2CCouriers(payload) {
+  const response = await api.post('/admin/orders/manual-booking/b2c/available-couriers', payload, {
+    timeout: 120000,
+  })
+  return response.data
+}
+
+export async function bookAdminManualB2CCourier(orderId, payload) {
+  const response = await api.post(
+    `/admin/orders/manual-booking/b2c/${orderId}/select-courier`,
+    payload,
+    { timeout: 210000 },
+  )
+  return response.data
+}
+
 export async function exportOrdersToCSV(filters = {}) {
   try {
     const response = await api.get('/admin/orders/export', {
