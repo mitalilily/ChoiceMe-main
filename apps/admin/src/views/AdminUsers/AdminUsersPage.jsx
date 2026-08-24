@@ -1,4 +1,8 @@
 import {
+  ViewIcon,
+  ViewOffIcon,
+} from '@chakra-ui/icons'
+import {
   Badge,
   Box,
   Button,
@@ -11,6 +15,8 @@ import {
   HStack,
   IconButton,
   Input,
+  InputGroup,
+  InputRightElement,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -89,6 +95,7 @@ const AdminUsersPage = () => {
   const [filters, setFilters] = useState({ search: '', status: '' })
   const [editingMember, setEditingMember] = useState(null)
   const [form, setForm] = useState(defaultForm)
+  const [showPassword, setShowPassword] = useState(true)
 
   const modal = useDisclosure()
   const { data, isLoading, isFetching, refetch } = useAdminEmployees(page, limit, filters)
@@ -111,6 +118,7 @@ const AdminUsersPage = () => {
   const openCreate = () => {
     setEditingMember(null)
     setForm(defaultForm)
+    setShowPassword(true)
     modal.onOpen()
   }
 
@@ -124,6 +132,7 @@ const AdminUsersPage = () => {
       password: '',
       moduleAccess: normalizeAccess(member.moduleAccess),
     })
+    setShowPassword(false)
     modal.onOpen()
   }
 
@@ -390,12 +399,24 @@ const AdminUsersPage = () => {
                 </FormControl>
                 <FormControl isRequired={!editingMember}>
                   <FormLabel>{editingMember ? 'New Password' : 'Password'}</FormLabel>
-                  <Input
-                    type="password"
-                    value={form.password}
-                    placeholder={editingMember ? 'Leave blank to keep unchanged' : 'Minimum 6 characters'}
-                    onChange={(e) => setField('password', e.target.value)}
-                  />
+                  <InputGroup>
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      value={form.password}
+                      placeholder={editingMember ? 'Leave blank to keep unchanged' : 'Minimum 6 characters'}
+                      onChange={(e) => setField('password', e.target.value)}
+                      pr="44px"
+                    />
+                    <InputRightElement>
+                      <IconButton
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setShowPassword((value) => !value)}
+                      />
+                    </InputRightElement>
+                  </InputGroup>
                 </FormControl>
                 <Box alignSelf="end">
                   <Badge colorScheme="blue" px={3} py={1} borderRadius="full">

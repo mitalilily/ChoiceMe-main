@@ -153,6 +153,17 @@ export const getAllOrdersServiceAdmin = async ({
     combinedOrders = combinedOrders.filter((o) => o.type === filters.type)
   }
 
+  if (filters.tag) {
+    const tag = String(filters.tag).trim().toLowerCase()
+    combinedOrders = combinedOrders.filter((o) =>
+      String(o.tags || '')
+        .toLowerCase()
+        .split(',')
+        .map((value) => value.trim())
+        .includes(tag),
+    )
+  }
+
   if (filters.status) {
     combinedOrders = combinedOrders.filter((o) => o.order_status === filters.status)
   }

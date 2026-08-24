@@ -9276,6 +9276,7 @@ export interface PaginationParams {
 export interface IOrderFilters {
   status?: string
   type?: 'b2c' | 'b2b'
+  tag?: string
   fromDate?: string
   toDate?: string
   search?: string

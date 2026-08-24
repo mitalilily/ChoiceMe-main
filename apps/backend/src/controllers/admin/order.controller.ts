@@ -78,6 +78,7 @@ export const getAllOrdersControllerAdmin = async (req: any, res: Response) => {
       search: req.query.search as string | undefined,
       userId: req.query.userId as string | undefined,
       type: req.query.type as 'b2c' | 'b2b' | undefined,
+      tag: req.query.tag as string | undefined,
       pickupStatus: req.query.pickupStatus as string | undefined,
       dashboardView: req.query.dashboardView as string | undefined,
       businessDate: req.query.businessDate as string | undefined,
@@ -108,6 +109,7 @@ export const exportOrdersControllerAdmin = async (req: any, res: Response) => {
       search: req.query.search as string | undefined,
       userId: req.query.userId as string | undefined,
       type: req.query.type as 'b2c' | 'b2b' | undefined,
+      tag: req.query.tag as string | undefined,
       pickupStatus: req.query.pickupStatus as string | undefined,
       dashboardView: req.query.dashboardView as string | undefined,
       businessDate: req.query.businessDate as string | undefined,
@@ -265,6 +267,15 @@ export const createManualB2CDraftController = async (req: any, res: Response) =>
 
     await assertManualBookingUser(userId)
     const { userId: _ignoredUserId, ...payload } = req.body || {}
+    payload.tags = Array.from(
+      new Set(
+        String(payload.tags || '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .concat('admin_manual_booking'),
+      ),
+    ).join(',')
     const result = await createB2CDraftOrderService(payload, userId, false)
 
     return res.status(201).json({

@@ -138,8 +138,8 @@ const ManualBooking = () => {
     ordersPage,
     ordersLimit,
     {
-      userId: selectedUserId || '__manual_booking_no_user__',
       type: 'b2c',
+      tag: 'admin_manual_booking',
       sortBy: 'created_at',
       sortOrder: 'desc',
     },
@@ -244,6 +244,7 @@ const ManualBooking = () => {
       ],
       pickup_date: form.pickupDate,
       pickup_time: form.pickupTime,
+      tags: 'admin_manual_booking',
     }
   }
 
@@ -622,7 +623,7 @@ const ManualBooking = () => {
           <Flex justify="space-between" align="center" mb={4}>
             <HStack>
               <Icon as={FiUser} />
-              <Heading size="md">Selected User B2C Orders</Heading>
+              <Heading size="md">Manual Booking Orders</Heading>
             </HStack>
             <Button size="sm" variant="outline" onClick={refetchOrders} isLoading={ordersFetching}>
               Refresh

@@ -84,26 +84,24 @@ export const createEmployeeService = async (data: IEmployeePayload, adminId: str
       where: eq(userProfiles.userId, adminId),
     })
 
-    if (!adminProfile) {
-      throw new Error('Admin does not have a profile. Cannot create employee profile.')
+    if (adminProfile) {
+      await tx.insert(userProfiles).values({
+        userId: user.id,
+        onboardingStep: adminProfile.onboardingStep,
+        monthlyOrderCount: adminProfile.monthlyOrderCount,
+        salesChannels: adminProfile.salesChannels,
+        companyInfo: adminProfile.companyInfo,
+        domesticKyc: adminProfile.domesticKyc,
+        bankDetails: adminProfile.bankDetails,
+        gstDetails: adminProfile.gstDetails,
+        businessType: adminProfile.businessType,
+        approved: adminProfile.approved,
+        rejectionReason: adminProfile.rejectionReason,
+        onboardingComplete: adminProfile.onboardingComplete,
+        profileComplete: adminProfile.profileComplete,
+        approvedAt: adminProfile.approvedAt,
+      })
     }
-
-    await tx.insert(userProfiles).values({
-      userId: user.id,
-      onboardingStep: adminProfile.onboardingStep,
-      monthlyOrderCount: adminProfile.monthlyOrderCount,
-      salesChannels: adminProfile.salesChannels,
-      companyInfo: adminProfile.companyInfo,
-      domesticKyc: adminProfile.domesticKyc,
-      bankDetails: adminProfile.bankDetails,
-      gstDetails: adminProfile.gstDetails,
-      businessType: adminProfile.businessType,
-      approved: adminProfile.approved,
-      rejectionReason: adminProfile.rejectionReason,
-      onboardingComplete: adminProfile.onboardingComplete,
-      profileComplete: adminProfile.profileComplete,
-      approvedAt: adminProfile.approvedAt,
-    })
 
     // ✅ 7. Send credentials email (async fire-and-forget)
     if (data.email) {
@@ -111,7 +109,7 @@ export const createEmployeeService = async (data: IEmployeePayload, adminId: str
         data.email,
         data.email,
         data.password,
-        adminProfile?.companyInfo?.contactPerson,
+        adminProfile?.companyInfo?.contactPerson || 'ChoiceMee Admin',
       ).catch((err) => console.error('Failed to send employee credentials email:', err))
     }
 
