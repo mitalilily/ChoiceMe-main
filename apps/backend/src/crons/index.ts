@@ -1,4 +1,8 @@
 import cron from 'node-cron'
+import { eq } from 'drizzle-orm'
+import { db } from '../models/client'
+import { stores } from '../models/schema/stores'
+import { syncShopifyOrdersForUser } from '../models/services/shopify.service'
 import { isRazorpayConfigured } from '../utils/razorpay'
 import { generateAutoBillingInvoices } from './invoiceGenerator'
 import { processPendingWebhooks } from './processPendingWebhooks'
@@ -16,6 +20,60 @@ import { retryFailedShipmentStatusEmails } from '../models/services/shipmentNoti
 let isReconcilingCodRemittances = false
 let isRetryingShipmentEmails = false
 let isPollingDeliveryOneTracking = false
+let isSyncingShopifyOrders = false
+
+const syncRecentShopifyOrders = async () => {
+  if (isSyncingShopifyOrders) {
+    console.log('[Cron] Skipping Shopify order sync: previous run still active')
+    return
+  }
+
+  isSyncingShopifyOrders = true
+  try {
+    const connectedStores = await db
+      .select({ id: stores.id, userId: stores.userId })
+      .from(stores)
+      .where(eq(stores.platformId, 1))
+
+    const createdAtMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    let created = 0
+    let updated = 0
+    let skipped = 0
+
+    for (const store of connectedStores) {
+      try {
+        const result = await syncShopifyOrdersForUser(
+          store.userId,
+          250,
+          store.id,
+          undefined,
+          { createdAtMin, onlyUnbooked: true },
+        )
+        created += result.created
+        updated += result.updated
+        skipped += result.skipped
+      } catch (error: any) {
+        console.error('[Cron] Shopify order sync failed for store', {
+          storeId: store.id,
+          message: error?.response?.data || error?.message || String(error),
+        })
+      }
+    }
+
+    if (created > 0 || updated > 0) {
+      console.log('[Cron] Shopify order sync finished', {
+        stores: connectedStores.length,
+        created,
+        updated,
+        skipped,
+      })
+    }
+  } catch (error: any) {
+    console.error('[Cron] Shopify order sync failed:', error?.message || error)
+  } finally {
+    isSyncingShopifyOrders = false
+  }
+}
 
 const runCodRemittanceReconciliation = async () => {
   if (isReconcilingCodRemittances) {
@@ -129,6 +187,14 @@ void runCodRemittanceReconciliation()
 cron.schedule('*/5 * * * *', () => {
   runCodRemittanceReconciliation().catch((err) => {
     console.error('Error in cron COD remittance reconciliation', err)
+  })
+})
+
+// Webhooks remain the fast path; this recent-order sweep recovers missed Shopify webhooks.
+void syncRecentShopifyOrders()
+cron.schedule('*/5 * * * *', () => {
+  syncRecentShopifyOrders().catch((err) => {
+    console.error('[Cron] Shopify order sync runner failed:', err)
   })
 })
 
