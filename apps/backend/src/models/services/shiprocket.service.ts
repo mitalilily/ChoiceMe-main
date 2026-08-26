@@ -5621,16 +5621,6 @@ export const createB2CShipmentService = async (
         `✅ Local order ${newOrder.id} created via ${params.integration_type} (AWB: ${shipmentMeta.awb_number})`,
       )
 
-      // Shopify orders receive their fulfillment and AWB as soon as booking succeeds.
-      await syncShopifyStatusForLocalOrder({
-        ...result.order,
-        order_status: 'booked',
-        awb_number: shipmentMeta.awb_number,
-        courier_partner: shipmentMeta.courier_name,
-      }).catch((shopifyError) => {
-        console.warn('[Booking] Shopify fulfillment sync failed:', shopifyError)
-      })
-
       // 🔔 Send webhook event for order creation (async, don't wait)
       const webhookStatus = 'booked'
 
@@ -5651,6 +5641,18 @@ export const createB2CShipmentService = async (
       })
 
       return { order: newOrder, shipment: shipmentData }
+    })
+
+    // The local booking transaction must commit before Shopify fulfillment is synced.
+    // Keeping this integration side effect outside the transaction prevents a Shopify
+    // API/helper failure from rolling back a shipment that Delhivery already accepted.
+    await syncShopifyStatusForLocalOrder({
+      ...result.order,
+      order_status: 'booked',
+      awb_number: shipmentMeta.awb_number,
+      courier_partner: shipmentMeta.courier_name,
+    }).catch((shopifyError) => {
+      console.warn('[Booking] Shopify fulfillment sync failed after booking:', shopifyError)
     })
 
     try {
