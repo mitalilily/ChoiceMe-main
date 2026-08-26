@@ -16,6 +16,11 @@ type SyncResult = {
   skipped: number
 }
 
+type ShopifySyncOptions = {
+  createdAtMin?: Date
+  onlyUnbooked?: boolean
+}
+
 type FulfillTrigger =
   | 'do_not_fulfill'
   | 'order_booked'
@@ -200,6 +205,50 @@ const getStoresForUser = async (userId: string, tx: any = db) => {
   return rows as ShopifyStore[]
 }
 
+const getShopifyAccessToken = async (store: ShopifyStore, tx: any = db): Promise<string> => {
+  const metadata = ((store as any)?.metadata || {}) as Record<string, unknown>
+  const clientId = String(metadata.shopifyClientId || store.apiKey || '').trim()
+  const clientSecret = String(metadata.shopifyClientSecret || '').trim()
+  const storedToken = String(store.adminApiAccessToken || '').trim()
+  const tokenExpiresAt = Date.parse(String(metadata.shopifyTokenExpiresAt || ''))
+
+  if (!clientId || !clientSecret) {
+    if (!storedToken) throw new Error('Shopify access token is not configured')
+    return storedToken
+  }
+
+  if (storedToken && Number.isFinite(tokenExpiresAt) && tokenExpiresAt - Date.now() > 5 * 60 * 1000) {
+    return storedToken
+  }
+
+  const tokenResponse = await axios.post(
+    `https://${normalizeDomain(store.domain)}/admin/oauth/access_token`,
+    new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+    }).toString(),
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 20000 },
+  )
+
+  const accessToken = String(tokenResponse?.data?.access_token || '').trim()
+  const expiresIn = toNumber(tokenResponse?.data?.expires_in, 86399)
+  if (!accessToken) throw new Error('Shopify did not return an access token')
+
+  const nextMetadata = {
+    ...metadata,
+    shopifyTokenExpiresAt: new Date(Date.now() + Math.max(expiresIn - 300, 60) * 1000).toISOString(),
+  }
+  await tx
+    .update(stores)
+    .set({ adminApiAccessToken: accessToken, metadata: nextMetadata, updatedAt: new Date() })
+    .where(eq(stores.id, store.id))
+
+  store.adminApiAccessToken = accessToken
+  ;(store as any).metadata = nextMetadata
+  return accessToken
+}
+
 const getStoreByDomain = async (domain: string, tx: any = db) => {
   const [store] = await tx
     .select()
@@ -209,17 +258,41 @@ const getStoreByDomain = async (domain: string, tx: any = db) => {
   return store as ShopifyStore | undefined
 }
 
-const fetchShopifyOrders = async (store: ShopifyStore, limit = 50) => {
+const fetchShopifyOrders = async (store: ShopifyStore, limit = 50, options: ShopifySyncOptions = {}) => {
   const base = `https://${normalizeDomain(store.domain)}/admin/api/${SHOPIFY_API_VERSION}`
-  const res = await axios.get(`${base}/orders.json`, {
-    headers: {
-      'X-Shopify-Access-Token': String(store.adminApiAccessToken || '').trim(),
-      'Content-Type': 'application/json',
-    },
-    params: { status: 'any', limit },
-    timeout: 30000,
-  })
-  return Array.isArray(res?.data?.orders) ? res.data.orders : []
+  const accessToken = await getShopifyAccessToken(store)
+  const headers = {
+    'X-Shopify-Access-Token': accessToken,
+    'Content-Type': 'application/json',
+  }
+  const requestedLimit = Math.max(limit, 1)
+  const orders: any[] = []
+  let nextUrl: string | null = `${base}/orders.json`
+  let params: Record<string, unknown> | undefined = {
+    status: 'any',
+    limit: Math.min(requestedLimit, 250),
+    order: 'created_at asc',
+    ...(options.createdAtMin ? { created_at_min: options.createdAtMin.toISOString() } : {}),
+  }
+
+  while (nextUrl && orders.length < requestedLimit) {
+    const res = await axios.get(nextUrl, { headers, params, timeout: 30000 })
+    const pageOrders = Array.isArray(res?.data?.orders) ? res.data.orders : []
+    orders.push(...pageOrders)
+
+    const linkHeader = String(res?.headers?.link || '')
+    const nextLink = linkHeader
+      .split(',')
+      .map((part) => part.trim())
+      .find((part) => /rel="next"/i.test(part))
+    const nextMatch = nextLink?.match(/^<([^>]+)>/)
+    nextUrl = nextMatch?.[1] || null
+    params = undefined
+
+    if (!pageOrders.length) break
+  }
+
+  return orders.slice(0, requestedLimit)
 }
 
 const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings: any, tx: any = db) => {
@@ -288,7 +361,7 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
   }
 
   const [existing] = await tx
-    .select({ id: b2c_orders.id })
+    .select({ id: b2c_orders.id, orderStatus: b2c_orders.order_status, awbNumber: b2c_orders.awb_number })
     .from(b2c_orders)
     .where(eq(b2c_orders.order_id, internalOrderId))
     .limit(1)
@@ -296,10 +369,14 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
   const [legacyExisting] = existing
     ? [undefined]
     : await tx
-        .select({ id: b2c_orders.id })
+        .select({ id: b2c_orders.id, orderStatus: b2c_orders.order_status, awbNumber: b2c_orders.awb_number })
         .from(b2c_orders)
         .where(eq(b2c_orders.order_id, legacyInternalOrderId))
         .limit(1)
+
+  if (settings?.onlyUnbookedSync && (existing?.awbNumber || legacyExisting?.awbNumber)) {
+    return 'skipped' as const
+  }
 
   if (existing?.id || legacyExisting?.id) {
     const targetId = existing?.id || legacyExisting?.id
@@ -322,6 +399,7 @@ export const syncShopifyOrdersForUser = async (
   limit = 50,
   storeId?: string,
   tx: any = db,
+  options: ShopifySyncOptions = {},
 ): Promise<SyncResult> => {
   const storesToSync = storeId ? [await getStoreForUser(userId, storeId, tx)].filter(Boolean) : await getStoresForUser(userId, tx)
   if (!storesToSync.length) {
@@ -331,8 +409,8 @@ export const syncShopifyOrdersForUser = async (
   const result: SyncResult = { created: 0, updated: 0, skipped: 0 }
 
   for (const store of storesToSync) {
-    const orders = await fetchShopifyOrders(store as ShopifyStore, limit)
-    const settings = (store as any)?.settings || {}
+    const orders = await fetchShopifyOrders(store as ShopifyStore, limit, options)
+    const settings = { ...((store as any)?.settings || {}), onlyUnbookedSync: options.onlyUnbooked }
     for (const order of orders) {
       const state = await upsertFromShopifyOrder(store as ShopifyStore, order, settings, tx)
       result[state] += 1
@@ -440,8 +518,9 @@ export const syncShopifyStatusForLocalOrder = async (order: any, tx: any = db) =
   if (!store) return
   const settings = (store as any)?.settings || {}
   const base = `https://${normalizeDomain(store.domain)}/admin/api/${SHOPIFY_API_VERSION}`
+  const accessToken = await getShopifyAccessToken(store, tx)
   const headers = {
-    'X-Shopify-Access-Token': String(store.adminApiAccessToken || '').trim(),
+    'X-Shopify-Access-Token': accessToken,
     'Content-Type': 'application/json',
   }
 

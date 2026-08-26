@@ -13,8 +13,18 @@ export const syncShopifyOrdersController = async (req: any, res: Response): Prom
     const rawLimit = Number(req.body?.limit ?? req.query?.limit ?? 50)
     const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 250) : 50
     const storeId = String(req.body?.storeId ?? req.query?.storeId ?? '').trim() || undefined
+    const createdAtMinRaw = String(req.body?.createdAtMin ?? req.query?.createdAtMin ?? '').trim()
+    const createdAtMin = createdAtMinRaw ? new Date(createdAtMinRaw) : undefined
+    const onlyUnbooked = req.body?.onlyUnbooked === true || req.query?.onlyUnbooked === 'true'
 
-    const result = await syncShopifyOrdersForUser(userId, limit, storeId)
+    if (createdAtMin && Number.isNaN(createdAtMin.getTime())) {
+      return res.status(400).json({ error: 'createdAtMin must be a valid date' })
+    }
+
+    const result = await syncShopifyOrdersForUser(userId, limit, storeId, undefined, {
+      createdAtMin,
+      onlyUnbooked,
+    })
     return res.status(200).json({
       success: true,
       message: 'Shopify orders synced successfully',
