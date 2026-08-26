@@ -5,15 +5,15 @@ WITH defaults AS (
     orders.id AS order_id,
     pickup.id AS pickup_id,
     jsonb_build_object(
-      'warehouse_name', COALESCE(address.addressNickname, address.contactName, 'Warehouse'),
-      'name', COALESCE(address.contactName, address.addressNickname, 'Warehouse'),
-      'phone', COALESCE(address.contactPhone, ''),
-      'address', concat_ws(', ', address.addressLine1, address.addressLine2),
+      'warehouse_name', COALESCE(address."addressNickname", address."contactName", 'Warehouse'),
+      'name', COALESCE(address."contactName", address."addressNickname", 'Warehouse'),
+      'phone', COALESCE(address."contactPhone", ''),
+      'address', concat_ws(', ', address."addressLine1", address."addressLine2"),
       'city', address.city,
       'state', address.state,
       'country', COALESCE(address.country, 'India'),
       'pincode', address.pincode,
-      'gst_number', COALESCE(address.gstNumber, '')
+      'gst_number', COALESCE(address."gstNumber", '')
     ) AS pickup_details
   FROM b2c_orders orders
   INNER JOIN pickup_addresses pickup
