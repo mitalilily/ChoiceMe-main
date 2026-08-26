@@ -1,6 +1,6 @@
 import axios from 'axios'
 import * as crypto from 'crypto'
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, ne } from 'drizzle-orm'
 import { db } from '../client'
 import { b2c_orders } from '../schema/b2cOrders'
 import { addresses, pickupAddresses } from '../schema/pickupAddresses'
@@ -427,16 +427,23 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
         .where(eq(b2c_orders.order_id, legacyInternalOrderId))
         .limit(1)
 
-  if (!existing?.id && !legacyExisting?.id) {
-    const [orderNumberCollision] = await tx
-      .select({ id: b2c_orders.id, integrationType: b2c_orders.integration_type })
-      .from(b2c_orders)
-      .where(and(eq(b2c_orders.user_id, store.userId), eq(b2c_orders.order_number, orderName)))
-      .limit(1)
+  const targetId = existing?.id || legacyExisting?.id
+  const orderNumberCollision = await tx
+    .select({ id: b2c_orders.id })
+    .from(b2c_orders)
+    .where(
+      targetId
+        ? and(
+            eq(b2c_orders.user_id, store.userId),
+            eq(b2c_orders.order_number, orderName),
+            ne(b2c_orders.id, targetId),
+          )
+        : and(eq(b2c_orders.user_id, store.userId), eq(b2c_orders.order_number, orderName)),
+    )
+    .limit(1)
 
-    if (orderNumberCollision && String(orderNumberCollision.integrationType || '').toLowerCase() !== 'shopify') {
-      updatePayload.order_number = `SH-${shopifyOrderId}`.slice(0, 50)
-    }
+  if (orderNumberCollision.length) {
+    updatePayload.order_number = `SH-${shopifyOrderId}`.slice(0, 50)
   }
 
   if (settings?.onlyUnbookedSync && (existing?.awbNumber || legacyExisting?.awbNumber)) {
@@ -444,7 +451,6 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
   }
 
   if (existing?.id || legacyExisting?.id) {
-    const targetId = existing?.id || legacyExisting?.id
     await tx
       .update(b2c_orders)
       .set({ ...updatePayload, order_id: internalOrderId })
@@ -477,8 +483,17 @@ export const syncShopifyOrdersForUser = async (
     const orders = await fetchShopifyOrders(store as ShopifyStore, limit, options)
     const settings = { ...((store as any)?.settings || {}), onlyUnbookedSync: options.onlyUnbooked }
     for (const order of orders) {
-      const state = await upsertFromShopifyOrder(store as ShopifyStore, order, settings, tx)
-      result[state] += 1
+      try {
+        const state = await upsertFromShopifyOrder(store as ShopifyStore, order, settings, tx)
+        result[state] += 1
+      } catch (error: any) {
+        console.error('[Shopify] Failed to sync individual order', {
+          storeId: (store as ShopifyStore)?.id || null,
+          shopifyOrderId: order?.id || null,
+          orderNumber: order?.name || order?.order_number || null,
+          message: error?.response?.data || error?.message || String(error),
+        })
+      }
     }
   }
 
