@@ -104,7 +104,9 @@ const UserConnectedChannels = () => {
               sx={{ color: syncingShopify ? '#9ca3af' : '#34d399', cursor: syncingShopify ? 'default' : 'pointer' }}
               onClick={() => {
                 if (syncingShopify) return
-                syncShopifyOrders({ limit: 100, storeId: row?.id }, {
+                // Keep manual sync within the API proxy window while still
+                // fetching the newest Shopify orders first.
+                syncShopifyOrders({ limit: 50, storeId: row?.id }, {
                   onSuccess: (data: { created: number; updated: number; message: string }) => {
                     toast.open({
                       message: `Shopify sync complete: ${data?.created ?? 0} created, ${data?.updated ?? 0} updated`,
