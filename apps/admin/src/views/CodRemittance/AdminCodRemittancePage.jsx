@@ -600,12 +600,10 @@ export default function AdminCodRemittancePage() {
 
   const creditPreview = useMemo(() => {
     const codAmount = toAmount(selectedRemittance?.codAmount)
-    const freightCharges = toAmount(selectedRemittance?.shippingCharges)
-    const codCharges = toAmount(selectedRemittance?.codCharges)
     const deductions =
       selectedRemittance?.deductions !== undefined && selectedRemittance?.deductions !== null
         ? toAmount(selectedRemittance?.deductions)
-        : freightCharges + codCharges
+        : 0
     const remittableAmount =
       selectedRemittance?.remittableAmount !== undefined &&
       selectedRemittance?.remittableAmount !== null
@@ -614,8 +612,6 @@ export default function AdminCodRemittancePage() {
 
     return {
       codAmount,
-      freightCharges,
-      codCharges,
       deductions,
       remittableAmount,
     }
@@ -942,30 +938,16 @@ export default function AdminCodRemittancePage() {
                   {formatInr(creditPreview.codAmount)}
                 </Text>
               </Flex>
-              <Flex justify="space-between" mb="6px">
-                <Text fontSize="sm" color="gray.700">
-                  Less: Freight Charges
-                </Text>
-                <Text fontSize="sm" fontWeight="600" color="red.500">
-                  - {formatInr(creditPreview.freightCharges)}
-                </Text>
-              </Flex>
-              <Flex justify="space-between" mb="6px">
-                <Text fontSize="sm" color="gray.700">
-                  Less: COD Charges
-                </Text>
-                <Text fontSize="sm" fontWeight="600" color="red.500">
-                  - {formatInr(creditPreview.codCharges)}
-                </Text>
-              </Flex>
-              <Flex justify="space-between" mb="6px">
-                <Text fontSize="sm" color="gray.700">
-                  Total Deductions
-                </Text>
-                <Text fontSize="sm" fontWeight="700" color="red.600">
-                  - {formatInr(creditPreview.deductions)}
-                </Text>
-              </Flex>
+              {creditPreview.deductions > 0 && (
+                <Flex justify="space-between" mb="6px">
+                  <Text fontSize="sm" color="gray.700">
+                    Manual Deductions
+                  </Text>
+                  <Text fontSize="sm" fontWeight="700" color="red.600">
+                    - {formatInr(creditPreview.deductions)}
+                  </Text>
+                </Flex>
+              )}
               <Flex justify="space-between" pt="8px" borderTop="1px solid" borderColor="gray.200">
                 <Text fontSize="sm" fontWeight="700">
                   Net Seller Settlement
