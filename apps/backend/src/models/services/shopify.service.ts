@@ -403,7 +403,11 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
     breadth: 10,
     height: 10,
     order_type: orderType,
-    prepaid_amount: orderType === 'prepaid' ? totalOrderValue : 0,
+    // A prepaid Shopify order has already been paid by the customer. This
+    // field represents an amount still paid in advance against the local
+    // shipment total, so setting it to Shopify's total would make the panel
+    // display zero and send a zero-value booking payload.
+    prepaid_amount: 0,
     cod_charges: 0,
     shipping_charges: shippingCharges,
     transaction_fee: 0,
@@ -422,7 +426,13 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
   }
 
   const [existing] = await tx
-    .select({ id: b2c_orders.id, orderStatus: b2c_orders.order_status, awbNumber: b2c_orders.awb_number })
+    .select({
+      id: b2c_orders.id,
+      orderStatus: b2c_orders.order_status,
+      awbNumber: b2c_orders.awb_number,
+      courierPartner: b2c_orders.courier_partner,
+      tags: b2c_orders.tags,
+    })
     .from(b2c_orders)
     .where(eq(b2c_orders.order_id, internalOrderId))
     .limit(1)
@@ -430,7 +440,13 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
   const [legacyExisting] = existing
     ? [undefined]
     : await tx
-        .select({ id: b2c_orders.id, orderStatus: b2c_orders.order_status, awbNumber: b2c_orders.awb_number })
+        .select({
+          id: b2c_orders.id,
+          orderStatus: b2c_orders.order_status,
+          awbNumber: b2c_orders.awb_number,
+          courierPartner: b2c_orders.courier_partner,
+          tags: b2c_orders.tags,
+        })
         .from(b2c_orders)
         .where(eq(b2c_orders.order_id, legacyInternalOrderId))
         .limit(1)
@@ -459,6 +475,28 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
   }
 
   if (existing?.id || legacyExisting?.id) {
+    const existingOrder = existing || legacyExisting
+
+    // Syncing source data must never turn an already-booked shipment back
+    // into a draft or remove its courier. Keep the shipment lifecycle owned
+    // by booking/tracking webhooks.
+    delete updatePayload.order_status
+    delete updatePayload.courier_partner
+    delete updatePayload.pickup_location_id
+    delete updatePayload.pickup_details
+    delete updatePayload.rto_details
+    delete updatePayload.is_rto_different
+
+    // Preserve local status/risk tags and add any tags currently present in
+    // Shopify, without duplicating entries on every sync.
+    const mergedTags = new Set(
+      [String(existingOrder?.tags || ''), String(order?.tags || '')]
+        .flatMap((value) => value.split(','))
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    )
+    updatePayload.tags = Array.from(mergedTags).join(', ').slice(0, 200) || null
+
     await tx
       .update(b2c_orders)
       .set({ ...updatePayload, order_id: internalOrderId })
