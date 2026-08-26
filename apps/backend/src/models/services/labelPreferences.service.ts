@@ -48,10 +48,7 @@ export const DEFAULT_PREFERENCES = {
 
 const enforcePlatformBranding = <T extends Record<string, any>>(prefs: T) => ({
   ...prefs,
-  label_sheet_layout:
-    prefs?.printer_type === 'inkjet' && prefs?.label_sheet_layout === 'a4_4up'
-      ? 'a4_4up'
-      : 'a4_single',
+  label_sheet_layout: prefs?.label_sheet_layout === 'a4_4up' ? 'a4_4up' : 'a4_single',
   brand_logo: null,
   powered_by: PLATFORM_BRAND_NAME,
 })

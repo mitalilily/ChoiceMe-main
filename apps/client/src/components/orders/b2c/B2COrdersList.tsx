@@ -344,10 +344,7 @@ const B2COrdersList = () => {
 
   const orders: B2COrder[] = data?.orders || []
   const selectedOrders: B2COrder[] = orders.filter((order) => selectedOrderIds.includes(order.id))
-  const bulkLabelPdfLayout =
-    labelPreferences?.printer_type === 'inkjet' && labelPreferences?.label_sheet_layout === 'a4_4up'
-      ? 'a4_4up'
-      : 'single'
+  const bulkLabelPdfLayout = labelPreferences?.label_sheet_layout === 'a4_4up' ? 'a4_4up' : 'single'
   const manifestValidationMessage =
     selectedOrders.length === 0
       ? 'Select orders to start a bulk action.'

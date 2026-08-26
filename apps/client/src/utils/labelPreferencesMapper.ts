@@ -23,6 +23,6 @@ export function mapFormToApi(form: LabelSettingsForm): Partial<LabelPreferences>
     char_limit: form.charLimit,
     max_items: form.maxItems,
     printer_type: form.printer,
-    label_sheet_layout: form.printer === 'inkjet' ? form.labelSheetLayout : 'a4_single',
+    label_sheet_layout: form.labelSheetLayout,
   }
 }
