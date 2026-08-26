@@ -49,7 +49,6 @@ import {
   useSyncB2CTracking,
 } from '../../hooks/Orders/useOrders'
 import { usePresignedDownloadMutation } from '../../hooks/Uploads/usePresignedDownloadUrls'
-import { useLabelPreferences } from '../../hooks/useLabelPreferences'
 import { downloadClientOrdersCsv } from '../../utils/orderCsvExport'
 import { FilterBar, type FilterField } from '../FilterBar'
 import { toast } from '../UI/Toast'
@@ -238,7 +237,6 @@ const AllOrders = () => {
     search: undefined,
   })
   const queryClient = useQueryClient()
-  const { preferences: labelPreferences } = useLabelPreferences()
   const { mutateAsync: presignDownloads } = usePresignedDownloadMutation()
   const { mutateAsync: regenerateDocuments, isPending: regeneratingDocuments } =
     useRegenerateOrderDocuments()
@@ -366,7 +364,7 @@ const AllOrders = () => {
   const orders: Order[] = normalizedOrders
   const totalCount = activeQuery.data?.totalCount ?? 0
   const selectedOrders: Order[] = orders.filter((order) => selectedOrderIds.includes(order.id))
-  const bulkLabelPdfLayout = labelPreferences?.label_sheet_layout === 'a4_4up' ? 'a4_4up' : 'single'
+  const bulkLabelPdfLayout = 'a4_4up'
   const manifestValidationMessage =
     selectedOrders.length === 0
       ? 'Select orders to start a bulk action.'
