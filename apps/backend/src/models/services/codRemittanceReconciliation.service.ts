@@ -12,6 +12,7 @@ export type MissingCodRemittanceOrder = {
   orderAmount: number
   codCharges: number
   freightCharges: number
+  shippingCharges: number
   userId: string
   userEmail?: string | null
   buyerName: string
@@ -99,6 +100,7 @@ export async function findMissingDeliveredCodOrders(limit = 250) {
     orderAmount: toNumber(row.orderAmount),
     codCharges: toNumber(row.codCharges),
     freightCharges: toNumber(row.freightCharges ?? row.shippingCharges),
+    shippingCharges: toNumber(row.shippingCharges),
     userId: row.userId,
     userEmail: row.userEmail || null,
     buyerName: row.buyerName,

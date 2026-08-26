@@ -99,9 +99,8 @@ const resolveOrderType = (order: any, settings: any): 'cod' | 'prepaid' => {
 
 const mapShopifyStatus = (order: any): string => {
   if (order?.cancelled_at) return 'cancelled'
-  const fulfillmentStatus = String(order?.fulfillment_status || '').toLowerCase()
-  if (fulfillmentStatus === 'fulfilled') return 'delivered'
-  if (fulfillmentStatus === 'partial') return 'in_transit'
+  // Shopify fulfillment is independent from ChoiceMee courier booking.
+  // A Shopify order must remain a ChoiceMee draft until we assign a courier/AWB.
   return 'pending'
 }
 
@@ -276,16 +275,16 @@ const fetchShopifyOrders = async (store: ShopifyStore, limit = 50, options: Shop
   }
 
   while (nextUrl && orders.length < requestedLimit) {
-    const res = await axios.get(nextUrl, { headers, params, timeout: 30000 })
+    const res: any = await axios.get(nextUrl, { headers, params, timeout: 30000 })
     const pageOrders = Array.isArray(res?.data?.orders) ? res.data.orders : []
     orders.push(...pageOrders)
 
-    const linkHeader = String(res?.headers?.link || '')
-    const nextLink = linkHeader
+    const linkHeader: string = String(res?.headers?.link || '')
+    const nextLink: string | undefined = linkHeader
       .split(',')
       .map((part) => part.trim())
       .find((part) => /rel="next"/i.test(part))
-    const nextMatch = nextLink?.match(/^<([^>]+)>/)
+    const nextMatch: RegExpMatchArray | null = nextLink?.match(/^<([^>]+)>/) || null
     nextUrl = nextMatch?.[1] || null
     params = undefined
 
@@ -315,7 +314,10 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
     0,
   )
   const declaredWeight = totalWeightGrams > 0 ? totalWeightGrams : 500
-  const orderAmount = toNumber(order?.total_price, 0)
+  const totalOrderValue = toNumber(order?.total_price, 0)
+  // Shopify total_price already includes shipping. Keep the panel's canonical
+  // split as item/tax value + customer shipping so the table does not double-count it.
+  const orderAmount = Math.max(0, totalOrderValue - shippingCharges)
   const orderName = String(order?.name || order?.order_number || shopifyOrderId).trim()
 
   const updatePayload: Partial<typeof b2c_orders.$inferInsert> = {
@@ -326,16 +328,17 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
     order_id: internalOrderId,
     invoice_number: order?.name ? String(order.name).slice(0, 100) : null,
     invoice_date: order?.created_at ? String(order.created_at).slice(0, 50) : null,
-    invoice_amount: orderAmount,
+    invoice_amount: totalOrderValue,
     buyer_name: String(
       shippingAddress?.name || order?.customer?.first_name || order?.email || 'Shopify Customer',
     ).slice(0, 255),
     buyer_phone: toPhone(order).slice(0, 20),
     buyer_email: String(order?.email || '').slice(0, 255) || null,
-    address: String(shippingAddress?.address1 || shippingAddress?.address2 || 'Address not provided').slice(
-      0,
-      500,
-    ),
+    address: [shippingAddress?.address1, shippingAddress?.address2]
+      .map((part) => String(part || '').trim())
+      .filter(Boolean)
+      .join(', ')
+      .slice(0, 500) || 'Address not provided',
     city: String(shippingAddress?.city || 'NA').slice(0, 100),
     state: String(shippingAddress?.province || shippingAddress?.province_code || 'NA').slice(0, 100),
     country: String(shippingAddress?.country || 'India').slice(0, 100),
@@ -346,14 +349,14 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
     breadth: 10,
     height: 10,
     order_type: orderType,
-    prepaid_amount: orderType === 'prepaid' ? orderAmount : 0,
+    prepaid_amount: orderType === 'prepaid' ? totalOrderValue : 0,
     cod_charges: 0,
     shipping_charges: shippingCharges,
     transaction_fee: 0,
     gift_wrap: 0,
     discount: 0,
     order_status: mappedStatus,
-    courier_partner: 'Shopify',
+    courier_partner: null,
     integration_type: 'shopify',
     is_external_api: false,
     tags: String(order?.tags || '').slice(0, 200) || `shopify_store:${store.id}`,
