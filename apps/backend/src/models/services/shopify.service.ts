@@ -365,6 +365,8 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
   // split as item/tax value + customer shipping so the table does not double-count it.
   const orderAmount = Math.max(0, totalOrderValue - shippingCharges)
   const orderName = String(order?.name || order?.order_number || shopifyOrderId).trim()
+  const shopifyCreatedAt = new Date(String(order?.created_at || ''))
+  const createdAt = Number.isNaN(shopifyCreatedAt.getTime()) ? new Date() : shopifyCreatedAt
   const defaultPickup = await getDefaultPickupAddress(store.userId, tx)
 
   const updatePayload: Partial<typeof b2c_orders.$inferInsert> = {
@@ -461,7 +463,7 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
 
   await tx.insert(b2c_orders).values({
     ...updatePayload,
-    created_at: new Date(),
+    created_at: createdAt,
   } as any)
   return 'created' as const
 }
