@@ -80,6 +80,7 @@ import { XpressbeesService } from './couriers/xpressbees.service'
 import { calculateOrderWeights } from './courierWeightCalculation.service'
 import { generateLabelForOrder } from './generateCustomLabelService'
 import { sendShipmentStatusEmailIfChanged } from './shipmentNotification.service'
+import { syncShopifyStatusForLocalOrder } from './shopify.service'
 import {
   computeB2CCodCharge,
   computeB2CRateCardCharge,
@@ -5619,6 +5620,16 @@ export const createB2CShipmentService = async (
       console.log(
         `✅ Local order ${newOrder.id} created via ${params.integration_type} (AWB: ${shipmentMeta.awb_number})`,
       )
+
+      // Shopify orders receive their fulfillment and AWB as soon as booking succeeds.
+      await syncShopifyStatusForLocalOrder({
+        ...result.order,
+        order_status: 'booked',
+        awb_number: shipmentMeta.awb_number,
+        courier_partner: shipmentMeta.courier_name,
+      }).catch((shopifyError) => {
+        console.warn('[Booking] Shopify fulfillment sync failed:', shopifyError)
+      })
 
       // 🔔 Send webhook event for order creation (async, don't wait)
       const webhookStatus = 'booked'
