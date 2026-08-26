@@ -43,7 +43,7 @@ export const downloadDocumentThroughProxy = async (
 };
 
 export const mergePdfDocumentsThroughProxy = async (
-  entries: Array<{ url?: string | null; fileName?: string | null }>,
+  entries: Array<{ key?: string | null; url?: string | null; fileName?: string | null }>,
   options?: {
     fileName?: string;
     disposition?: 'inline' | 'attachment';

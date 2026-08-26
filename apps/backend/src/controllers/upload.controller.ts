@@ -48,6 +48,7 @@ const inferContentType = (fileName: string) => {
 }
 
 type BulkMergeEntry = {
+  key?: string
   url?: string
   fileName?: string
 }
@@ -252,14 +253,20 @@ export const mergePdfDocuments = async (req: Request, res: Response): Promise<an
     let skippedCount = 0
 
     for (const entry of entries) {
+      const storageKey = typeof entry?.key === 'string' ? entry.key.trim() : ''
       const source = typeof entry?.url === 'string' ? entry.url.trim() : ''
-      if (!source) {
+      if (!storageKey && !source) {
         skippedCount += 1
         continue
       }
 
       try {
-        const upstream = await axios.get(source, {
+        const resolvedSource = storageKey ? await presignDownload(storageKey) : source
+        if (!resolvedSource || typeof resolvedSource !== 'string') {
+          throw new Error('Label file could not be resolved from storage')
+        }
+
+        const upstream = await axios.get(resolvedSource, {
           responseType: 'arraybuffer',
           timeout: 60000,
           validateStatus: (status) => status >= 200 && status < 300,
@@ -290,9 +297,20 @@ export const mergePdfDocuments = async (req: Request, res: Response): Promise<an
         }
 
         downloadedCount += 1
-      } catch (error) {
+      } catch (error: any) {
         skippedCount += 1
+        console.warn('[Bulk PDF merge] Skipping entry', {
+          key: storageKey || null,
+          source: source || null,
+          fileName: entry?.fileName || null,
+          message: error?.message || String(error),
+          status: error?.response?.status || null,
+        })
       }
+    }
+
+    if (!downloadedCount) {
+      return res.status(422).json({ message: 'No readable PDF documents were found' })
     }
 
     const mergedBytes = await mergedPdf.save()

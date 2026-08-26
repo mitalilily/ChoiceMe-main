@@ -178,7 +178,7 @@ export const downloadMergedPdf = async (
 
   try {
     const mergeResponse = await mergePdfDocumentsThroughProxy(
-      entries.map((entry) => ({ url: entry.url, fileName: entry.fileName })),
+      entries.map((entry) => ({ key: entry.key, url: entry.url, fileName: entry.fileName })),
       {
         fileName,
         layout,
