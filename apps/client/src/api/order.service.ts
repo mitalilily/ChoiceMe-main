@@ -233,6 +233,7 @@ export interface FetchOrdersListParams {
   page?: number
   limit?: number
   status?: string | string[]
+  draftOnly?: boolean
   type?: string
   courier?: string
   warehouse?: string

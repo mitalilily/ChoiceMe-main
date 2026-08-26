@@ -6096,6 +6096,7 @@ export const getAllB2BOrdersService = async () => {
 
 interface OrderFilters {
   status?: string | string[] // support single or multiple statuses
+  draftOnly?: boolean
   type?: string
   courier?: string
   warehouse?: string
@@ -6127,6 +6128,18 @@ export const getB2COrdersByUserService = async (
   }
 
   // 🔹 Type filter (COD / Prepaid)
+  if (filters.draftOnly) {
+    conditions.push(
+      sql`(
+        ${b2c_orders.order_status} = 'pending'
+        AND NULLIF(TRIM(COALESCE(${b2c_orders.awb_number}, '')), '') IS NULL
+        AND NULLIF(TRIM(COALESCE(${b2c_orders.shipment_id}, '')), '') IS NULL
+        AND NULLIF(TRIM(COALESCE(${b2c_orders.courier_partner}, '')), '') IS NULL
+        AND ${b2c_orders.courier_id} IS NULL
+      )`,
+    )
+  }
+
   if (filters.type) {
     conditions.push(eq(b2c_orders.order_type, filters.type))
   }
@@ -9477,6 +9490,7 @@ const toIsoString = (value: unknown, fallback?: string): string => {
       return date.toISOString()
     }
   }
+
   if (fallback) return fallback
   return new Date().toISOString()
 }

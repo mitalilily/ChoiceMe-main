@@ -97,6 +97,7 @@ import { getB2COrderFormDefaults } from './orderFormDefaults'
 /* ───────────── Types ───────────── */
 interface OrderFilters {
   status?: string | string[]
+  draftOnly?: boolean
   sortBy?: 'created_at'
   sortOrder?: 'asc' | 'desc'
   type?: string
@@ -303,6 +304,7 @@ const B2COrdersList = () => {
   const effectiveFilters: OrderFilters = {
     ...filters,
     status: selectedStatusFilter ? [...selectedStatusFilter] : undefined,
+    draftOnly: selectedTab === 'new',
     sortBy: filters.sortBy || 'created_at',
     sortOrder: filters.sortOrder || 'desc',
   }

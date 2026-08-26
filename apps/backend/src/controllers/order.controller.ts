@@ -667,6 +667,7 @@ export const getB2COrdersController = async (req: Request, res: Response) => {
     // Filters from query
     const filters = {
       status: normalizedStatus || undefined,
+      draftOnly: String(req.query.draftOnly || '').toLowerCase() === 'true',
       type: req.query.type as string | undefined,
       courier: req.query.courier as string | undefined,
       warehouse: req.query.warehouse as string | undefined,

@@ -157,6 +157,7 @@ export const useBookB2CCourier = (onClose?: () => void) => {
 // useOrders.ts
 interface Filters {
   status?: string | string[]
+  draftOnly?: boolean
   sortBy?: 'created_at'
   sortOrder?: 'asc' | 'desc'
   fromDate?: string
