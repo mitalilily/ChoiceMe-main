@@ -62,6 +62,10 @@ export const syncShopifyOrders = async (payload?: { limit?: number; storeId?: st
   const response = await axiosInstance.post('/integrations/shopify/sync-orders', {
     limit: payload?.limit ?? 50,
     storeId: payload?.storeId,
+  }, {
+    // Shopify pagination and per-order reconciliation can exceed the normal
+    // request timeout. Keep the sync request alive until the latest orders are saved.
+    timeout: 120000,
   })
   return response.data
 }
