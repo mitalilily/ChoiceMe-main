@@ -10,14 +10,23 @@ const userId = getArg('user-id')
 const storeId = getArg('store-id')
 const days = Math.max(Number(getArg('days', '20')) || 20, 1)
 
-if (!userId || !storeId) {
-  throw new Error('Usage: tsx src/scripts/syncShopifyHistoricUnbooked.ts --user-id=<id> --store-id=<id> [--days=20]')
+const main = async () => {
+  if (!userId || !storeId) {
+    throw new Error(
+      'Usage: syncShopifyHistoricUnbooked --user-id=<id> --store-id=<id> [--days=20]',
+    )
+  }
+
+  const createdAtMin = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const result = await syncShopifyOrdersForUser(userId, 5000, storeId, undefined, {
+    createdAtMin,
+    onlyUnbooked: true,
+  })
+
+  console.log(JSON.stringify({ userId, storeId, days, createdAtMin, ...result }, null, 2))
 }
 
-const createdAtMin = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-const result = await syncShopifyOrdersForUser(userId, 5000, storeId, undefined, {
-  createdAtMin,
-  onlyUnbooked: true,
+main().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
 })
-
-console.log(JSON.stringify({ userId, storeId, days, createdAtMin, ...result }, null, 2))
