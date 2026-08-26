@@ -63,6 +63,8 @@ export async function createCodRemittance(params: {
   codAmount: number
   codCharges: number
   freightCharges: number
+  /** Shipping charged to the customer and collected as part of COD. */
+  shippingCharges?: number
   collectedAt?: Date
 }): Promise<{ remittance: any; created: boolean }> {
   const {
@@ -75,15 +77,16 @@ export async function createCodRemittance(params: {
     codAmount,
     codCharges,
     freightCharges,
+    shippingCharges = 0,
     collectedAt,
   } = params
 
-  // COD remittance should default to full COD payable.
-  // Sellers already recharge wallet separately, so we do not auto-deduct platform charges here.
-  const normalizedFreightCharges = 0
+  // COD collection includes the item amount plus any shipping charge paid by the customer.
+  // Platform freight and COD fees are settled through the seller wallet and are not deducted here.
+  const normalizedShippingCharges = Number.isFinite(Number(shippingCharges)) ? Number(shippingCharges) : 0
   const normalizedCodCharges = 0
   const deductions = 0
-  const remittableAmount = Number(codAmount)
+  const remittableAmount = Number(codAmount) + normalizedShippingCharges
 
   // Idempotency guard: delivered webhooks and reconciliation jobs can be retried.
   const duplicateChecks = [and(eq(codRemittances.orderId, orderId), eq(codRemittances.orderType, orderType))]
@@ -117,7 +120,7 @@ export async function createCodRemittance(params: {
       codAmount: codAmount.toString(),
       codCharges: normalizedCodCharges.toString(),
       // Legacy column name retained for compatibility; defaulted to zero for COD remittance flow.
-      shippingCharges: normalizedFreightCharges.toString(),
+      shippingCharges: normalizedShippingCharges.toString(),
       deductions: deductions.toString(),
       remittableAmount: remittableAmount.toString(),
       status: 'pending', // ✅ PENDING - waiting for courier settlement

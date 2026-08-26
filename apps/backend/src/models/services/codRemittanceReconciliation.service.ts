@@ -130,6 +130,7 @@ export async function reconcileMissingCodRemittances(limit = 250): Promise<CodRe
         codAmount: order.orderAmount,
         codCharges: order.codCharges,
         freightCharges: order.freightCharges,
+        shippingCharges: toNumber(order.shippingCharges),
         collectedAt: order.collectedAt || undefined,
       })
 

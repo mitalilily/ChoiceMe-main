@@ -1169,6 +1169,7 @@ export async function processDelhiveryWebhook(payload: any, tx = db) {
           codAmount: Number(order.order_amount || 0),
           codCharges: Number(order.cod_charges || 0),
           freightCharges: Number(order.freight_charges ?? order.shipping_charges ?? 0),
+          shippingCharges: Number(order.shipping_charges || 0),
           collectedAt: new Date(),
         })
 
@@ -1662,6 +1663,7 @@ export async function processEkartWebhook(payload: any, tx = db) {
         codAmount: Number(order.order_amount ?? 0),
         codCharges: Number(order.cod_charges ?? 0),
         freightCharges: Number(order.freight_charges ?? order.shipping_charges ?? 0),
+        shippingCharges: Number(order.shipping_charges || 0),
         collectedAt: new Date(),
       })
 
@@ -1913,6 +1915,7 @@ export async function processXpressbeesWebhook(payload: any, tx = db) {
         codAmount: Number(order.order_amount ?? 0),
         codCharges: Number(order.cod_charges ?? 0),
         freightCharges: Number(order.freight_charges ?? order.shipping_charges ?? 0),
+        shippingCharges: Number(order.shipping_charges || 0),
         collectedAt: new Date(),
       })
 
