@@ -357,10 +357,13 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
     ? order.shipping_lines.reduce((sum: number, s: any) => sum + toNumber(s?.price, 0), 0)
     : 0
   const products = mapProducts(order)
-  const totalWeightGrams = (Array.isArray(order?.line_items) ? order.line_items : []).reduce(
+  const lineItemWeightGrams = (Array.isArray(order?.line_items) ? order.line_items : []).reduce(
     (sum: number, item: any) => sum + toNumber(item?.grams, 0) * Math.max(1, toNumber(item?.quantity, 1)),
     0,
   )
+  // Shopify exposes both order-level and line-item weights in grams. Prefer
+  // total_weight so edits to the product/order unit are reflected on resync.
+  const totalWeightGrams = toNumber(order?.total_weight, 0) || lineItemWeightGrams
   const declaredWeight = totalWeightGrams > 0 ? totalWeightGrams : 500
   const totalOrderValue = toNumber(order?.total_price, 0)
   // Shopify total_price already includes shipping. Keep the panel's canonical
