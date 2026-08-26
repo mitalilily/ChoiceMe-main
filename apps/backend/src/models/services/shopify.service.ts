@@ -181,7 +181,8 @@ const toPhone = (order: any): string => {
     order?.customer?.phone ||
     ''
   const clean = String(phone).replace(/[^\d+]/g, '').trim()
-  return clean || '0000000000'
+  const normalized = clean.replace(/^\+91/, '')
+  return normalized || '0000000000'
 }
 
 const getStoreForUser = async (userId: string, storeId?: string, tx: any = db) => {
