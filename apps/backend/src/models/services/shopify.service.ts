@@ -316,7 +316,9 @@ const fetchShopifyOrders = async (store: ShopifyStore, limit = 50, options: Shop
   let params: Record<string, unknown> | undefined = {
     status: 'any',
     limit: Math.min(requestedLimit, 250),
-    order: 'created_at asc',
+    // Manual syncs should start with the newest Shopify orders so the panel
+    // receives the latest order numbers within the requested limit.
+    order: 'created_at desc',
     ...(options.createdAtMin ? { created_at_min: options.createdAtMin.toISOString() } : {}),
   }
 
@@ -461,11 +463,30 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
     return 'updated' as const
   }
 
-  await tx.insert(b2c_orders).values({
-    ...updatePayload,
-    created_at: createdAt,
-  } as any)
-  return 'created' as const
+  try {
+    await tx.insert(b2c_orders).values({
+      ...updatePayload,
+      created_at: createdAt,
+    } as any)
+    return 'created' as const
+  } catch (error: any) {
+    // A manual sync can overlap the background sync (or a rapid repeat click).
+    // If the other request inserted this Shopify order first, treat the
+    // conflict as an update instead of failing the whole sync request.
+    if (error?.code !== '23505' || error?.constraint !== 'b2c_orders_order_id_unique') {
+      throw error
+    }
+
+    const [conflictingOrder] = await tx
+      .select({ id: b2c_orders.id })
+      .from(b2c_orders)
+      .where(eq(b2c_orders.order_id, internalOrderId))
+      .limit(1)
+
+    if (!conflictingOrder?.id) throw error
+
+    return 'updated' as const
+  }
 }
 
 export const syncShopifyOrdersForUser = async (
