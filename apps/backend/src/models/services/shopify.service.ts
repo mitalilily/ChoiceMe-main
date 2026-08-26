@@ -1,8 +1,9 @@
 import axios from 'axios'
 import * as crypto from 'crypto'
-import { and, eq } from 'drizzle-orm'
+import { and, asc, desc, eq } from 'drizzle-orm'
 import { db } from '../client'
 import { b2c_orders } from '../schema/b2cOrders'
+import { addresses, pickupAddresses } from '../schema/pickupAddresses'
 import { stores } from '../schema/stores'
 
 const SHOPIFY_PLATFORM_ID = 1
@@ -204,6 +205,50 @@ const getStoresForUser = async (userId: string, tx: any = db) => {
   return rows as ShopifyStore[]
 }
 
+const getDefaultPickupAddress = async (userId: string, tx: any = db) => {
+  const [row] = await tx
+    .select({
+      pickupId: pickupAddresses.id,
+      addressNickname: addresses.addressNickname,
+      addressLine1: addresses.addressLine1,
+      addressLine2: addresses.addressLine2,
+      city: addresses.city,
+      state: addresses.state,
+      country: addresses.country,
+      pincode: addresses.pincode,
+      contactName: addresses.contactName,
+      contactPhone: addresses.contactPhone,
+      gstNumber: addresses.gstNumber,
+    })
+    .from(pickupAddresses)
+    .innerJoin(addresses, eq(pickupAddresses.addressId, addresses.id))
+    .where(
+      and(
+        eq(pickupAddresses.userId, userId),
+        eq(addresses.userId, userId),
+        eq(pickupAddresses.isPickupEnabled, true),
+      ),
+    )
+    .orderBy(desc(pickupAddresses.isPrimary), asc(addresses.createdAt))
+    .limit(1)
+
+  if (!row) return null
+
+  const pickupDetails = {
+    warehouse_name: row.addressNickname || row.contactName || 'Warehouse',
+    name: row.contactName || row.addressNickname || 'Warehouse',
+    phone: row.contactPhone || '',
+    address: [row.addressLine1, row.addressLine2].filter(Boolean).join(', '),
+    city: row.city,
+    state: row.state,
+    country: row.country || 'India',
+    pincode: row.pincode,
+    gst_number: row.gstNumber || '',
+  }
+
+  return { pickupId: row.pickupId, pickupDetails }
+}
+
 const getShopifyAccessToken = async (store: ShopifyStore, tx: any = db): Promise<string> => {
   const metadata = ((store as any)?.metadata || {}) as Record<string, unknown>
   const clientId = String(metadata.shopifyClientId || store.apiKey || '').trim()
@@ -319,6 +364,7 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
   // split as item/tax value + customer shipping so the table does not double-count it.
   const orderAmount = Math.max(0, totalOrderValue - shippingCharges)
   const orderName = String(order?.name || order?.order_number || shopifyOrderId).trim()
+  const defaultPickup = await getDefaultPickupAddress(store.userId, tx)
 
   const updatePayload: Partial<typeof b2c_orders.$inferInsert> = {
     user_id: store.userId,
@@ -360,6 +406,10 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
     integration_type: 'shopify',
     is_external_api: false,
     tags: String(order?.tags || '').slice(0, 200) || `shopify_store:${store.id}`,
+    pickup_location_id: defaultPickup?.pickupId || null,
+    pickup_details: defaultPickup?.pickupDetails || null,
+    rto_details: defaultPickup?.pickupDetails || null,
+    is_rto_different: false,
     updated_at: new Date(),
   }
 
