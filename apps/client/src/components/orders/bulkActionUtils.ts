@@ -1,6 +1,9 @@
 import { saveAs } from 'file-saver'
 import { PDFDocument } from 'pdf-lib'
-import { downloadDocumentThroughProxy } from '../../api/upload.api'
+import {
+  downloadDocumentThroughProxy,
+  mergePdfDocumentsThroughProxy,
+} from '../../api/upload.api'
 
 export type DocumentType = 'label' | 'invoice' | 'manifest'
 
@@ -171,10 +174,28 @@ export const downloadMergedPdf = async (
   fileName: string,
   options?: { layout?: MergedPdfLayout },
 ) => {
+  const layout = options?.layout ?? 'single'
+
+  try {
+    const mergeResponse = await mergePdfDocumentsThroughProxy(
+      entries.map((entry) => ({ url: entry.url, fileName: entry.fileName })),
+      {
+        fileName,
+        layout,
+      },
+    )
+    saveAs(mergeResponse.blob, fileName)
+    return {
+      downloadedCount: mergeResponse.downloadedCount,
+      skippedCount: mergeResponse.skippedCount,
+    }
+  } catch (error) {
+    console.warn('Falling back to local PDF merge for bulk download:', error)
+  }
+
   const mergedPdf = await PDFDocument.create()
   let downloadedCount = 0
   let skippedCount = 0
-  const layout = options?.layout ?? 'single'
   let currentA4Page: ReturnType<PDFDocument['addPage']> | null = null
   let currentA4Cell = 0
 

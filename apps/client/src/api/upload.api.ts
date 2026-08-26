@@ -42,6 +42,35 @@ export const downloadDocumentThroughProxy = async (
   return response.data as Blob
 };
 
+export const mergePdfDocumentsThroughProxy = async (
+  entries: Array<{ url?: string | null; fileName?: string | null }>,
+  options?: {
+    fileName?: string;
+    disposition?: 'inline' | 'attachment';
+    layout?: 'single' | 'a4_4up';
+  },
+) => {
+  const response = await axiosInstance.post(
+    '/uploads/merge-pdfs',
+    {
+      entries,
+      fileName: options?.fileName,
+      disposition: options?.disposition || 'attachment',
+      layout: options?.layout || 'single',
+    },
+    {
+      responseType: 'blob',
+      timeout: 120000,
+    },
+  )
+
+  return {
+    blob: response.data as Blob,
+    downloadedCount: Number(response.headers?.['x-downloaded-count'] ?? entries.length),
+    skippedCount: Number(response.headers?.['x-skipped-count'] ?? 0),
+  }
+};
+
 export const uploadFileToStorage = async ({
   file,
   folderKey,
