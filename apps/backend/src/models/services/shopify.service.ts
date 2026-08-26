@@ -374,6 +374,18 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
         .where(eq(b2c_orders.order_id, legacyInternalOrderId))
         .limit(1)
 
+  if (!existing?.id && !legacyExisting?.id) {
+    const [orderNumberCollision] = await tx
+      .select({ id: b2c_orders.id, integrationType: b2c_orders.integration_type })
+      .from(b2c_orders)
+      .where(and(eq(b2c_orders.user_id, store.userId), eq(b2c_orders.order_number, orderName)))
+      .limit(1)
+
+    if (orderNumberCollision && String(orderNumberCollision.integrationType || '').toLowerCase() !== 'shopify') {
+      updatePayload.order_number = `SH-${shopifyOrderId}`.slice(0, 50)
+    }
+  }
+
   if (settings?.onlyUnbookedSync && (existing?.awbNumber || legacyExisting?.awbNumber)) {
     return 'skipped' as const
   }
