@@ -6236,10 +6236,21 @@ export const getB2COrdersByUserService = async (
   // Fetch paginated results
   const sortBy = filters.sortBy || 'created_at'
   const sortOrder = filters.sortOrder === 'asc' ? 'asc' : 'desc'
+  const chronologicalOrder = sql`
+    COALESCE(
+      CASE
+        WHEN ${b2c_orders.integration_type} = 'shopify'
+          AND NULLIF(TRIM(${b2c_orders.order_date}), '') IS NOT NULL
+        THEN NULLIF(TRIM(${b2c_orders.order_date}), '')::timestamptz
+        ELSE NULL
+      END,
+      ${b2c_orders.created_at}
+    )
+  `
   const orderByClause =
     sortBy === 'created_at' && sortOrder === 'asc'
-      ? asc(b2c_orders.created_at)
-      : desc(b2c_orders.created_at)
+      ? asc(chronologicalOrder)
+      : desc(chronologicalOrder)
 
   const ordersRaw = await db
     .select({
