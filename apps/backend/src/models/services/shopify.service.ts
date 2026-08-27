@@ -672,7 +672,8 @@ export const syncShopifyStatusForLocalOrder = async (order: any, tx: any = db) =
   const orderStatus = String(order?.order_status || '').toLowerCase()
 
   try {
-    if (shouldAttemptFulfillment(orderStatus, settings?.fulfillTrigger)) {
+    try {
+      if (shouldAttemptFulfillment(orderStatus, settings?.fulfillTrigger)) {
       const [shopifyOrderRes, fulfillmentOrdersRes] = await Promise.all([
         axios.get(`${base}/orders/${shopifyOrderId}.json`, {
           headers,
@@ -760,6 +761,15 @@ export const syncShopifyStatusForLocalOrder = async (order: any, tx: any = db) =
           })
         }
       }
+      }
+    } catch (fulfillmentError: any) {
+      // A fulfillment failure must not prevent the status/tag update below.
+      // The next tracking event will retry the fulfillment automatically.
+      console.warn('[Shopify] Fulfillment sync failed; continuing status sync', {
+        order_number: order?.order_number,
+        awb_number: order?.awb_number,
+        message: fulfillmentError?.response?.data || fulfillmentError?.message || String(fulfillmentError),
+      })
     }
 
     if (settings?.autoUpdateShipmentStatus) {
@@ -770,6 +780,8 @@ export const syncShopifyStatusForLocalOrder = async (order: any, tx: any = db) =
         .filter(Boolean)
         .filter((t) => !/^mcw_status:/i.test(t))
       cleanTags.push(`mcw_status:${orderStatus}`)
+      const trackingNumber = String(order?.awb_number || '').trim()
+      if (trackingNumber) cleanTags.push(`mcw_awb:${trackingNumber}`)
       await axios.put(
         `${base}/orders/${shopifyOrderId}.json`,
         {
