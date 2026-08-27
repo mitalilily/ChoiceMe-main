@@ -10085,6 +10085,16 @@ const persistB2CTrackingStatus = async (
 
   await db.update(b2c_orders).set(updateData).where(eq(b2c_orders.id, order.id))
 
+  // Tracking polling/webhooks update the local shipment first. Mirror the
+  // same status and tracking data to Shopify after every real status change.
+  await syncShopifyStatusForLocalOrder({ ...order, ...updateData }, db).catch((err) => {
+    console.warn('[Tracking] Shopify fulfillment/status sync failed', {
+      order_number: order.order_number,
+      awb_number: order.awb_number,
+      message: err?.response?.data || err?.message || String(err),
+    })
+  })
+
   const synced = {
     order_status: updateData.order_status ?? order.order_status,
     edd: updateData.edd ?? order.edd,

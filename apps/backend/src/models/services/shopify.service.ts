@@ -676,7 +676,7 @@ export const syncShopifyStatusForLocalOrder = async (order: any, tx: any = db) =
       const [shopifyOrderRes, fulfillmentOrdersRes] = await Promise.all([
         axios.get(`${base}/orders/${shopifyOrderId}.json`, {
           headers,
-          params: { fields: 'id,fulfillment_status' },
+          params: { fields: 'id,fulfillment_status,source_name,line_items' },
           timeout: 20000,
         }),
         axios.get(`${base}/orders/${shopifyOrderId}/fulfillment_orders.json`, {
@@ -697,9 +697,9 @@ export const syncShopifyStatusForLocalOrder = async (order: any, tx: any = db) =
         const reqStatus = String(fo?.request_status || '').toLowerCase()
         return foStatus === 'open' && (!reqStatus || reqStatus === 'unsubmitted' || reqStatus === 'submitted')
       })
+      const trackingNumber = String(order?.awb_number || '').trim()
 
       if (!isAlreadyFulfilled && openFulfillmentOrders.length) {
-        const trackingNumber = String(order?.awb_number || '').trim()
         const fulfillmentPayload: any = {
           fulfillment: {
             line_items_by_fulfillment_order: openFulfillmentOrders.map((fo: any) => ({
@@ -717,6 +717,48 @@ export const syncShopifyStatusForLocalOrder = async (order: any, tx: any = db) =
         }
 
         await axios.post(`${base}/fulfillments.json`, fulfillmentPayload, { headers, timeout: 20000 })
+      } else if (!isAlreadyFulfilled && !openFulfillmentOrders.length) {
+        // Orders created from Shopify Draft Orders use manual fulfillment and
+        // may not expose fulfillment_orders. Use Shopify's legacy manual
+        // fulfillment shape for those orders so the AWB still reaches the
+        // store and Shopify marks the order fulfilled.
+        const lineItems = Array.isArray(shopifyOrder?.line_items)
+          ? shopifyOrder.line_items
+              .filter((item: any) => toNumber(item?.fulfillable_quantity, 0) > 0)
+              .map((item: any) => ({
+                id: item.id,
+                quantity: toNumber(item.fulfillable_quantity, item.quantity || 1),
+              }))
+          : []
+
+        if (lineItems.length) {
+          const locationsRes = await axios.get(`${base}/locations.json`, {
+            headers,
+            params: { status: 'active' },
+            timeout: 20000,
+          })
+          const locationId = locationsRes?.data?.locations?.[0]?.id
+          if (!locationId) throw new Error('Shopify has no active location for manual fulfillment')
+
+          const manualFulfillment: any = {
+            fulfillment: {
+              location_id: locationId,
+              line_items: lineItems,
+              notify_customer: shouldNotifyCustomerOnFulfill(settings),
+            },
+          }
+          if (trackingNumber) {
+            manualFulfillment.fulfillment.tracking_number = trackingNumber
+            manualFulfillment.fulfillment.tracking_company = String(
+              order?.courier_partner || 'ChoiceMee',
+            ).slice(0, 255)
+          }
+
+          await axios.post(`${base}/orders/${shopifyOrderId}/fulfillments.json`, manualFulfillment, {
+            headers,
+            timeout: 20000,
+          })
+        }
       }
     }
 
