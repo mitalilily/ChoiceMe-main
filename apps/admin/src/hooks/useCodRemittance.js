@@ -18,7 +18,9 @@ export const useCodPlatformStats = () => {
   return useQuery({
     queryKey: ['codPlatformStats'],
     queryFn: getCodPlatformStats,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -29,7 +31,9 @@ export const useAllCodRemittances = (params) => {
   return useQuery({
     queryKey: ['allCodRemittances', params],
     queryFn: () => getAllCodRemittances(params),
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -40,7 +44,9 @@ export const usePendingCodUserTotals = (params) => {
   return useQuery({
     queryKey: ['pendingCodUserTotals', params],
     queryFn: () => getPendingCodUserTotals(params),
-    staleTime: 1000 * 60 * 2,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -52,7 +58,9 @@ export const useUserCodRemittances = (userId, params = {}) => {
     queryKey: ['userCodRemittances', userId, params],
     queryFn: () => getUserCodRemittances(userId, params),
     enabled: !!userId,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 }
 
