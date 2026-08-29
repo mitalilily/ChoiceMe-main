@@ -6,7 +6,10 @@ import { codRemittances } from '../../models/schema/codRemittance'
 import { userProfiles } from '../../models/schema/userProfile'
 import { users } from '../../models/schema/users'
 import { wallets } from '../../models/schema/wallet'
-import { markCodRemittanceSettledOffline } from '../../models/services/codRemittance.service'
+import {
+  bookedCodRemittanceCondition,
+  markCodRemittanceSettledOffline,
+} from '../../models/services/codRemittance.service'
 
 const parseSettlementDate = (value: unknown) => {
   const raw = String(value || '').trim()
@@ -42,7 +45,7 @@ export const getAllCodRemittances = async (req: any, res: Response): Promise<any
     const normalizedSearch = String(search || '').trim()
 
     const offset = (parseInt(page as string) - 1) * parseInt(limit as string)
-    const conditions = []
+    const conditions = [bookedCodRemittanceCondition()]
 
     if (status) {
       conditions.push(eq(codRemittances.status, status as any))
@@ -135,7 +138,7 @@ export const getCodPlatformStats = async (req: any, res: Response): Promise<any>
         totalAmount: sql<number>`COALESCE(SUM(${codRemittances.remittableAmount}), 0)`,
       })
       .from(codRemittances)
-      .where(eq(codRemittances.status, 'credited'))
+      .where(and(bookedCodRemittanceCondition(), eq(codRemittances.status, 'credited')))
 
     // Total pending remittances
     const [pendingStats] = await db
@@ -144,13 +147,13 @@ export const getCodPlatformStats = async (req: any, res: Response): Promise<any>
         totalAmount: sql<number>`COALESCE(SUM(${codRemittances.remittableAmount}), 0)`,
       })
       .from(codRemittances)
-      .where(eq(codRemittances.status, 'pending'))
+      .where(and(bookedCodRemittanceCondition(), eq(codRemittances.status, 'pending')))
 
     // Unique users with pending remittances
     const [usersWithPending] = await db
       .select({ count: sql<number>`COUNT(DISTINCT ${codRemittances.userId})` })
       .from(codRemittances)
-      .where(eq(codRemittances.status, 'pending'))
+      .where(and(bookedCodRemittanceCondition(), eq(codRemittances.status, 'pending')))
 
     // Today's credited remittances
     const today = new Date()
@@ -162,7 +165,13 @@ export const getCodPlatformStats = async (req: any, res: Response): Promise<any>
         totalAmount: sql<number>`COALESCE(SUM(${codRemittances.remittableAmount}), 0)`,
       })
       .from(codRemittances)
-      .where(and(eq(codRemittances.status, 'credited'), gte(codRemittances.creditedAt, today)))
+      .where(
+        and(
+          bookedCodRemittanceCondition(),
+          eq(codRemittances.status, 'credited'),
+          gte(codRemittances.creditedAt, today),
+        ),
+      )
 
     return res.json({
       success: true,
@@ -203,7 +212,7 @@ export const getPendingCodRemittanceUserTotals = async (
     const parsedLimit = Math.max(parseInt(limit as string, 10) || 20, 1)
     const offset = (parsedPage - 1) * parsedLimit
 
-    const conditions = [eq(codRemittances.status, 'pending')]
+    const conditions = [eq(codRemittances.status, 'pending'), bookedCodRemittanceCondition()]
 
     if (fromDate) {
       conditions.push(gte(codRemittances.collectedAt, new Date(fromDate as string)))
@@ -302,7 +311,7 @@ export const getUserCodRemittances = async (req: any, res: Response): Promise<an
     const parsedLimit = Math.max(parseInt(limit as string, 10) || 100, 1)
     const offset = (parsedPage - 1) * parsedLimit
 
-    const conditions = [eq(codRemittances.userId, userId)]
+    const conditions = [eq(codRemittances.userId, userId), bookedCodRemittanceCondition()]
 
     if (status) {
       conditions.push(eq(codRemittances.status, status as any))
@@ -339,7 +348,13 @@ export const getUserCodRemittances = async (req: any, res: Response): Promise<an
         totalAmount: sql<number>`COALESCE(SUM(${codRemittances.remittableAmount}), 0)`,
       })
       .from(codRemittances)
-      .where(and(eq(codRemittances.userId, userId), eq(codRemittances.status, 'credited')))
+      .where(
+        and(
+          eq(codRemittances.userId, userId),
+          bookedCodRemittanceCondition(),
+          eq(codRemittances.status, 'credited'),
+        ),
+      )
 
     const [pendingStats] = await db
       .select({
@@ -347,7 +362,13 @@ export const getUserCodRemittances = async (req: any, res: Response): Promise<an
         totalAmount: sql<number>`COALESCE(SUM(${codRemittances.remittableAmount}), 0)`,
       })
       .from(codRemittances)
-      .where(and(eq(codRemittances.userId, userId), eq(codRemittances.status, 'pending')))
+      .where(
+        and(
+          eq(codRemittances.userId, userId),
+          bookedCodRemittanceCondition(),
+          eq(codRemittances.status, 'pending'),
+        ),
+      )
 
     // Get wallet balance
     const [wallet] = await db.select().from(wallets).where(eq(wallets.userId, userId))
@@ -471,7 +492,7 @@ export const exportAllCodRemittances = async (req: any, res: Response): Promise<
     const { status, fromDate, toDate, search } = req.query
     const normalizedSearch = String(search || '').trim()
 
-    const conditions = []
+    const conditions = [bookedCodRemittanceCondition()]
 
     if (status) {
       conditions.push(eq(codRemittances.status, status as any))

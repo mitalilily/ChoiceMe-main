@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import { db } from '../client'
 import { b2c_orders } from '../schema/b2cOrders'
 import { codRemittances } from '../schema/codRemittance'
@@ -87,6 +87,8 @@ export async function findMissingDeliveredCodOrders(limit = 250) {
       and(
         eq(b2c_orders.order_type, 'cod'),
         eq(b2c_orders.order_status, 'delivered'),
+        isNotNull(b2c_orders.awb_number),
+        sql`NULLIF(TRIM(${b2c_orders.awb_number}), '') IS NOT NULL`,
         isNull(codRemittances.id),
       ),
     )

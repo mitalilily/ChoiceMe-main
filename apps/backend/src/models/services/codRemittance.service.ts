@@ -1,6 +1,8 @@
-import { and, desc, eq, gte, lte, or, sql } from 'drizzle-orm'
+import { and, desc, eq, exists, gte, isNotNull, lte, or, sql } from 'drizzle-orm'
 import { db } from '../client'
 import { codRemittances } from '../schema/codRemittance'
+import { b2b_orders } from '../schema/b2bOrders'
+import { b2c_orders } from '../schema/b2cOrders'
 import { userProfiles } from '../schema/userProfile'
 import { users } from '../schema/users'
 import { sendCodRemittanceSettledEmail } from '../../utils/emailSender'
@@ -17,6 +19,45 @@ const getSellerDisplayName = (profile?: { companyInfo?: any } | null, email?: st
     'Seller'
   )
 }
+
+/**
+ * A COD remittance is only valid for an order that was actually booked by a
+ * courier and received an AWB. This condition is shared by client and admin
+ * reads so stale/unbooked rows cannot affect either panel or settlement totals.
+ */
+export const bookedCodRemittanceCondition = () =>
+  or(
+    and(
+      eq(codRemittances.orderType, 'b2c'),
+      exists(
+        db
+          .select({ id: b2c_orders.id })
+          .from(b2c_orders)
+          .where(
+            and(
+              eq(b2c_orders.id, codRemittances.orderId),
+              isNotNull(b2c_orders.awb_number),
+              sql`NULLIF(TRIM(${b2c_orders.awb_number}), '') IS NOT NULL`,
+            ),
+          ),
+      ),
+    ),
+    and(
+      eq(codRemittances.orderType, 'b2b'),
+      exists(
+        db
+          .select({ id: b2b_orders.id })
+          .from(b2b_orders)
+          .where(
+            and(
+              eq(b2b_orders.id, codRemittances.orderId),
+              isNotNull(b2b_orders.awb_number),
+              sql`NULLIF(TRIM(${b2b_orders.awb_number}), '') IS NOT NULL`,
+            ),
+          ),
+      ),
+    ),
+  )
 
 const notifySellerCodRemittanceSettled = async (remittance: any, utrNumber?: string) => {
   const [seller] = await db
@@ -80,6 +121,17 @@ export async function createCodRemittance(params: {
     shippingCharges = 0,
     collectedAt,
   } = params
+
+  // Unbooked Shopify/manual orders must never enter COD settlement accounting.
+  if (!String(awbNumber || '').trim()) {
+    console.warn('[COD Remittance] Skipping creation for unbooked COD order', {
+      orderId,
+      orderNumber,
+      orderType,
+      userId,
+    })
+    return { remittance: null, created: false }
+  }
 
   // COD collection includes the item amount plus any shipping charge paid by the customer.
   // Platform freight and COD fees are settled through the seller wallet and are not deducted here.
@@ -160,7 +212,7 @@ export async function markCodRemittanceSettledOffline(params: {
       const [remittance] = await tx
         .select()
         .from(codRemittances)
-        .where(eq(codRemittances.id, remittanceId))
+        .where(and(eq(codRemittances.id, remittanceId), bookedCodRemittanceCondition()))
 
       if (!remittance) {
         throw new Error(`Remittance not found: ${remittanceId}`)
@@ -240,7 +292,7 @@ export async function getCodRemittances(
   const { status, fromDate, toDate, page = 1, limit = 20 } = filters
   const offset = (page - 1) * limit
 
-  const conditions = [eq(codRemittances.userId, userId)]
+  const conditions = [eq(codRemittances.userId, userId), bookedCodRemittanceCondition()]
 
   if (status) {
     conditions.push(eq(codRemittances.status, status as any))
@@ -287,7 +339,13 @@ export async function getCodRemittanceStats(userId: string) {
       totalAmount: sql<number>`COALESCE(SUM(${codRemittances.remittableAmount}), 0)`,
     })
     .from(codRemittances)
-    .where(and(eq(codRemittances.userId, userId), eq(codRemittances.status, 'credited')))
+    .where(
+      and(
+        eq(codRemittances.userId, userId),
+        bookedCodRemittanceCondition(),
+        eq(codRemittances.status, 'credited'),
+      ),
+    )
 
   // Total pending remittances (Next Remittance/Total Due)
   const [pendingStats] = await db
@@ -296,7 +354,13 @@ export async function getCodRemittanceStats(userId: string) {
       totalAmount: sql<number>`COALESCE(SUM(${codRemittances.remittableAmount}), 0)`,
     })
     .from(codRemittances)
-    .where(and(eq(codRemittances.userId, userId), eq(codRemittances.status, 'pending')))
+    .where(
+      and(
+        eq(codRemittances.userId, userId),
+        bookedCodRemittanceCondition(),
+        eq(codRemittances.status, 'pending'),
+      ),
+    )
 
   // Get last credited remittance
   const [lastRemittance] = await db
@@ -343,7 +407,7 @@ export async function getCodDashboardSummary(userId: string) {
   const recentRemittances = await db
     .select()
     .from(codRemittances)
-    .where(eq(codRemittances.userId, userId))
+    .where(and(eq(codRemittances.userId, userId), bookedCodRemittanceCondition()))
     .orderBy(desc(codRemittances.collectedAt), desc(codRemittances.createdAt))
     .limit(10)
 
