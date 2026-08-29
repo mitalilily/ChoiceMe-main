@@ -133,12 +133,12 @@ export async function createCodRemittance(params: {
     return { remittance: null, created: false }
   }
 
-  // Seller COD remittance is only the COD amount for the shipped items.
-  // Customer shipping and platform freight remain separate accounting fields.
+  // The courier collects both the seller's COD amount and customer shipping.
+  // Platform freight remains separate and is never added to seller remittance.
   const normalizedShippingCharges = Number.isFinite(Number(shippingCharges)) ? Number(shippingCharges) : 0
   const normalizedCodCharges = 0
   const deductions = 0
-  const remittableAmount = Number(codAmount)
+  const remittableAmount = Number(codAmount) + normalizedShippingCharges
 
   // Idempotency guard: delivered webhooks and reconciliation jobs can be retried.
   const duplicateChecks = [and(eq(codRemittances.orderId, orderId), eq(codRemittances.orderType, orderType))]
@@ -222,9 +222,9 @@ export async function markCodRemittanceSettledOffline(params: {
         throw new Error(`Remittance already settled: ${remittance.orderNumber}`)
       }
 
-      // 2. Determine settled amount (use courier-settled amount if different from original)
-      const amountToCredit =
-        settledAmount !== undefined ? Number(settledAmount) : Number(remittance.remittableAmount)
+      // 2. Remittable amount is deterministic: COD plus customer shipping.
+      // A manual/CSV settlement amount must not change the seller's remittance value.
+      const amountToCredit = Number(remittance.codAmount || 0) + Number(remittance.shippingCharges || 0)
 
       if (!Number.isFinite(amountToCredit) || amountToCredit <= 0) {
         throw new Error('Invalid settled amount. Amount must be greater than 0.')
