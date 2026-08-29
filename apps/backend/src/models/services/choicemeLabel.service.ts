@@ -481,7 +481,9 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
       creator: 'ChoiceMee Label Generator',
     },
     pageSize: { width: 288, height: 432 },
-    pageMargins: [13, 13, 13, 13],
+    // Keep every generated label on its single 4x6 page. Overflow creates a
+    // continuation page, which the 4-up bulk compositor would treat as a label.
+    pageMargins: [10, 10, 10, 10],
     defaultStyle: {
       font: 'LiberationSans',
       fontSize: 6.5,
@@ -515,7 +517,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           },
         ],
         columnGap: 8,
-        margin: [0, 0, 0, 8],
+        margin: [0, 0, 0, 5],
       },
       {
         table: {
@@ -553,7 +555,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           paddingTop: () => 1,
           paddingBottom: () => 1,
         },
-        margin: [0, 0, 0, 8],
+        margin: [0, 0, 0, 5],
       },
       {
         columns: [
@@ -591,7 +593,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           },
         ],
         columnGap: 8,
-        margin: [0, 0, 0, 8],
+        margin: [0, 0, 0, 5],
       },
       {
         columns: [
@@ -613,7 +615,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           },
         ],
         columnGap: 8,
-        margin: [0, 0, 0, 4],
+        margin: [0, 0, 0, 2],
       },
       {
         canvas: [
@@ -627,7 +629,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
             dash: { length: 4, space: 2 },
           },
         ],
-        margin: [0, 3, 0, 5],
+        margin: [0, 2, 0, 3],
       },
       {
         stack: [
@@ -636,7 +638,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           ...sellerAddressLines.map((line) => ({ text: line, fontSize: 8.0, color: '#111111' })),
           { text: `Contact: ${sellerContact || '-'}`, fontSize: 8.0, color: '#374151' },
         ],
-        margin: [0, 0, 0, 6],
+        margin: [0, 0, 0, 4],
       },
       {
         table: {
@@ -660,10 +662,10 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           vLineWidth: () => 0,
           paddingLeft: () => 0,
           paddingRight: () => 0,
-          paddingTop: () => 2,
-          paddingBottom: () => 2,
+          paddingTop: () => 1,
+          paddingBottom: () => 1,
         },
-        margin: [0, 0, 0, 6],
+        margin: [0, 0, 0, 4],
       },
       {
         columns: [
@@ -687,8 +689,8 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
               vLineWidth: () => 0.5,
               paddingLeft: () => 4,
               paddingRight: () => 4,
-              paddingTop: () => 4,
-              paddingBottom: () => 4,
+              paddingTop: () => 2,
+              paddingBottom: () => 2,
             },
           },
         ],

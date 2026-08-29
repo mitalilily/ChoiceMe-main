@@ -296,21 +296,22 @@ export const generateMissingLabels = async <T extends BulkOrderDocumentShape>(
   orders: T[],
   generateLabel: (order: T) => Promise<string | null | undefined>,
   concurrency = 4,
+  options?: { regenerateExisting?: boolean },
 ) => {
   const preparedOrders = [...orders]
-  const missingLabels = orders
+  const labelsToGenerate = orders
     .map((order, index) => ({ order, index }))
     .filter(({ order }) => {
       const { key, url } = getDocumentReference(order, 'label')
-      return !key && !url
+      return options?.regenerateExisting || (!key && !url)
     })
   const failures: Array<LabelGenerationFailure<T>> = []
   let generatedCount = 0
   let cursor = 0
 
   const worker = async () => {
-    while (cursor < missingLabels.length) {
-      const current = missingLabels[cursor]
+    while (cursor < labelsToGenerate.length) {
+      const current = labelsToGenerate[cursor]
       cursor += 1
       if (!current) continue
 
@@ -330,7 +331,7 @@ export const generateMissingLabels = async <T extends BulkOrderDocumentShape>(
     }
   }
 
-  const workerCount = Math.min(Math.max(1, concurrency), missingLabels.length)
+  const workerCount = Math.min(Math.max(1, concurrency), labelsToGenerate.length)
   await Promise.all(Array.from({ length: workerCount }, () => worker()))
 
   return { preparedOrders, generatedCount, failures }

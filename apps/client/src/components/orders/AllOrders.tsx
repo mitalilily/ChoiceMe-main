@@ -660,6 +660,8 @@ const AllOrders = () => {
             })
             return response.data.label
           },
+          4,
+          { regenerateExisting: true },
         )
 
         if (failures.length) {

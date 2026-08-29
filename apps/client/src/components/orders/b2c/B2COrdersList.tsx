@@ -954,6 +954,8 @@ const B2COrdersList = () => {
             })
             return response.data.label
           },
+          4,
+          { regenerateExisting: true },
         )
 
         if (failures.length) {
