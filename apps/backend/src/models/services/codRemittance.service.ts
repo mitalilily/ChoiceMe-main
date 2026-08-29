@@ -138,7 +138,7 @@ export async function createCodRemittance(params: {
   const normalizedShippingCharges = Number.isFinite(Number(shippingCharges)) ? Number(shippingCharges) : 0
   const normalizedCodCharges = 0
   const deductions = 0
-  const remittableAmount = Number(codAmount) + normalizedShippingCharges
+  const totalCollectedAmount = Number(codAmount) + normalizedShippingCharges
 
   // Idempotency guard: delivered webhooks and reconciliation jobs can be retried.
   const duplicateChecks = [and(eq(codRemittances.orderId, orderId), eq(codRemittances.orderType, orderType))]
@@ -169,12 +169,13 @@ export async function createCodRemittance(params: {
       orderNumber,
       awbNumber: awbNumber || null,
       courierPartner: courierPartner || null,
-      codAmount: codAmount.toString(),
+      // Store the full courier-collected COD value so COD and remittable stay aligned.
+      codAmount: totalCollectedAmount.toString(),
       codCharges: normalizedCodCharges.toString(),
       // Legacy column name retained for compatibility; defaulted to zero for COD remittance flow.
       shippingCharges: normalizedShippingCharges.toString(),
       deductions: deductions.toString(),
-      remittableAmount: remittableAmount.toString(),
+      remittableAmount: totalCollectedAmount.toString(),
       status: 'pending', // ✅ PENDING - waiting for courier settlement
       collectedAt: collectedAt || new Date(),
       notes: `COD collected by ${
@@ -184,7 +185,7 @@ export async function createCodRemittance(params: {
     .returning()
 
   console.log(
-    `📦 COD Remittance created (PENDING): ₹${remittableAmount} for order ${orderNumber}. Waiting for courier settlement.`,
+    `📦 COD Remittance created (PENDING): ₹${totalCollectedAmount} for order ${orderNumber}. Waiting for courier settlement.`,
   )
 
   return { remittance, created: true }
@@ -224,7 +225,7 @@ export async function markCodRemittanceSettledOffline(params: {
 
       // 2. Remittable amount is deterministic: COD plus customer shipping.
       // A manual/CSV settlement amount must not change the seller's remittance value.
-      const amountToCredit = Number(remittance.codAmount || 0) + Number(remittance.shippingCharges || 0)
+      const amountToCredit = Number(remittance.codAmount || 0)
 
       if (!Number.isFinite(amountToCredit) || amountToCredit <= 0) {
         throw new Error('Invalid settled amount. Amount must be greater than 0.')
