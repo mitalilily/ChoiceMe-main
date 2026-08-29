@@ -133,12 +133,12 @@ export async function createCodRemittance(params: {
     return { remittance: null, created: false }
   }
 
-  // COD collection includes the item amount plus any shipping charge paid by the customer.
-  // Platform freight and COD fees are settled through the seller wallet and are not deducted here.
+  // Seller COD remittance is only the COD amount for the shipped items.
+  // Customer shipping and platform freight remain separate accounting fields.
   const normalizedShippingCharges = Number.isFinite(Number(shippingCharges)) ? Number(shippingCharges) : 0
   const normalizedCodCharges = 0
   const deductions = 0
-  const remittableAmount = Number(codAmount) + normalizedShippingCharges
+  const remittableAmount = Number(codAmount)
 
   // Idempotency guard: delivered webhooks and reconciliation jobs can be retried.
   const duplicateChecks = [and(eq(codRemittances.orderId, orderId), eq(codRemittances.orderType, orderType))]
