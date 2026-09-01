@@ -3645,6 +3645,24 @@ const resolveB2COrderAmount = (params: {
   return 0
 }
 
+const resolveB2CCustomerPayableAmount = (order: B2COrderRow) => {
+  const invoiceAmount = Number((order as any).invoice_amount ?? 0)
+  if (String((order as any).integration_type || '').toLowerCase() === 'shopify' && invoiceAmount > 0) {
+    return invoiceAmount
+  }
+
+  const productAmount = Number(order.order_amount ?? 0)
+  const total =
+    productAmount +
+    Number(order.shipping_charges ?? 0) +
+    Number(order.transaction_fee ?? 0) +
+    Number(order.gift_wrap ?? 0) -
+    Number(order.discount ?? 0) -
+    Number(order.prepaid_amount ?? 0)
+
+  return Number.isFinite(total) && total > 0 ? total : productAmount
+}
+
 const buildB2CBookingParamsFromOrder = (
   order: B2COrderRow,
   courierParams: Partial<ShipmentParams>,
@@ -3664,12 +3682,8 @@ const buildB2CBookingParamsFromOrder = (
     ...courierParams,
     order_number: String(order.order_number || ''),
     payment_type: String(order.order_type || 'prepaid').toLowerCase() as ShipmentParams['payment_type'],
-    order_amount: resolveB2COrderAmount({
-      order_amount: order.order_amount,
-      order_items: order.products,
-      invoice_amount: (order as any).invoice_amount,
-      total_amount: (order as any).total_amount,
-    }),
+    order_amount: resolveB2CCustomerPayableAmount(order),
+    invoice_amount: resolveB2CCustomerPayableAmount(order),
     order_date: (order.order_date || new Date().toISOString().slice(0, 10)) as any,
     package_weight: Number(order.weight ?? 0),
     package_length: Number(order.length ?? 0),

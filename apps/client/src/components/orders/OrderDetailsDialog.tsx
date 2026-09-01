@@ -181,9 +181,13 @@ const getChargeBreakdown = (order: OrderDetailsDialogProps['order'], productValu
   const giftWrap = toMoneyNumber(order?.gift_wrap)
   const discount = toMoneyNumber(order?.discount)
   const prepaidAmount = toMoneyNumber(order?.prepaid_amount)
+  const invoiceAmount = toMoneyNumber((order as any)?.invoice_amount)
+  const isShopifyOrder = String(order?.integration_type || '').toLowerCase() === 'shopify'
   const totalPayable = Math.max(
     0,
-    productValue + shippingCharges + transactionFee + giftWrap - discount - prepaidAmount,
+    isShopifyOrder && invoiceAmount > 0
+      ? invoiceAmount
+      : productValue + shippingCharges + transactionFee + giftWrap - discount - prepaidAmount,
   )
 
   return {

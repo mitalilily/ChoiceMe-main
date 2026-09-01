@@ -540,7 +540,7 @@ export default function B2COrderFormSteps({
           {currentStep === 0 && (
             <Stack gap={2} mb={2}>
               <FormSectionAccordion title="Order Details" icon={<FaBox />} defaultExpanded>
-                <OrderDetailsForm />
+                <OrderDetailsForm skipOrderIdAvailabilityCheck={isEditMode} />
               </FormSectionAccordion>
 
               <FormSectionAccordion title="Recipient Details" icon={<FaUser />} defaultExpanded>

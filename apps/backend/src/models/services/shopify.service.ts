@@ -34,6 +34,55 @@ const toNumber = (value: unknown, fallback = 0): number => {
   return Number.isFinite(n) ? n : fallback
 }
 
+const parseWeightFromTextGrams = (value: unknown): number | null => {
+  const text = String(value || '').toLowerCase()
+  const match = text.match(/(?:^|[^0-9.])(\d+(?:\.\d+)?)\s*(kg|kgs|kilogram|kilograms|g|gm|gms|gram|grams)(?:[^a-z]|$)/i)
+  if (!match) return null
+
+  const amount = toNumber(match[1], 0)
+  if (amount <= 0) return null
+  const unit = match[2].toLowerCase()
+  return unit.startsWith('kg') || unit.startsWith('kilo')
+    ? Math.round(amount * 1000)
+    : Math.round(amount)
+}
+
+const normalizeShopifyWeightGrams = (item: any) => {
+  const quantity = Math.max(1, toNumber(item?.quantity, 1))
+  const rawGrams = toNumber(item?.grams, 0)
+  if (rawGrams <= 0) return 0
+
+  const textWeight =
+    parseWeightFromTextGrams(item?.variant_title) ??
+    parseWeightFromTextGrams(item?.title) ??
+    parseWeightFromTextGrams(item?.name)
+
+  if (textWeight && rawGrams > textWeight * 100 && rawGrams % 1000 === 0) {
+    return textWeight * quantity
+  }
+
+  if (rawGrams >= 50000 && rawGrams % 1000 === 0) {
+    return Math.round(rawGrams / 1000) * quantity
+  }
+
+  return rawGrams * quantity
+}
+
+const resolveShopifyOrderWeightGrams = (order: any) => {
+  const items = Array.isArray(order?.line_items) ? order.line_items : []
+  const normalizedLineWeight = items.reduce(
+    (sum: number, item: any) => sum + normalizeShopifyWeightGrams(item),
+    0,
+  )
+  const rawTotalWeight = toNumber(order?.total_weight, 0)
+
+  if (normalizedLineWeight > 0) return normalizedLineWeight
+  if (rawTotalWeight >= 50000 && rawTotalWeight % 1000 === 0) {
+    return Math.round(rawTotalWeight / 1000)
+  }
+  return rawTotalWeight > 0 ? rawTotalWeight : 500
+}
+
 const buildInternalOrderId = (storeId: string, shopifyOrderId: string) => {
   const safeStoreId = String(storeId || '').trim()
   const safeOrderId = String(shopifyOrderId || '').trim()
@@ -357,14 +406,7 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
     ? order.shipping_lines.reduce((sum: number, s: any) => sum + toNumber(s?.price, 0), 0)
     : 0
   const products = mapProducts(order)
-  const lineItemWeightGrams = (Array.isArray(order?.line_items) ? order.line_items : []).reduce(
-    (sum: number, item: any) => sum + toNumber(item?.grams, 0) * Math.max(1, toNumber(item?.quantity, 1)),
-    0,
-  )
-  // Shopify exposes both order-level and line-item weights in grams. Prefer
-  // total_weight so edits to the product/order unit are reflected on resync.
-  const totalWeightGrams = toNumber(order?.total_weight, 0) || lineItemWeightGrams
-  const declaredWeight = totalWeightGrams > 0 ? totalWeightGrams : 500
+  const declaredWeight = resolveShopifyOrderWeightGrams(order)
   const totalOrderValue = toNumber(order?.total_price, 0)
   // Shopify total_price already includes shipping. Keep the panel's canonical
   // split as item/tax value + customer shipping so the table does not double-count it.

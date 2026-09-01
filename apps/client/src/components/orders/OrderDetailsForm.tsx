@@ -11,6 +11,9 @@ import type { B2BFormData } from './b2b/B2BOrderForm'
 import type { B2CFormData } from './b2c/B2COrderForm'
 
 type OrderFormData = B2CFormData | B2BFormData
+type OrderDetailsFormProps = {
+  skipOrderIdAvailabilityCheck?: boolean
+}
 
 const padDatePart = (value: number) => String(value).padStart(2, '0')
 const getTodayDate = () => {
@@ -23,7 +26,7 @@ const allOrderTypes = [
   { key: 'cod', label: 'Cash on Delivery' },
 ]
 
-const OrderDetailsForm = () => {
+const OrderDetailsForm = ({ skipOrderIdAvailabilityCheck = false }: OrderDetailsFormProps) => {
   const {
     control,
     clearErrors,
@@ -52,16 +55,26 @@ const OrderDetailsForm = () => {
 
   const currentOrderType = watch('orderType')
   const currentOrderId = String(watch('orderId') || '').trim()
+  const currentOrderDate = String(watch('orderDate') || '').trim()
 
   useEffect(() => {
-    setValue('orderId', generateOrderId())
-    setValue('orderDate', getTodayDate())
-  }, [setValue])
+    if (!currentOrderId) {
+      setValue('orderId', generateOrderId())
+    }
+    if (!currentOrderDate) {
+      setValue('orderDate', getTodayDate())
+    }
+  }, [currentOrderDate, currentOrderId, setValue])
 
   useEffect(() => {
     if (!currentOrderId) {
       setOrderIdStatus('idle')
       setLastCheckedOrderId('')
+      return
+    }
+    if (skipOrderIdAvailabilityCheck) {
+      setOrderIdStatus('idle')
+      setLastCheckedOrderId(currentOrderId)
       return
     }
 
@@ -98,7 +111,7 @@ const OrderDetailsForm = () => {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [clearErrors, currentOrderId, errors?.orderId?.type, setError])
+  }, [clearErrors, currentOrderId, errors?.orderId?.type, setError, skipOrderIdAvailabilityCheck])
 
   const orderIdHelperText =
     (errors?.orderId?.message as string) ||

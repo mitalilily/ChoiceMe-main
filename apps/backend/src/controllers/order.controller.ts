@@ -111,7 +111,9 @@ const normalizeJsonValue = (value: unknown) => {
   return null
 }
 
-const buildDraftB2COrderUpdatePayload = (params: ShipmentParams) => {
+const buildDraftB2COrderUpdatePayload = (
+  params: ShipmentParams,
+): Partial<typeof b2c_orders.$inferInsert> => {
   const pickupDetails = normalizeJsonValue(params.pickup) ?? {}
   const rtoDetails = normalizeJsonValue(params.rto)
   const isCodOrder = params.payment_type === 'cod'
@@ -156,6 +158,7 @@ const buildDraftB2COrderUpdatePayload = (params: ShipmentParams) => {
     order_status: 'pending',
     pickup_status: 'pending',
     pickup_error: null,
+    tags: params.tags ?? null,
     order_id: null,
     awb_number: null,
     shipment_id: null,
@@ -183,6 +186,18 @@ const buildDraftB2COrderUpdatePayload = (params: ShipmentParams) => {
     weight_discrepancy: false,
     is_insurance: false,
   }
+}
+
+const resolveDraftCustomerPayableAmount = (updates: ReturnType<typeof buildDraftB2COrderUpdatePayload>) => {
+  const total =
+    Number(updates.order_amount ?? 0) +
+    Number(updates.shipping_charges ?? 0) +
+    Number(updates.transaction_fee ?? 0) +
+    Number(updates.gift_wrap ?? 0) -
+    Number(updates.discount ?? 0) -
+    Number(updates.prepaid_amount ?? 0)
+
+  return Number.isFinite(total) && total > 0 ? total : Number(updates.order_amount ?? 0)
 }
 
 export const createB2CShipmentController = async (req: any, res: Response) => {
@@ -532,6 +547,15 @@ export const updateB2COrderController = async (req: any, res: Response) => {
       ...params,
       order_number: normalizedOrderNumber,
     })
+
+    if (String(existingOrder.integration_type || '').toLowerCase() === 'shopify') {
+      updates.integration_type = existingOrder.integration_type
+      updates.order_id = existingOrder.order_id
+      updates.invoice_number = existingOrder.invoice_number
+      updates.invoice_date = existingOrder.invoice_date
+      updates.invoice_amount = resolveDraftCustomerPayableAmount(updates)
+      updates.tags = existingOrder.tags
+    }
 
     await db
       .update(b2c_orders)

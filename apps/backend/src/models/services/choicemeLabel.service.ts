@@ -308,6 +308,11 @@ const normalizeLineItem = (item: any) => {
 }
 
 const resolveCustomerFacingTotal = (order: any, itemTotal: number) => {
+  const invoiceAmount = normalizeNumber(order?.invoice_amount)
+  if (String(order?.integration_type || '').toLowerCase() === 'shopify' && invoiceAmount > 0) {
+    return invoiceAmount
+  }
+
   const productAmount = normalizeNumber(order?.order_amount)
   const baseAmount = productAmount > 0 ? productAmount : itemTotal
   const total =

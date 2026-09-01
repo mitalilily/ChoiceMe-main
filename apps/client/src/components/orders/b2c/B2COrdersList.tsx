@@ -125,15 +125,18 @@ const toMoneyNumber = (value: unknown) => {
 }
 
 const getB2CCustomerPaymentTotal = (order: B2COrder) =>
-  Math.max(
-    0,
-    toMoneyNumber(order.order_amount) +
-      toMoneyNumber(order.shipping_charges) +
-      toMoneyNumber(order.transaction_fee) +
-      toMoneyNumber(order.gift_wrap) -
-      toMoneyNumber(order.discount) -
-      toMoneyNumber(order.prepaid_amount),
-  )
+  String(order.integration_type || '').toLowerCase() === 'shopify' &&
+  toMoneyNumber((order as any).invoice_amount) > 0
+    ? toMoneyNumber((order as any).invoice_amount)
+    : Math.max(
+        0,
+        toMoneyNumber(order.order_amount) +
+          toMoneyNumber(order.shipping_charges) +
+          toMoneyNumber(order.transaction_fee) +
+          toMoneyNumber(order.gift_wrap) -
+          toMoneyNumber(order.discount) -
+          toMoneyNumber(order.prepaid_amount),
+      )
 
 const orderStatusFilterTabs = [
   { label: 'Drafts', value: 'new', statuses: ['pending'] },
