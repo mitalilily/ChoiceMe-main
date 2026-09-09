@@ -13,6 +13,32 @@ import {
   supportedServiceProviderList,
 } from '../../utils/courierProviders'
 
+const resolveCancellationProvider = (order: {
+  integration_type?: string | null
+  courier_partner?: string | null
+  courier_id?: number | string | null
+}) => {
+  const integration = normalizeServiceProviderKey(order.integration_type)
+  if (INTEGRATED_SERVICE_PROVIDERS.includes(integration as any)) return integration
+
+  const courierPartner = String(order.courier_partner || '')
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '')
+  const courierId = Number(order.courier_id ?? 0)
+
+  if (courierPartner.includes('xpressbees') || courierPartner.includes('expressbees')) {
+    return 'xpressbees'
+  }
+  if (courierPartner.includes('deliveryone') || courierPartner.includes('delhiveryone')) {
+    return 'deliveryone'
+  }
+  if (courierPartner.includes('delhivery') || courierId === 99 || courierId === 100) {
+    return 'deliveryone'
+  }
+
+  return integration
+}
+
 export async function cancelOrderShipment(orderId: string, expectedUserId?: string) {
   console.log('🔍 Starting cancellation for orderId:', orderId)
 
@@ -51,7 +77,7 @@ export async function cancelOrderShipment(orderId: string, expectedUserId?: stri
     throw new Error(`Order with status "${order.order_status}" cannot be cancelled`)
   }
 
-  const integration = normalizeServiceProviderKey(order.integration_type)
+  const integration = resolveCancellationProvider(order)
   if (!order.awb_number) {
     console.log('Cancelling local pending order without provider AWB', {
       orderId,

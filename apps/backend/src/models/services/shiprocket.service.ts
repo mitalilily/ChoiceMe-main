@@ -3647,7 +3647,10 @@ const resolveB2COrderAmount = (params: {
 
 const resolveB2CCustomerPayableAmount = (order: B2COrderRow) => {
   const invoiceAmount = Number((order as any).invoice_amount ?? 0)
-  if (String((order as any).integration_type || '').toLowerCase() === 'shopify' && invoiceAmount > 0) {
+  const isShopifyOrder =
+    String((order as any).integration_type || '').toLowerCase() === 'shopify' ||
+    String((order as any).order_id || '').startsWith('shopify_')
+  if (isShopifyOrder && invoiceAmount > 0) {
     return invoiceAmount
   }
 

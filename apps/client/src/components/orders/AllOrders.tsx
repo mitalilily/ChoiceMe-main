@@ -116,7 +116,10 @@ const getCustomerPaymentTotal = (order: Order) => {
     return toMoneyNumber(order.order_amount)
   }
 
-  if (String(order.integration_type || '').toLowerCase() === 'shopify') {
+  const isShopifyOrder =
+    String(order.integration_type || '').toLowerCase() === 'shopify' ||
+    String((order as any).order_id || '').startsWith('shopify_')
+  if (isShopifyOrder) {
     const invoiceAmount = toMoneyNumber((order as any).invoice_amount)
     if (invoiceAmount > 0) return invoiceAmount
   }

@@ -524,6 +524,9 @@ const upsertFromShopifyOrder = async (store: ShopifyStore, order: any, settings:
     // by booking/tracking webhooks.
     delete updatePayload.order_status
     delete updatePayload.courier_partner
+    if (existingOrder?.awbNumber || existingOrder?.courierPartner) {
+      delete updatePayload.integration_type
+    }
     delete updatePayload.pickup_location_id
     delete updatePayload.pickup_details
     delete updatePayload.rto_details

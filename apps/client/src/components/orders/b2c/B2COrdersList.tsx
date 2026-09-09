@@ -125,7 +125,8 @@ const toMoneyNumber = (value: unknown) => {
 }
 
 const getB2CCustomerPaymentTotal = (order: B2COrder) =>
-  String(order.integration_type || '').toLowerCase() === 'shopify' &&
+  (String(order.integration_type || '').toLowerCase() === 'shopify' ||
+    String((order as any).order_id || '').startsWith('shopify_')) &&
   toMoneyNumber((order as any).invoice_amount) > 0
     ? toMoneyNumber((order as any).invoice_amount)
     : Math.max(
