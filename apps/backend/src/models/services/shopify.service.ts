@@ -141,7 +141,11 @@ const resolveOrderType = (order: any, settings: any): 'cod' | 'prepaid' => {
   const gateways = Array.isArray(order?.payment_gateway_names)
     ? order.payment_gateway_names.map((g: string) => String(g || '').toLowerCase())
     : []
-  const codGateway = gateways.some((g: string) => g.includes('cod') || g.includes('cash'))
+  const codGateway = gateways.some((gateway: string) => {
+    const spaced = gateway.replace(/[^a-z0-9]+/g, ' ').trim()
+    const compact = gateway.replace(/[^a-z0-9]+/g, '')
+    return /\bcod\b/.test(spaced) || /cash\s*on\s*delivery/.test(spaced) || compact === 'cashondelivery'
+  })
   if (codGateway) return 'cod'
 
   return String(order?.financial_status || '').toLowerCase() === 'paid' ? 'prepaid' : 'cod'
@@ -608,6 +612,141 @@ export const syncShopifyOrdersForUser = async (
   }
 
   return result
+}
+
+export const backfillShopifyUnbookedPaymentModes = async (
+  options: {
+    userId?: string
+    storeId?: string
+    limit?: number
+  } = {},
+  tx: any = db,
+) => {
+  const requestedLimit = Math.max(1, Math.min(Math.floor(Number(options.limit || 250)), 250))
+  const whereClause = options.userId
+    ? options.storeId
+      ? and(
+          eq(stores.userId, options.userId),
+          eq(stores.platformId, SHOPIFY_PLATFORM_ID),
+          eq(stores.id, String(options.storeId)),
+        )
+      : and(eq(stores.userId, options.userId), eq(stores.platformId, SHOPIFY_PLATFORM_ID))
+    : options.storeId
+      ? and(eq(stores.platformId, SHOPIFY_PLATFORM_ID), eq(stores.id, String(options.storeId)))
+      : eq(stores.platformId, SHOPIFY_PLATFORM_ID)
+
+  const storesToBackfill = (await tx.select().from(stores).where(whereClause)) as ShopifyStore[]
+  const summary = {
+    stores: storesToBackfill.length,
+    scanned: 0,
+    corrected: 0,
+    skippedBooked: 0,
+    skippedStatus: 0,
+    unchanged: 0,
+    missingLocal: 0,
+    failed: 0,
+    corrections: [] as Array<{
+      storeId: string
+      orderNumber: string
+      previousType: string
+      correctedType: 'cod' | 'prepaid'
+    }>,
+  }
+
+  for (const store of storesToBackfill) {
+    const settings = (store as any)?.settings || {}
+    let orders: any[] = []
+    try {
+      orders = await fetchShopifyOrders(store, requestedLimit)
+    } catch (error: any) {
+      summary.failed += 1
+      console.error('[Shopify] Payment-mode backfill failed to fetch orders', {
+        storeId: store.id,
+        domain: store.domain,
+        message: error?.response?.data || error?.message || String(error),
+      })
+      continue
+    }
+
+    for (const order of orders) {
+      summary.scanned += 1
+      const shopifyOrderId = String(order?.id || '')
+      if (!shopifyOrderId) continue
+
+      const internalOrderId = buildInternalOrderId(String(store.id), shopifyOrderId)
+      const legacyInternalOrderId = `shopify_${shopifyOrderId}`
+      const [localOrder] = await tx
+        .select({
+          id: b2c_orders.id,
+          orderNumber: b2c_orders.order_number,
+          orderType: b2c_orders.order_type,
+          orderStatus: b2c_orders.order_status,
+          awbNumber: b2c_orders.awb_number,
+          courierPartner: b2c_orders.courier_partner,
+        })
+        .from(b2c_orders)
+        .where(eq(b2c_orders.order_id, internalOrderId))
+        .limit(1)
+
+      const [legacyLocalOrder] = localOrder
+        ? [undefined]
+        : await tx
+            .select({
+              id: b2c_orders.id,
+              orderNumber: b2c_orders.order_number,
+              orderType: b2c_orders.order_type,
+              orderStatus: b2c_orders.order_status,
+              awbNumber: b2c_orders.awb_number,
+              courierPartner: b2c_orders.courier_partner,
+            })
+            .from(b2c_orders)
+            .where(eq(b2c_orders.order_id, legacyInternalOrderId))
+            .limit(1)
+
+      const target = localOrder || legacyLocalOrder
+      if (!target?.id) {
+        summary.missingLocal += 1
+        continue
+      }
+
+      if (target.awbNumber || target.courierPartner) {
+        summary.skippedBooked += 1
+        continue
+      }
+
+      const status = String(target.orderStatus || '').toLowerCase()
+      if (status && !['pending', 'draft'].includes(status)) {
+        summary.skippedStatus += 1
+        continue
+      }
+
+      const resolvedType = resolveOrderType(order, settings)
+      if (String(target.orderType || '').toLowerCase() === resolvedType) {
+        summary.unchanged += 1
+        continue
+      }
+
+      const updatePayload: Partial<typeof b2c_orders.$inferInsert> = {
+        order_type: resolvedType,
+        updated_at: new Date(),
+      }
+      if (resolvedType === 'prepaid') {
+        updatePayload.prepaid_amount = 0
+        updatePayload.cod_charges = 0
+      }
+
+      await tx.update(b2c_orders).set(updatePayload).where(eq(b2c_orders.id, target.id))
+      summary.corrected += 1
+      summary.corrections.push({
+        storeId: String(store.id),
+        orderNumber: String(target.orderNumber || order?.name || shopifyOrderId),
+        previousType: String(target.orderType || ''),
+        correctedType: resolvedType,
+      })
+    }
+  }
+
+  return summary
 }
 
 export const verifyShopifyWebhookSignature = (rawBody: Buffer, receivedHmac?: string) => {
