@@ -3688,10 +3688,10 @@ const buildB2CBookingParamsFromOrder = (
 ): ShipmentParams => {
   const pickupDetails = getB2COrderPickupDetails(order)
   const rtoDetails = getB2COrderRtoDetails(order)
-  const isShopifyOrder =
-    String(order.integration_type || '').toLowerCase() === 'shopify' ||
-    String(order.order_id || '').startsWith('shopify_')
-  const hasCanonicalShopifyTotal = isShopifyOrder && Number(order.invoice_amount ?? 0) > 0
+  const requestedTransactionFee =
+    courierParams.transaction_fee !== undefined
+      ? Number(courierParams.transaction_fee)
+      : Number(order.transaction_fee ?? 0)
   const pickupDate =
     courierParams.pickup_date ||
     courierParams.pickup?.pickup_date ||
@@ -3713,9 +3713,13 @@ const buildB2CBookingParamsFromOrder = (
     package_breadth: Number(order.breadth ?? 0),
     package_height: Number(order.height ?? 0),
     shipping_charges: Number(order.shipping_charges ?? 0),
-    // Shopify's invoice_amount already includes the platform tax/payment
-    // adjustments. Never carry a stale transaction/tax-like fee into COD.
-    transaction_fee: hasCanonicalShopifyTotal ? 0 : Number(order.transaction_fee ?? 0),
+    // Only carry a fee that is explicitly present in the booking form/request.
+    // Shopify's invoice total is authoritative, but a seller-entered fee is a
+    // real customer charge and must flow through the courier and label.
+    transaction_fee:
+      Number.isFinite(requestedTransactionFee) && requestedTransactionFee >= 0
+        ? requestedTransactionFee
+        : 0,
     gift_wrap: String(order.gift_wrap ?? 0),
     discount: Number(order.discount ?? 0),
     prepaid_amount: String(order.prepaid_amount ?? 0),
@@ -5385,6 +5389,7 @@ export const createB2CShipmentService = async (
                 transaction_fee: transactionFee,
                 gift_wrap: giftWrap,
                 discount,
+                invoice_amount: customerOrderTotal,
                 volumetric_weight: finalSlabbedFreight.volumetric_weight ?? null,
                 charged_weight: finalSlabbedFreight.chargeable_weight ?? null,
                 weight_discrepancy: false,
