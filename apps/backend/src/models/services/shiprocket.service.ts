@@ -3645,25 +3645,41 @@ const resolveB2COrderAmount = (params: {
   return 0
 }
 
-const resolveB2CCustomerPayableAmount = (order: B2COrderRow) => {
-  const invoiceAmount = Number((order as any).invoice_amount ?? 0)
-  const isShopifyOrder =
-    String((order as any).integration_type || '').toLowerCase() === 'shopify' ||
-    String((order as any).order_id || '').startsWith('shopify_')
-  if (isShopifyOrder && invoiceAmount > 0) {
-    return invoiceAmount
+const resolveB2CBookingBaseAmount = (order: B2COrderRow) => {
+  const storedAmount = Number(order.order_amount ?? 0)
+  const invoiceAmount = Number(order.invoice_amount ?? 0)
+  const shippingCharges = Number(order.shipping_charges ?? 0)
+  const otherCharges = Number(order.other_charges ?? 0)
+  const transactionFee = Number(order.transaction_fee ?? 0)
+  const giftWrap = Number(order.gift_wrap ?? 0)
+  const discount = Number(order.discount ?? 0)
+  const prepaidAmount = Number(order.prepaid_amount ?? 0)
+
+  if (!Number.isFinite(storedAmount) || storedAmount <= 0) {
+    const fallback =
+      invoiceAmount - shippingCharges - otherCharges - transactionFee - giftWrap + discount + prepaidAmount
+    return Number.isFinite(fallback) && fallback > 0 ? roundMoneyValue(fallback) : 0
   }
 
-  const productAmount = Number(order.order_amount ?? 0)
-  const total =
-    productAmount +
-    Number(order.shipping_charges ?? 0) +
-    Number(order.transaction_fee ?? 0) +
-    Number(order.gift_wrap ?? 0) -
-    Number(order.discount ?? 0) -
-    Number(order.prepaid_amount ?? 0)
+  if (Number.isFinite(invoiceAmount) && invoiceAmount > 0 && shippingCharges > 0) {
+    const invoiceFromStoredBase =
+      storedAmount + shippingCharges + otherCharges + transactionFee + giftWrap - discount - prepaidAmount
 
-  return Number.isFinite(total) && total > 0 ? total : productAmount
+    // New Shopify rows store order_amount as the product/base amount and
+    // invoice_amount as the final amount. Preserve the base for the one
+    // downstream customer-total calculation.
+    if (Math.abs(invoiceAmount - invoiceFromStoredBase) <= 0.01) {
+      return roundMoneyValue(storedAmount)
+    }
+
+    // Some legacy rows stored the final invoice total in order_amount. Remove
+    // the already-included shipping before the downstream calculation.
+    if (Math.abs(invoiceAmount - storedAmount) <= 0.01) {
+      return roundMoneyValue(Math.max(storedAmount - shippingCharges, 0))
+    }
+  }
+
+  return roundMoneyValue(storedAmount)
 }
 
 const buildB2CBookingParamsFromOrder = (
@@ -3685,8 +3701,8 @@ const buildB2CBookingParamsFromOrder = (
     ...courierParams,
     order_number: String(order.order_number || ''),
     payment_type: String(order.order_type || 'prepaid').toLowerCase() as ShipmentParams['payment_type'],
-    order_amount: resolveB2CCustomerPayableAmount(order),
-    invoice_amount: resolveB2CCustomerPayableAmount(order),
+    order_amount: resolveB2CBookingBaseAmount(order),
+    invoice_amount: Number(order.invoice_amount ?? 0) || resolveB2CBookingBaseAmount(order),
     order_date: (order.order_date || new Date().toISOString().slice(0, 10)) as any,
     package_weight: Number(order.weight ?? 0),
     package_length: Number(order.length ?? 0),
