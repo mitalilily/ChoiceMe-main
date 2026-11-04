@@ -109,7 +109,10 @@ const initialFilterValues = {
 const PickupAddresses = () => {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerType, setDrawerType] = useState<'filter' | 'add' | null>(null)
-  const [page, setPage] = useState(0)
+  // The API and DataTable both use one-based page numbers when pagination is
+  // controlled. Starting at zero caused every second page to be skipped, which
+  // made older saved warehouses look as if they had disappeared after ten rows.
+  const [page, setPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [showExportConfirm, setShowExportConfirm] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
@@ -126,7 +129,7 @@ const PickupAddresses = () => {
 
   const { data, isLoading, isError } = usePickupAddresses({
     ...filters,
-    page: page + 1,
+    page,
     limit: rowsPerPage,
   })
 
@@ -355,7 +358,7 @@ const PickupAddresses = () => {
             onPageChange={setPage}
             onRowsPerPageChange={(limit) => {
               setRowsPerPage(limit)
-              setPage(0)
+              setPage(1)
             }}
           />
         )}

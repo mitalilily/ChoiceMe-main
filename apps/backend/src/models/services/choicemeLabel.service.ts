@@ -7,6 +7,7 @@ import sharp from 'sharp'
 import { db } from '../client'
 import { b2b_orders } from '../schema/b2bOrders'
 import { b2c_orders } from '../schema/b2cOrders'
+import { labelPreferences } from '../schema/labelPreferences'
 import { userProfiles } from '../schema/userProfile'
 import { users } from '../schema/users'
 import { presignDownload, presignUpload } from './upload.service'
@@ -423,8 +424,21 @@ type ShipmentLabelPdfParams = {
   paymentMethod: string
   paymentColor: string
   normalizedItems: Array<ReturnType<typeof normalizeLineItem>>
+  preferences?: {
+    orderInfo?: Record<string, boolean>
+    shipperInfo?: Record<string, boolean>
+    productInfo?: Record<string, boolean>
+    charLimit?: number
+    maxItems?: number
+  }
   footerUrl: string
 }
+
+const preferenceEnabled = (preferences: Record<string, boolean> | undefined, key: string) =>
+  preferences?.[key] !== false
+
+const truncateLabelText = (value: string, limit: number) =>
+  value.length > limit ? `${value.slice(0, limit)}…` : value
 
 const buildBarcodeDataUrl = async (awb: string) => {
   try {
@@ -459,23 +473,60 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
     paymentMethod,
     paymentColor,
     normalizedItems,
+    preferences,
   } = params
 
+  const orderInfo = preferences?.orderInfo
+  const shipperInfo = preferences?.shipperInfo
+  const productInfo = preferences?.productInfo
+  const showLogo = preferenceEnabled(shipperInfo, 'brandLogo')
+  const showSellerName = preferenceEnabled(shipperInfo, 'sellerBrandName')
+  const showShipperAddress = preferenceEnabled(shipperInfo, 'shipperAddress')
+  const showShipperPhone = preferenceEnabled(shipperInfo, 'shipperPhone')
+  const showCustomerPhone = preferenceEnabled(orderInfo, 'customerPhone')
+  const showOrderId = preferenceEnabled(orderInfo, 'orderId')
+  const showInvoiceNumber = preferenceEnabled(orderInfo, 'invoiceNumber')
+  const showOrderDate = preferenceEnabled(orderInfo, 'orderDate')
+  const showAwb = preferenceEnabled(orderInfo, 'awb')
+  const showDeclaredValue = preferenceEnabled(orderInfo, 'declaredValue')
+  const showCodBanner = preferenceEnabled(orderInfo, 'cod')
+  const showSortCode = preferenceEnabled(orderInfo, 'rtoRoutingCode')
+  const showDimensions = preferenceEnabled(productInfo, 'dimension')
+  const showWeight = preferenceEnabled(productInfo, 'deadWeight')
+  const showOtherCharges = preferenceEnabled(productInfo, 'otherCharges')
+  const maxItems = Math.max(1, Math.min(20, Number(preferences?.maxItems) || 3))
+  const charLimit = Math.max(5, Math.min(250, Number(preferences?.charLimit) || 25))
   const awb = normalizeText(order?.awb_number ?? order?.awbNumber, '-')
+  const orderNumber = normalizeText(order?.order_number ?? order?.order_id ?? order?.id, '-')
+  const invoiceNumber = normalizeText(order?.invoice_number, '')
+  const sortCode = normalizeText(order?.sort_code ?? order?.delhivery_label_meta?.sort_code, '')
+  const dimensions = [order?.package_length ?? order?.length, order?.package_breadth ?? order?.breadth, order?.package_height ?? order?.height]
+    .map((value) => String(value ?? '').trim())
+    .filter(Boolean)
+    .join(' x ')
+  const weight = normalizeText(order?.package_weight ?? order?.weight, '')
   const providerLabel = resolveProviderKey(order) === 'delhivery' ? 'DELHIVERY' : 'DELIVERYONE'
   const itemTotal = normalizedItems.reduce((sum, item) => sum + Math.max(0, item.lineTotal), 0)
   const totalAmount = resolveCustomerFacingTotal(order, itemTotal)
   const amountRows = buildLabelAmountRows(order, itemTotal, totalAmount)
-  const rows: any[] = normalizedItems.slice(0, 4).map((item) => [
-    { text: item.productId || '-', fontSize: 6.3, color: '#4b5563' },
-    { text: item.productName || '-', fontSize: 6.3, color: '#111111' },
-    { text: formatMoney(item.unitPrice), fontSize: 6.3, alignment: 'right', color: '#111111' },
-    { text: String(item.quantity), fontSize: 6.3, alignment: 'right', color: '#111111' },
-    { text: formatMoney(item.lineTotal), fontSize: 6.3, alignment: 'right', color: '#111111' },
-  ])
+  const productColumns = [
+    { key: 'skuCode', label: 'SKU', width: 44, value: (item: ReturnType<typeof normalizeLineItem>) => item.productId || '-' },
+    { key: 'itemName', label: 'Product Name', width: 98, value: (item: ReturnType<typeof normalizeLineItem>) => truncateLabelText(item.productName || '-', charLimit) },
+    { key: 'productCost', label: 'Rate', width: 40, value: (item: ReturnType<typeof normalizeLineItem>) => formatMoney(item.unitPrice) },
+    { key: 'productQuantity', label: 'Qty', width: 28, value: (item: ReturnType<typeof normalizeLineItem>) => String(item.quantity) },
+    { key: 'productCost', label: 'Amount', width: 52, value: (item: ReturnType<typeof normalizeLineItem>) => formatMoney(item.lineTotal) },
+  ].filter((column) => preferenceEnabled(productInfo, column.key))
+  const rows: any[] = normalizedItems.slice(0, maxItems).map((item) =>
+    productColumns.map((column) => ({
+      text: column.value(item),
+      fontSize: 6.3,
+      alignment: column.key === 'skuCode' || column.key === 'itemName' ? undefined : 'right',
+      color: column.key === 'skuCode' ? '#4b5563' : '#111111',
+    })),
+  )
 
-  if (!rows.length) {
-    rows.push([{ text: '-', colSpan: 5, fontSize: 6.3, color: '#6b7280' }, {}, {}, {}, {}])
+  if (!rows.length && productColumns.length) {
+    rows.push(productColumns.map((_, index) => (index === 0 ? { text: '-', colSpan: productColumns.length, fontSize: 6.3, color: '#6b7280' } : {})))
   }
 
   const barcodeDataUrl = await buildBarcodeDataUrl(awb)
@@ -504,30 +555,32 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           {
             width: '*',
             stack: [
-              sellerLogoDataUrl
+              showLogo && sellerLogoDataUrl
                 ? {
                     image: sellerLogoDataUrl,
                     width: 112,
                     margin: [0, 0, 0, 3],
                   }
                 : { text: '', margin: [0, 0, 0, 0] },
-              { text: sellerName, fontSize: 10.6, bold: true, color: '#111111', margin: [0, 0, 0, 1] },
+              ...(showSellerName
+                ? [{ text: sellerName, fontSize: 10.6, bold: true, color: '#111111', margin: [0, 0, 0, 1] }]
+                : []),
             ],
           },
           {
             width: 120,
             stack: [
               { text: 'SHIPPING LABEL', fontSize: 10.6, bold: true, alignment: 'right', characterSpacing: 0.8 },
-              { text: `Order # ${invoiceNo}`, fontSize: 6.2, alignment: 'right', color: '#374151', margin: [0, 1, 0, 0] },
-              { text: `AWB # ${awb}`, fontSize: 6.2, alignment: 'right', color: '#374151' },
-              { text: `Generated: ${orderDate || '-'}`, fontSize: 6.2, alignment: 'right', color: '#374151' },
+              ...(showOrderId ? [{ text: `Order # ${orderNumber}`, fontSize: 6.2, alignment: 'right', color: '#374151', margin: [0, 1, 0, 0] }] : []),
+              ...(showAwb ? [{ text: `AWB # ${awb}`, fontSize: 6.2, alignment: 'right', color: '#374151' }] : []),
+              ...(showOrderDate ? [{ text: `Generated: ${orderDate || '-'}`, fontSize: 6.2, alignment: 'right', color: '#374151' }] : []),
             ],
           },
         ],
         columnGap: 8,
         margin: [0, 0, 0, 5],
       },
-      {
+      ...(showCodBanner ? [{
         table: {
           widths: [78, '*'],
           body: [
@@ -564,7 +617,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           paddingBottom: () => 1,
         },
         margin: [0, 0, 0, 5],
-      },
+      }] : []),
       {
         columns: [
           {
@@ -578,25 +631,31 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
                 color: '#111111',
                 margin: [0, 1, 0, 0],
               },
-              {
+              ...(showDeclaredValue ? [{
                 text: `Order Value: ${formatMoney(totalAmount)}`,
                 fontSize: 9.2,
                 bold: true,
                 color: '#111111',
                 margin: [0, 1, 0, 0],
-              },
-              { text: `Reference Order # : ${invoiceNo}`, fontSize: 6.2, color: '#374151', margin: [0, 2, 0, 0] },
-              { text: `AWB # : ${awb}`, fontSize: 6.2, color: '#374151' },
-              { text: `Date : ${orderDate || '-'}`, fontSize: 6.2, color: '#374151' },
+              }] : []),
+              ...(showOrderId ? [{ text: `Reference Order # : ${orderNumber}`, fontSize: 6.2, color: '#374151', margin: [0, 2, 0, 0] }] : []),
+              ...(showInvoiceNumber && invoiceNumber ? [{ text: `Invoice # : ${invoiceNumber}`, fontSize: 6.2, color: '#374151' }] : []),
+              ...(showAwb ? [{ text: `AWB # : ${awb}`, fontSize: 6.2, color: '#374151' }] : []),
+              ...(showOrderDate ? [{ text: `Date : ${orderDate || '-'}`, fontSize: 6.2, color: '#374151' }] : []),
+              ...(showSortCode && sortCode ? [{ text: `Sort Code : ${sortCode}`, fontSize: 6.2, color: '#374151' }] : []),
+              ...(showDimensions && dimensions ? [{ text: `Dimensions : ${dimensions}`, fontSize: 6.2, color: '#374151' }] : []),
+              ...(showWeight && weight ? [{ text: `Weight : ${weight}`, fontSize: 6.2, color: '#374151' }] : []),
             ],
           },
           {
             width: 102,
             stack: [
-              barcodeDataUrl
+              showAwb && barcodeDataUrl
                 ? { image: barcodeDataUrl, width: 98, alignment: 'center', margin: [0, 0, 0, 1] }
-                : { text: awb, alignment: 'center', fontSize: 12, bold: true, margin: [0, 10, 0, 10] },
-              { text: awb, alignment: 'center', fontSize: 8.4, color: '#111111', margin: [0, -2, 0, 0] },
+                : showAwb
+                  ? { text: awb, alignment: 'center', fontSize: 12, bold: true, margin: [0, 10, 0, 10] }
+                  : { text: '', margin: [0, 10, 0, 10] },
+              ...(showAwb ? [{ text: awb, alignment: 'center', fontSize: 8.4, color: '#111111', margin: [0, -2, 0, 0] }] : []),
             ],
           },
         ],
@@ -611,7 +670,7 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
               { text: 'To:', fontSize: 9.2, bold: true, color: '#111111' },
               { text: customerName, fontSize: 11.5, bold: true, color: '#111111', margin: [0, 1, 0, 0] },
               ...customerAddressLines.map((line) => ({ text: line, fontSize: 8.2, color: '#111111' })),
-              { text: `Contact: ${customerPhone || '-'}`, fontSize: 8.2, color: '#374151', margin: [0, 1, 0, 0] },
+              ...(showCustomerPhone ? [{ text: `Contact: ${customerPhone || '-'}`, fontSize: 8.2, color: '#374151', margin: [0, 1, 0, 0] }] : []),
             ],
           },
           {
@@ -639,27 +698,27 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
         ],
         margin: [0, 2, 0, 3],
       },
-      {
+      ...(showSellerName || showShipperAddress || showShipperPhone ? [{
         stack: [
           { text: 'FROM', fontSize: 6.8, bold: true, color: '#111111', margin: [0, 0, 0, 2] },
-          { text: sellerName, fontSize: 10.2, bold: true, color: '#111111' },
-          ...sellerAddressLines.map((line) => ({ text: line, fontSize: 8.0, color: '#111111' })),
-          { text: `Contact: ${sellerContact || '-'}`, fontSize: 8.0, color: '#374151' },
+          ...(showSellerName ? [{ text: sellerName, fontSize: 10.2, bold: true, color: '#111111' }] : []),
+          ...(showShipperAddress ? sellerAddressLines.map((line) => ({ text: line, fontSize: 8.0, color: '#111111' })) : []),
+          ...(showShipperPhone ? [{ text: `Contact: ${sellerContact || '-'}`, fontSize: 8.0, color: '#374151' }] : []),
         ],
         margin: [0, 0, 0, 4],
-      },
-      {
+      }] : []),
+      ...(productColumns.length ? [{
         table: {
           headerRows: 1,
-          widths: [44, 98, 40, 28, 52],
+          widths: productColumns.map((column) => column.width),
           body: [
-            [
-              { text: 'SKU', bold: true, fontSize: 6.2, color: '#374151' },
-              { text: 'Product Name', bold: true, fontSize: 6.2, color: '#374151' },
-              { text: 'Rate', bold: true, fontSize: 6.2, color: '#374151', alignment: 'right' },
-              { text: 'Qty', bold: true, fontSize: 6.2, color: '#374151', alignment: 'right' },
-              { text: 'Amount', bold: true, fontSize: 6.2, color: '#374151', alignment: 'right' },
-            ],
+            productColumns.map((column) => ({
+              text: column.label,
+              bold: true,
+              fontSize: 6.2,
+              color: '#374151',
+              alignment: column.key === 'skuCode' || column.key === 'itemName' ? undefined : 'right',
+            })),
             ...rows,
           ],
         },
@@ -674,14 +733,20 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           paddingBottom: () => 1,
         },
         margin: [0, 0, 0, 4],
-      },
+      }] : []),
       {
         columns: [
           {
             width: '*',
             stack: [
               { text: 'NOTE', fontSize: 6.6, bold: true, color: '#111111', margin: [0, 0, 0, 2] },
-              { text: 'Local ChoiceMee label template generated from order and seller details.', fontSize: 6.0, color: '#6b7280' },
+              {
+                text: showOtherCharges && normalizeNumber(order?.other_charges) > 0
+                  ? `Other charges: ${formatMoney(order?.other_charges)}`
+                  : 'Local ChoiceMee label template generated from order and seller details.',
+                fontSize: 6.0,
+                color: '#6b7280',
+              },
             ],
           },
           {
@@ -730,7 +795,7 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     console.warn('ChoiceMee label generator received a mismatched user id; using the order owner.')
   }
 
-  const [profileRow, userRow] = await Promise.all([
+  const [profileRow, userRow, preferencesRow] = await Promise.all([
     tx
       .select()
       .from(userProfiles)
@@ -743,15 +808,32 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
       .where(eq(users.id, resolvedUserId))
       .limit(1)
       .then((rows: any[]) => rows[0] ?? null),
+    tx
+      .select()
+      .from(labelPreferences)
+      .where(eq(labelPreferences.user_id, resolvedUserId))
+      .limit(1)
+      .then((rows: any[]) => rows[0] ?? null),
   ])
 
   const companyInfo = (profileRow?.companyInfo || {}) as Record<string, any>
   const pickupDetails = (parseMaybeJson<Record<string, any>>(resolvedOrder?.pickup_details) || {}) as Record<string, any>
+  const rtoDetails = (parseMaybeJson<Record<string, any>>(resolvedOrder?.rto_details) || {}) as Record<string, any>
+  const preferences = {
+    orderInfo: (preferencesRow?.order_info || {}) as Record<string, boolean>,
+    shipperInfo: (preferencesRow?.shipper_info || {}) as Record<string, boolean>,
+    productInfo: (preferencesRow?.product_info || {}) as Record<string, boolean>,
+    charLimit: preferencesRow?.char_limit,
+    maxItems: preferencesRow?.max_items,
+  }
+  const useRtoAddress = preferenceEnabled(preferences.shipperInfo, 'rtoAddress') && Object.keys(rtoDetails).length > 0
+  const senderDetails = useRtoAddress ? rtoDetails : pickupDetails
   const lineItems = extractLineItems(resolvedOrder)
   const normalizedItems = lineItems.map(normalizeLineItem)
 
   const sellerName = normalizeText(
-    pickupDetails?.warehouse_name ||
+    senderDetails?.warehouse_name ||
+      senderDetails?.name ||
       companyInfo?.brandName ||
       companyInfo?.businessName ||
       companyInfo?.companyName ||
@@ -760,12 +842,19 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
       'ChoiceMee',
   )
   const sellerAddressLines = buildAddressLines(
-    pickupDetails?.address || companyInfo?.companyAddress || companyInfo?.address || '',
-    compactPlaceLine(pickupDetails?.city || companyInfo?.city, pickupDetails?.state || companyInfo?.state, pickupDetails?.pincode || companyInfo?.pincode),
-    pickupDetails?.country || companyInfo?.country || resolvedOrder?.country || 'India',
+    senderDetails?.address || companyInfo?.companyAddress || companyInfo?.address || '',
+    compactPlaceLine(senderDetails?.city || companyInfo?.city, senderDetails?.state || companyInfo?.state, senderDetails?.pincode || companyInfo?.pincode),
+    senderDetails?.country || companyInfo?.country || resolvedOrder?.country || 'India',
   ).slice(0, 3)
+  // Labels represent the selected warehouse, so its contact must win over the
+  // account-level contact number whenever a warehouse phone is available.
   const sellerContact = normalizeText(
-    companyInfo?.companyContactNumber || companyInfo?.contactNumber || userRow?.phone || pickupDetails?.phone || '-',
+    senderDetails?.phone ||
+      senderDetails?.contactPhone ||
+      companyInfo?.companyContactNumber ||
+      companyInfo?.contactNumber ||
+      userRow?.phone ||
+      '-',
   )
   const sellerLogoDataUrl = await resolveSellerLogoDataUrl(companyInfo, resolvedOrder)
 
@@ -812,6 +901,7 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     paymentMethod,
     paymentColor,
     normalizedItems,
+    preferences,
     footerUrl,
   })
 

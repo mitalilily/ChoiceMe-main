@@ -80,7 +80,15 @@ export default function CustomSelect({
           error={error}
           label={label}
           value={search || selectedItem?.label || placeholder || ''}
-          onClick={() => setOpen((prev) => !prev)}
+          onClick={() => {
+            setOpen((prev) => {
+              // A previous selection must not become a permanent search filter.
+              // Otherwise selecting COD leaves "Cash on Delivery" in the input and
+              // makes Prepaid impossible to select when the menu is opened again.
+              if (!prev) setSearch('')
+              return !prev
+            })
+          }}
           onChange={(e) => {
             if (searchable) {
               setSearch(e.target.value)
@@ -127,7 +135,7 @@ export default function CustomSelect({
                             selected={value === item.key}
                             onClick={() => {
                               onSelect(item.key)
-                              setSearch(item.label)
+                              setSearch('')
                               setOpen(false)
                             }}
                             sx={{
