@@ -58,13 +58,14 @@ const DeliveryDetailsForm = ({ type = 'b2c' }: { type?: FormType }) => {
   }, [locationData, isError, normalizedPincode, setError, clearErrors, setValue])
 
   const fields = [
-    { name: 'buyerName', label: 'Name' },
-    { name: 'buyerPhone', label: 'Phone' },
+    { name: 'buyerPhone', label: 'Phone Number' },
+    { name: 'buyerName', label: 'Full Name' },
+    { name: 'address', label: 'Complete Address' },
     { name: 'buyerEmail', label: 'Email' },
     { name: 'pincode', label: 'Pincode' },
     { name: 'city', label: 'City' },
     { name: 'state', label: 'State' },
-    { name: 'address', label: 'Address' },
+    { name: 'country', label: 'Country' },
     ...(type === 'b2b'
       ? [
           { name: 'companyName', label: 'Company Name' },
@@ -116,7 +117,7 @@ const DeliveryDetailsForm = ({ type = 'b2c' }: { type?: FormType }) => {
         const customerField = customerFieldMap[fieldItem.name]
 
         return (
-          <Grid key={fieldItem.name} size={{ xs: 12, md: fieldItem.name === 'address' ? 12 : 4 }}>
+          <Grid key={fieldItem.name} size={{ xs: 12, sm: fieldItem.name === 'address' ? 12 : fieldItem.name === 'buyerPhone' || fieldItem.name === 'buyerName' ? 6 : 4 }}>
             <Controller
               name={fieldItem.name as keyof (B2CFormData & B2BFormData)}
               control={control}

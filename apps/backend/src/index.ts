@@ -4,6 +4,7 @@ import { server } from './app'
 import { testDatabaseConnection } from './models/client'
 import { ensureInsuranceChargeColumns } from './models/migrations/ensureInsuranceChargeColumns'
 import { ensureInvoicePreferencesColumns } from './models/migrations/ensureInvoicePreferencesColumns'
+import { ensureLabelNoteColumns } from './models/migrations/ensureLabelNoteColumns'
 import { ensureQuickDetailsTable } from './models/migrations/ensureQuickDetailsTable'
 import { ensureShipmentEmailDeliveriesTable } from './models/migrations/ensureShipmentEmailDeliveriesTable'
 
@@ -35,6 +36,7 @@ async function startServer() {
 
   await ensureInsuranceChargeColumns()
   await ensureInvoicePreferencesColumns()
+  await ensureLabelNoteColumns()
   await ensureQuickDetailsTable()
   await ensureShipmentEmailDeliveriesTable()
 

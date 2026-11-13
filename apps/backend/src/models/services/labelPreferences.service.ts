@@ -9,6 +9,8 @@ export const DEFAULT_PREFERENCES = {
   label_sheet_layout: 'a4_single',
   char_limit: 25,
   max_items: 3,
+  note_enabled: false,
+  label_note: '',
   order_info: {
     orderId: true,
     invoiceNumber: true,
@@ -49,6 +51,8 @@ export const DEFAULT_PREFERENCES = {
 const enforcePlatformBranding = <T extends Record<string, any>>(prefs: T) => ({
   ...prefs,
   label_sheet_layout: prefs?.label_sheet_layout === 'a4_4up' ? 'a4_4up' : 'a4_single',
+  note_enabled: prefs?.note_enabled === true,
+  label_note: String(prefs?.label_note ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 240),
   brand_logo: null,
   powered_by: PLATFORM_BRAND_NAME,
 })
@@ -73,7 +77,8 @@ export const labelPreferencesService = {
   },
 
   async createOrUpdate(userId: string, data: any) {
-    const safeData = enforcePlatformBranding(data || {})
+    const allowed = ['printer_type', 'label_sheet_layout', 'char_limit', 'max_items', 'order_info', 'shipper_info', 'product_info', 'note_enabled', 'label_note']
+    const safeData = enforcePlatformBranding(Object.fromEntries(allowed.filter((key) => data?.[key] !== undefined).map((key) => [key, data[key]])))
     const [existing] = await db
       .select()
       .from(labelPreferences)

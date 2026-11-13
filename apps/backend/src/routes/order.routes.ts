@@ -18,8 +18,24 @@ import {
   trackOrderController,
 } from '../controllers/order.controller'
 import { requireAuth } from '../middlewares/requireAuth'
+import { getSellerOrderExport } from '../models/services/orderExports.service'
 
 const router = Router()
+
+router.get('/export', requireAuth, async (req: any, res) => {
+  const userId = req.user?.sub
+  if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+  const scope = String(req.query.scope || 'all')
+  if (!['all', 'b2c', 'b2b'].includes(scope)) return res.status(400).json({ message: 'Invalid order export scope' })
+  try {
+    const orders = await getSellerOrderExport(userId, scope as 'all' | 'b2c' | 'b2b', { ...req.query, status: req.query['status[]'] ?? req.query.status })
+    res.setHeader('Cache-Control', 'no-store')
+    return res.json({ success: true, orders, totalCount: orders.length })
+  } catch (error) {
+    console.error('Seller order export failed:', error)
+    return res.status(500).json({ message: 'Unable to export orders. Please retry.' })
+  }
+})
 
 // POST /b2c/shipment
 router.post('/b2c/create', requireAuth, createB2CShipmentController)

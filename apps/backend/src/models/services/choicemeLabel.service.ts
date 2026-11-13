@@ -430,6 +430,8 @@ type ShipmentLabelPdfParams = {
     productInfo?: Record<string, boolean>
     charLimit?: number
     maxItems?: number
+    noteEnabled?: boolean
+    labelNote?: string
   }
   footerUrl: string
 }
@@ -542,7 +544,14 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
     pageSize: { width: 288, height: 432 },
     // Keep every generated label on its single 4x6 page. Overflow creates a
     // continuation page, which the 4-up bulk compositor would treat as a label.
-    pageMargins: [10, 10, 10, 10],
+    pageMargins: [10, 10, 10, preferences?.noteEnabled && preferences?.labelNote?.trim() ? 46 : 10],
+    footer: preferences?.noteEnabled && preferences?.labelNote?.trim() ? {
+      text: String(preferences.labelNote).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 240),
+      fontSize: 6.5,
+      lineHeight: 1.1,
+      margin: [10, 4, 10, 6],
+      color: '#111111',
+    } : undefined,
     defaultStyle: {
       font: 'LiberationSans',
       fontSize: 6.5,
@@ -739,11 +748,11 @@ export const buildShipmentLabelPdfBuffer = async (params: ShipmentLabelPdfParams
           {
             width: '*',
             stack: [
-              { text: 'NOTE', fontSize: 6.6, bold: true, color: '#111111', margin: [0, 0, 0, 2] },
+              { text: showOtherCharges && normalizeNumber(order?.other_charges) > 0 ? 'ADDITIONAL CHARGES' : '', fontSize: 6.6, bold: true, color: '#111111', margin: [0, 0, 0, 2] },
               {
                 text: showOtherCharges && normalizeNumber(order?.other_charges) > 0
                   ? `Other charges: ${formatMoney(order?.other_charges)}`
-                  : 'Local ChoiceMee label template generated from order and seller details.',
+                  : '',
                 fontSize: 6.0,
                 color: '#6b7280',
               },
@@ -825,6 +834,8 @@ export async function generateLabelForOrder(order: any, userId: string, tx: any 
     productInfo: (preferencesRow?.product_info || {}) as Record<string, boolean>,
     charLimit: preferencesRow?.char_limit,
     maxItems: preferencesRow?.max_items,
+    noteEnabled: preferencesRow?.note_enabled === true,
+    labelNote: preferencesRow?.label_note ?? '',
   }
   const useRtoAddress = preferenceEnabled(preferences.shipperInfo, 'rtoAddress') && Object.keys(rtoDetails).length > 0
   const senderDetails = useRtoAddress ? rtoDetails : pickupDetails

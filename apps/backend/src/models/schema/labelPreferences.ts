@@ -1,5 +1,5 @@
 ﻿import { sql } from 'drizzle-orm'
-import { integer, jsonb, pgTableCreator, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { boolean, integer, jsonb, pgTableCreator, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 import { users } from './users'
 
 const createTable = pgTableCreator((name) => `meracourierwala_${name}`)
@@ -63,6 +63,8 @@ export const labelPreferences = createTable('label_preferences', {
 
   char_limit: integer('char_limit').default(25).notNull(),
   max_items: integer('max_items').default(3).notNull(),
+  note_enabled: boolean('note_enabled').default(false).notNull(),
+  label_note: varchar('label_note', { length: 240 }).default('').notNull(),
 
   brand_logo: text('brand_logo'), // S3 key or URL
   powered_by: varchar('powered_by', { length: 120 }).default(PLATFORM_BRAND_NAME),

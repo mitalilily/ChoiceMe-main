@@ -320,7 +320,7 @@ const B2COrdersList = () => {
   const { mutate: syncB2CTracking, isPending: syncingTracking } = useSyncB2CTracking()
   const queryClient = useQueryClient()
   const { mutateAsync: presignDownloads } = usePresignedDownloadMutation()
-  const { data: warehouses } = usePickupAddresses()
+  const { data: warehouses } = usePickupAddresses({ page: 1, limit: 500 })
   const { mutate: cancelShipment, isPending: cancellingShipment } = useCancelShipment()
   const { mutate: createReverse } = useCreateReverseShipment()
   const { mutateAsync: deleteB2COrder, isPending: deletingB2COrder } = useDeleteB2COrder()
@@ -1937,6 +1937,7 @@ const B2COrdersList = () => {
 
       <CustomDrawer
         width={drawerWidth}
+        presentation="dialog"
         open={drawerOpen}
         onClose={() => {
           setDrawerOpen(false)

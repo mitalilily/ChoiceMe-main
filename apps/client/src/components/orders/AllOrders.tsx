@@ -1740,6 +1740,7 @@ const AllOrders = () => {
       />
 
       <CustomDrawer
+        presentation={orderDrawerType === 'b2c' ? 'dialog' : 'drawer'}
         width={1200}
         open={orderDrawerOpen}
         onClose={() => {

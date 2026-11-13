@@ -260,40 +260,9 @@ export const fetchB2BOrdersByUser = async (params: FetchOrdersListParams = {}) =
 
 export type ClientOrderExportScope = 'all' | 'b2c' | 'b2b'
 
-const ORDER_EXPORT_PAGE_SIZE = 100
-
-export const fetchOrdersForCsvExport = async (
-  scope: ClientOrderExportScope,
-  filters: FetchOrdersListParams = {},
-) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const orders: any[] = []
-  let page = 1
-  let totalPages = 1
-
-  do {
-    const params = { ...filters, page, limit: ORDER_EXPORT_PAGE_SIZE }
-    const response =
-      scope === 'b2c'
-        ? await fetchB2COrdersByUser(params)
-        : scope === 'b2b'
-          ? await fetchB2BOrdersByUser(params)
-          : await fetchAllOrders(params)
-
-    const pageOrders = Array.isArray(response?.orders) ? response.orders : []
-    orders.push(...pageOrders)
-
-    const totalCount = Number(response?.totalCount ?? pageOrders.length)
-    const responseTotalPages = Number(response?.totalPages)
-    totalPages =
-      Number.isFinite(responseTotalPages) && responseTotalPages > 0
-        ? responseTotalPages
-        : Math.max(1, Math.ceil(totalCount / ORDER_EXPORT_PAGE_SIZE))
-
-    page += 1
-  } while (page <= totalPages)
-
-  return orders
+export const fetchOrdersForCsvExport = async (scope: ClientOrderExportScope, filters: FetchOrdersListParams = {}) => {
+  const response = await axiosInstance.get('/orders/export', { params: { ...filters, scope }, timeout: 120000 })
+  return Array.isArray(response.data?.orders) ? response.data.orders : []
 }
 
 export interface GenerateManifestParams {

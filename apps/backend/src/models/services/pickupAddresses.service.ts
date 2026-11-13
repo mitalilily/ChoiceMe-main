@@ -105,6 +105,11 @@ function buildCourierAddress(address: CourierAddressLike | null | undefined) {
 
 export async function createPickupAddressService(data: CreatePickupDto, userId: string) {
   return await db.transaction(async (txn) => {
+    await txn.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`warehouses:${userId}`}))`)
+    const [warehouseCount] = await txn.select({ count: sql<number>`count(*)::int` }).from(pickupAddresses).where(eq(pickupAddresses.userId, userId))
+    if (Number(warehouseCount.count) >= 500) {
+      throw Object.assign(new Error('You can save up to 500 warehouses. Edit an existing warehouse to make changes.'), { code: 'WAREHOUSE_LIMIT_REACHED' })
+    }
     const existing = await txn.query.pickupAddresses.findFirst({
       where: eq(pickupAddresses.userId, userId),
     })

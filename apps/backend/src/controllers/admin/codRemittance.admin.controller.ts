@@ -490,9 +490,12 @@ export const updateRemittanceNotes = async (req: any, res: Response): Promise<an
 export const exportAllCodRemittances = async (req: any, res: Response): Promise<any> => {
   try {
     const { status, fromDate, toDate, search } = req.query
+    const sellerId = String(req.query.userId || req.query.sellerId || '').trim()
     const normalizedSearch = String(search || '').trim()
 
     const conditions = [bookedCodRemittanceCondition()]
+
+    if (sellerId) conditions.push(eq(codRemittances.userId, sellerId))
 
     if (status) {
       conditions.push(eq(codRemittances.status, status as any))

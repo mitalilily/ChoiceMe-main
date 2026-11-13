@@ -6315,7 +6315,7 @@ export const getB2COrdersByUserService = async (
     })
     .from(b2c_orders)
     .where(whereCondition)
-    .orderBy(orderByClause)
+    .orderBy(orderByClause, desc(b2c_orders.id))
     .limit(limit)
     .offset(offset)
 
@@ -6376,7 +6376,7 @@ export const getB2BOrdersByUserService = async (
     .select()
     .from(b2b_orders)
     .where(whereCondition)
-    .orderBy(desc(b2b_orders.order_date))
+    .orderBy(desc(b2b_orders.order_date), desc(b2b_orders.id))
     .limit(limit)
     .offset(offset)
 

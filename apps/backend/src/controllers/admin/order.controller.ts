@@ -21,6 +21,7 @@ import {
 } from '../../utils/adminOrderExportCsv'
 import { extractCodChargeBasisFromBody, extractOrderAmountFromBody } from '../../utils/orderAmount'
 import { buildCsv } from '../../utils/csv'
+import { uniqueShipments } from '../../utils/shipmentIdentity'
 
 const normalizeSearch = (value: unknown) => String(value || '').trim()
 
@@ -124,7 +125,7 @@ export const exportOrdersControllerAdmin = async (req: any, res: Response) => {
       filters,
     })
 
-    const rows = orders.map(toAdminOrderExportRow)
+    const rows = uniqueShipments(orders).map(toAdminOrderExportRow)
     const csv = buildCsv(ADMIN_ORDER_EXPORT_HEADERS, rows)
 
     // Set headers for file download

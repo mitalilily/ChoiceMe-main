@@ -13,6 +13,8 @@
     "check:plan-rates": "tsx src/scripts/checkPlanScopedKashmirRates.ts",
     "check:wallet-awb-link": "tsx src/scripts/checkWalletTransactionAwbLink.ts",
     "check:storage-object-key": "tsx src/scripts/checkStorageObjectKey.ts",
+    "check:seller-shipping": "tsx src/scripts/checkSellerShippingChanges.ts",
+    "backfill:seller-csv": "tsx src/scripts/backfillSellerCsvExports.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "migrate": "drizzle-kit push",
     "migrate:sql": "tsx src/scripts/runSqlMigrations.ts",

@@ -1,20 +1,19 @@
-import { Box, Button, Chip, Paper, Stack, Typography, alpha } from '@mui/material'
+import { Box, Button, LinearProgress, Stack, Typography, alpha } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { FormProvider, useFieldArray, useForm, type FieldErrors } from 'react-hook-form'
-import { BiRupee } from 'react-icons/bi'
-import { FaBox, FaUser } from 'react-icons/fa'
+import { FaBox, FaCheck, FaUser } from 'react-icons/fa'
 import { useNavigate } from 'react-router-dom'
 import { fetchLocations } from '../../../api/locations'
 import type { CreateShipmentParams } from '../../../api/order.service'
 import { useCreateShipment, useUpdateB2COrder } from '../../../hooks/Orders/useOrders'
 import { usePaymentOptions } from '../../../hooks/usePaymentOptions'
 import { normalizeParcelWeightInputToGrams } from '../../../utils/weight'
-import FormSectionAccordion from '../../UI/accordion/FormSectionAccordion'
 import AmountSummaryCard from '../AmountSummaryCard'
 import DeliveryDetailsForm from '../DeliveryDetailsForm'
 import OptionalChargesForm from '../OptionalChargesForm'
 import OrderDetailsForm from '../OrderDetailsForm'
 import PickupLocationForm from '../PickupLocationForm'
+import PaymentModeSelector from '../PaymentModeSelector'
 import PackageDetailsForm from './PackageDetailsForm'
 import PackageDimensionsForm from './PackageDimensionsForm'
 
@@ -115,7 +114,6 @@ export default function B2COrderFormSteps({
   const updateOrderMutation = useUpdateB2COrder(onClose)
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(0)
-  const steps = ['Order & Delivery', 'Pickup Location']
   const { data: paymentOptions } = usePaymentOptions()
   const isEditMode = mode === 'edit'
 
@@ -181,8 +179,8 @@ export default function B2COrderFormSteps({
         const newOrderType = paymentOptions.prepaidEnabled
           ? 'prepaid'
           : paymentOptions.codEnabled
-          ? 'cod'
-          : 'prepaid'
+            ? 'cod'
+            : 'prepaid'
         setValue('orderType', newOrderType)
       }
     }
@@ -316,39 +314,28 @@ export default function B2COrderFormSteps({
     }
   }
 
+  const stepLabels = [
+    { title: 'Customer', caption: 'Who is this order going to?', icon: <FaUser /> },
+    { title: 'Order', caption: 'Products, pricing and payment', icon: <FaBox /> },
+    { title: 'Package', caption: 'Weight, dimensions and pickup warehouse', icon: <FaBox /> },
+  ]
+  const busy = isEditMode ? updateOrderMutation.isPending : createShipmentMutation.isPending
+
   const validateStep = async () => {
     if (currentStep === 0) {
-      const productFields = fields.flatMap((_, idx) =>
-        ['productName', 'price', 'quantity'].map(
-          (key) => `products.${idx}.${key}` as keyof B2CFormData,
-        ),
-      )
-
-      const step1Fields: (keyof B2CFormData)[] = [
+      const valid = await trigger([
         'buyerName',
         'buyerPhone',
         'address',
         'pincode',
-        'orderType',
         'city',
         'state',
         'country',
-        ...productFields,
-        'weight',
-        'length',
-        'breadth',
-        'height',
-      ]
-
-      const baseValid = await trigger(step1Fields)
-      if (!baseValid) return false
-
-      // Real-time pincode serviceability check
-      const pincode = watch('pincode')
+      ])
+      if (!valid) return false
       try {
-        const resp = await fetchLocations({ pincode })
-        const serviceable = Array.isArray(resp?.data) ? resp.data.length > 0 : !!resp?.data
-        if (!serviceable) {
+        const response = await fetchLocations({ pincode: watch('pincode') })
+        if (!(Array.isArray(response?.data) ? response.data.length > 0 : !!response?.data)) {
           methods.setError('pincode', {
             type: 'manual',
             message: 'Destination pincode not serviceable by any courier',
@@ -356,218 +343,183 @@ export default function B2COrderFormSteps({
           return false
         }
       } catch {
-        // ignore transient failure, allow move if fields valid
+        /* Final serviceability is checked by the booking API. */
       }
-
       return true
     }
-
-    return true
+    if (currentStep === 1) {
+      if (!fields.length) {
+        methods.setError('products', { type: 'manual', message: 'Add at least one product' })
+        return false
+      }
+      const productFields = fields.flatMap((_, index) =>
+        ['productName', 'price', 'quantity'].map(
+          (key) => `products.${index}.${key}` as keyof B2CFormData,
+        ),
+      )
+      return trigger(['orderId', 'orderDate', 'orderType', ...productFields])
+    }
+    return trigger([
+      'weight',
+      'length',
+      'breadth',
+      'height',
+      'pickupLocationId',
+      'pickupDate',
+      'pickupTime',
+    ])
   }
 
   const nextStep = async () => {
-    const valid = await validateStep()
-    if (valid) setCurrentStep((prev) => Math.min(prev + 1, stepLabels.length - 1))
+    if (await validateStep()) setCurrentStep((step) => Math.min(step + 1, 2))
   }
-
-  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 0))
-
-  const stepLabels = [
-    { title: 'Order & Delivery', caption: 'Customer, products and package details' },
-    { title: 'Pickup Location', caption: 'Pickup and RTO warehouse details' },
-  ]
-
-  const stepCompletion = ((currentStep + 1) / stepLabels.length) * 100
-
   useEffect(() => {
     setValue('orderAmount', totalCollectable, { shouldValidate: true })
   }, [setValue, totalCollectable])
 
   return (
     <FormProvider {...methods}>
-      <Stack
-        gap={2}
+      <Box
         sx={{
-          height: '100%',
-          position: 'relative',
-          p: { xs: 1, sm: 1.5, md: 2 },
-          borderRadius: 4,
-          border: `1px solid ${alpha(ACCENT, 0.14)}`,
-          background: '#ffffff',
-          boxShadow: `0 12px 30px ${alpha(ACCENT, 0.08)}`,
+          bgcolor: '#fff',
+          border: '1px solid #E5E9EF',
+          borderRadius: 3,
+          overflow: 'hidden',
+          color: TEXT_PRIMARY,
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+          height: { xs: '100%', sm: 'min(720px, calc(92dvh - 112px))' },
         }}
       >
-        <Paper
-          elevation={0}
-          sx={{
-            px: { xs: 2, sm: 2.5, md: 3 },
-            py: { xs: 2, sm: 2.25 },
-            borderRadius: 3,
-            border: `1px solid ${alpha(ACCENT, 0.14)}`,
-            background: alpha(ACCENT, 0.03),
-          }}
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}
         >
-          <Stack gap={1}>
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              justifyContent="space-between"
-              alignItems={{ xs: 'flex-start', sm: 'center' }}
-              gap={1}
-            >
-              <Typography variant="h6" fontWeight={800} sx={{ color: TEXT_PRIMARY }}>
-                {isEditMode ? 'Edit B2C Order' : 'B2C Order Creation'}
-              </Typography>
-              <Chip
-                label={`Step ${currentStep + 1} of ${stepLabels.length}`}
-                size="small"
+          <Stack
+            component="nav"
+            aria-label="Order steps"
+            spacing={1}
+            sx={{
+              width: { xs: '100%', md: 180 },
+              flexShrink: 0,
+              bgcolor: '#F8FAFC',
+              p: { xs: 1.5, md: 2 },
+              borderRight: { md: '1px solid #E5E9EF' },
+              flexDirection: { xs: 'row', md: 'column' },
+              gap: 1,
+            }}
+          >
+            {stepLabels.map((step, index) => (
+              <Button
+                key={step.title}
+                disabled={busy || index > currentStep}
+                onClick={() => setCurrentStep(index)}
+                aria-current={index === currentStep ? 'step' : undefined}
                 sx={{
-                  fontWeight: 700,
-                  color: TEXT_PRIMARY,
-                  backgroundColor: '#ffffff',
-                  border: `1px solid ${alpha(ACCENT, 0.2)}`,
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                  textTransform: 'none',
+                  minWidth: 0,
+                  flex: { xs: 1, md: 'unset' },
+                  px: { xs: 1, md: 1.5 },
+                  py: 1.5,
+                  borderLeft:
+                    index === currentStep ? `3px solid ${ACCENT}` : '3px solid transparent',
+                  bgcolor: index === currentStep ? alpha(ACCENT, 0.08) : 'transparent',
+                  color: index < currentStep ? '#16865D' : TEXT_PRIMARY,
                 }}
+              >
+                <Box
+                  sx={{
+                    display: { xs: 'none', sm: 'grid' },
+                    placeItems: 'center',
+                    width: 32,
+                    height: 32,
+                    mr: 1,
+                    flexShrink: 0,
+                    borderRadius: '50%',
+                    bgcolor: index < currentStep ? '#E4F5EC' : '#E9EEF6',
+                  }}
+                >
+                  {index < currentStep ? <FaCheck size={12} /> : step.icon}
+                </Box>
+                <Box>
+                  <Typography fontSize={13} fontWeight={750}>
+                    {step.title}
+                  </Typography>
+                  <Typography fontSize={11} color="text.secondary">
+                    Step {index + 1}
+                  </Typography>
+                </Box>
+              </Button>
+            ))}
+            <Box sx={{ mt: 'auto !important', pt: 5, display: { xs: 'none', md: 'block' } }}>
+              <Typography variant="caption" color="text.secondary">
+                Progress
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={((currentStep + 1) / 3) * 100}
+                sx={{ my: 1, height: 4, borderRadius: 2 }}
               />
-            </Stack>
-            <Typography variant="body2" sx={{ color: TEXT_MUTED }}>
-              {isEditMode
-                ? 'Update the draft order details and save your changes before shipping.'
-                : 'Build shipments faster with a guided flow. Only the active step is editable.'}
-            </Typography>
-            <Box
-              sx={{
-                mt: 0.5,
-                width: '100%',
-                height: 8,
-                borderRadius: 99,
-                overflow: 'hidden',
-                bgcolor: alpha(ACCENT, 0.08),
-                border: `1px solid ${alpha(ACCENT, 0.12)}`,
-              }}
+              <Typography variant="caption" color="text.secondary">
+                {currentStep + 1} / 3 steps
+              </Typography>
+            </Box>
+          </Stack>
+          <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', p: { xs: 2, sm: 3 } }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.5}
+              sx={{ pb: 2, mb: 2.5, borderBottom: '1px solid #EDF0F5' }}
             >
               <Box
                 sx={{
-                  width: `${stepCompletion}%`,
-                  height: '100%',
-                  transition: 'width 240ms ease',
-                  background: ACCENT,
+                  p: 1.25,
+                  bgcolor: alpha(ACCENT, 0.07),
+                  color: ACCENT,
+                  borderRadius: 2,
+                  display: 'flex',
                 }}
-              />
+              >
+                {stepLabels[currentStep].icon}
+              </Box>
+              <Box>
+                <Typography fontWeight={800}>{stepLabels[currentStep].title} Details</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {stepLabels[currentStep].caption}
+                </Typography>
+              </Box>
+              <Typography variant="caption" sx={{ ml: 'auto !important', color: TEXT_MUTED }}>
+                Step {currentStep + 1} of 3
+              </Typography>
+            </Stack>
+            <Box sx={{ display: currentStep === 0 ? 'block' : 'none' }}>
+              <DeliveryDetailsForm />
             </Box>
-          </Stack>
-        </Paper>
-
-        <Box
-          component="form"
-          onSubmit={(e) => e.preventDefault()}
-          sx={{
-            flex: 1,
-            overflowY: 'auto',
-            p: { xs: 0.5, sm: 1, md: 1.5 },
-            pr: { xs: 1, sm: 2, md: 2.5 },
-            '&::-webkit-scrollbar': {
-              width: '8px',
-            },
-            '&::-webkit-scrollbar-thumb': {
-              backgroundColor: alpha(ACCENT, 0.35),
-              borderRadius: '999px',
-            },
-            '&::-webkit-scrollbar-track': {
-              backgroundColor: alpha(ACCENT, 0.08),
-              borderRadius: '999px',
-            },
-          }}
-        >
-          <Stack direction={{ xs: 'column', md: 'row' }} gap={1.25} mb={2.5}>
-            {stepLabels.map((step, index) => {
-              const isActive = index === currentStep
-              const isCompleted = index < currentStep
-              return (
-                <Paper
-                  key={step.title}
-                  elevation={0}
-                  sx={{
-                    flex: 1,
-                    px: 1.5,
-                    py: 1.25,
-                    borderRadius: 2.5,
-                    border: `1px solid ${
-                      isActive
-                        ? alpha(ACCENT, 0.3)
-                        : isCompleted
-                        ? alpha(ACCENT, 0.2)
-                        : alpha('#64748B', 0.25)
-                    }`,
-                    background: isActive
-                      ? alpha(ACCENT, 0.08)
-                      : isCompleted
-                      ? alpha(ACCENT, 0.05)
-                      : '#ffffff',
-                    boxShadow: isActive ? `0 8px 20px ${alpha(ACCENT, 0.12)}` : 'none',
-                    transition: 'all 200ms ease',
-                  }}
-                >
-                  <Stack direction="row" gap={1.25} alignItems="center">
-                    <Box
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: '50%',
-                        display: 'grid',
-                        placeItems: 'center',
-                        fontWeight: 800,
-                        fontSize: '0.85rem',
-                        color: isActive || isCompleted ? '#fff' : '#6b7280',
-                        bgcolor: isActive ? ACCENT : isCompleted ? alpha(ACCENT, 0.75) : '#f1f5f9',
-                      }}
-                    >
-                      {index + 1}
-                    </Box>
-                    <Stack spacing={0.1}>
-                      <Typography variant="body2" fontWeight={700} sx={{ color: TEXT_PRIMARY }}>
-                        {step.title}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: TEXT_MUTED, lineHeight: 1.3 }}>
-                        {step.caption}
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                </Paper>
-              )
-            })}
-          </Stack>
-
-          {/* Step content */}
-          {currentStep === 0 && (
-            <Stack gap={2} mb={2}>
-              <FormSectionAccordion title="Order Details" icon={<FaBox />} defaultExpanded>
-                <OrderDetailsForm skipOrderIdAvailabilityCheck={isEditMode} />
-              </FormSectionAccordion>
-
-              <FormSectionAccordion title="Recipient Details" icon={<FaUser />} defaultExpanded>
-                <DeliveryDetailsForm />
-              </FormSectionAccordion>
-
-              <FormSectionAccordion title="Products" icon={<FaBox />} defaultExpanded>
+            <Stack spacing={2.5} sx={{ display: currentStep === 1 ? 'flex' : 'none' }}>
+              <OrderDetailsForm skipOrderIdAvailabilityCheck={isEditMode} hidePaymentMode />
+              <Box>
+                <Typography fontWeight={750} mb={1.25}>
+                  Products · {fields.length} item{fields.length === 1 ? '' : 's'}
+                </Typography>
                 <PackageDetailsForm
                   append={append}
                   control={control}
                   fields={fields}
                   remove={remove}
                 />
-              </FormSectionAccordion>
-
-              <FormSectionAccordion defaultExpanded title="Package Details" icon={<FaBox />}>
-                <PackageDimensionsForm />
-              </FormSectionAccordion>
-
-              <FormSectionAccordion
-                title="Optional Charges & Summary"
-                icon={<BiRupee />}
-                defaultExpanded
-              >
-                <OptionalChargesForm />
-              </FormSectionAccordion>
-
+                {errors.products?.message && (
+                  <Typography color="error" variant="caption">
+                    {String(errors.products.message)}
+                  </Typography>
+                )}
+              </Box>
+              <OptionalChargesForm />
+              <PaymentModeSelector />
               <AmountSummaryCard
                 subtotal={subtotal}
                 totalCollectable={totalCollectable}
@@ -575,83 +527,79 @@ export default function B2COrderFormSteps({
                 errors={errors as FieldErrors<B2CFormData>}
               />
             </Stack>
-          )}
-
-          {currentStep === 1 && <PickupLocationForm />}
-          {/* Sticky footer inside scroll */}
-          <Box
-            sx={{
-              py: 1.5,
-              px: { xs: 1.5, sm: 2.25 },
-              background: '#ffffff',
-              border: `1px solid ${alpha(ACCENT, 0.16)}`,
-              borderRadius: '14px',
-              position: 'sticky',
-              bottom: 0,
-              zIndex: 10,
-              mt: 2.5,
-              boxShadow: `0 10px 20px ${alpha(ACCENT, 0.08)}`,
-            }}
-          >
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              justifyContent="space-between"
-              alignItems={{ xs: 'stretch', sm: 'center' }}
-              gap={1.5}
-            >
-              <Typography variant="body2" sx={{ color: TEXT_MUTED, fontWeight: 600 }}>
-                {steps[currentStep]}
-              </Typography>
-              {currentStep > 0 && (
-                <Button
-                  type="button" // ✅ no accidental submit
-                  loading={isEditMode ? updateOrderMutation?.isPending : createShipmentMutation?.isPending}
-                  variant="outlined"
-                  onClick={prevStep}
-                  fullWidth={false}
-                  sx={{
-                    minWidth: { xs: '100%', sm: 120 },
-                    borderColor: alpha(ACCENT, 0.35),
-                    color: ACCENT,
-                    '&:hover': { borderColor: ACCENT, backgroundColor: alpha(ACCENT, 0.07) },
-                  }}
-                >
-                  Back
-                </Button>
-              )}
-              {currentStep < stepLabels.length - 1 ? (
-                <Button
-                  type="button" // ✅ no accidental submit
-                  variant="contained"
-                  onClick={nextStep}
-                  sx={{
-                    minWidth: { xs: '100%', sm: 130 },
-                    fontWeight: 700,
-                    background: ACCENT,
-                  }}
-                >
-                  Next
-                </Button>
-              ) : (
-                <Button
-                  type="button" // ✅ prevent browser reload
-                  variant="contained"
-                  color="primary"
-                  onClick={handleSubmit(onSubmit)} // ✅ react-hook-form submit
-                  loading={isEditMode ? updateOrderMutation?.isPending : createShipmentMutation?.isPending}
-                  sx={{
-                    minWidth: { xs: '100%', sm: 210 },
-                    fontWeight: 800,
-                    background: ACCENT,
-                  }}
-                >
-                  {isEditMode ? 'Update Order' : 'Create Order'}
-                </Button>
-              )}
+            <Stack spacing={3} sx={{ display: currentStep === 2 ? 'flex' : 'none' }}>
+              <PackageDimensionsForm />
+              <Box sx={{ borderTop: '1px solid #EDF0F5', pt: 2.5 }}>
+                <PickupLocationForm />
+              </Box>
             </Stack>
           </Box>
-        </Box>
-      </Stack>
+        </Stack>
+        <Stack
+          direction="row"
+          spacing={2}
+          justifyContent="space-between"
+          sx={{
+            p: { xs: 1.5, sm: 2 },
+            borderTop: '1px solid #E5E9EF',
+            bgcolor: '#FAFBFC',
+            flexShrink: 0,
+          }}
+        >
+          <Button
+            type="button"
+            variant="outlined"
+            disabled={busy}
+            onClick={() => (currentStep ? setCurrentStep((step) => step - 1) : onClose?.())}
+            sx={{ minWidth: { xs: 90, sm: 150 }, borderColor: '#DCE3ED', textTransform: 'none' }}
+          >
+            {currentStep ? 'Back' : 'Cancel'}
+          </Button>
+          <Button
+            type="button"
+            variant="contained"
+            loading={busy}
+            onClick={
+              currentStep < 2
+                ? nextStep
+                : async () => {
+                    if (await validateStep())
+                      await handleSubmit(onSubmit, (issues) => {
+                        setCurrentStep(
+                          issues.buyerName ||
+                            issues.buyerPhone ||
+                            issues.address ||
+                            issues.pincode ||
+                            issues.city ||
+                            issues.state ||
+                            issues.country
+                            ? 0
+                            : issues.orderId ||
+                                issues.orderDate ||
+                                issues.orderType ||
+                                issues.products
+                              ? 1
+                              : 2,
+                        )
+                      })()
+                  }
+            }
+            sx={{
+              minWidth: { xs: 150, sm: 220 },
+              bgcolor: ACCENT,
+              textTransform: 'none',
+              fontWeight: 750,
+              boxShadow: 'none',
+            }}
+          >
+            {currentStep < 2
+              ? `Next · ${stepLabels[currentStep + 1].title}`
+              : isEditMode
+                ? 'Save Changes'
+                : 'Create Order'}
+          </Button>
+        </Stack>
+      </Box>
     </FormProvider>
   )
 }

@@ -7,6 +7,7 @@ import type { B2COrder } from '../../../types/generic.types'
 import { normalizeParcelWeightInputToGrams } from '../../../utils/weight'
 import CustomDialog from '../../UI/modal/CustomModal'
 import { SelectCourierForm } from '../SelectCourierForm'
+import WarehouseSelector from '../WarehouseSelector'
 import type { B2CFormData, Product } from './B2COrderForm'
 
 type B2CSelectCourierDialogProps = {
@@ -23,7 +24,9 @@ const getLocalDateInputValue = () => {
 }
 
 const normalizeDateInput = (value?: string | null) => {
-  const normalized = String(value || '').trim().slice(0, 10)
+  const normalized = String(value || '')
+    .trim()
+    .slice(0, 10)
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : getLocalDateInputValue()
 }
 
@@ -259,10 +262,14 @@ export default function B2CSelectCourierDialog({
       }}
       title={order?.order_number ? `Select Courier - ${order.order_number}` : 'Select Courier'}
       maxWidth="xl"
-      width="min(1180px, calc(100vw - 32px))"
-      borderRadius={8}
+      width="min(920px, calc(100vw - 24px))"
+      borderRadius={20}
       footer={
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: '100%', justifyContent: 'flex-end' }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1}
+          sx={{ width: '100%', justifyContent: 'flex-end' }}
+        >
           <Button
             variant="outlined"
             onClick={onClose}
@@ -277,19 +284,31 @@ export default function B2CSelectCourierDialog({
             disabled={bookCourierMutation.isPending}
             sx={{ minWidth: 150, textTransform: 'none' }}
           >
-            {bookCourierMutation.isPending ? <CircularProgress size={18} color="inherit" /> : 'Book Shipment'}
+            {bookCourierMutation.isPending ? (
+              <CircularProgress size={18} color="inherit" />
+            ) : (
+              'Book Shipment'
+            )}
           </Button>
         </Stack>
       }
     >
       <FormProvider {...methods}>
-        <Box sx={{ maxHeight: '70vh', overflowY: 'auto', pr: { xs: 0, md: 1 } }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ mb: 2.5 }}>
+            <WarehouseSelector compact disabled={bookCourierMutation.isPending} />
+          </Box>
           {errors.courierPartnerId && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {errors.courierPartnerId.message as string}
             </Alert>
           )}
-          <SelectCourierForm shipment_type="b2c" />
+          <SelectCourierForm
+            shipment_type="b2c"
+            compact
+            disabled={bookCourierMutation.isPending}
+            onShip={handleSubmit(handleBookCourier)}
+          />
         </Box>
       </FormProvider>
     </CustomDialog>

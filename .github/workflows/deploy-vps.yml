@@ -73,9 +73,9 @@ jobs:
         if: ${{ env.BACKEND_ENV_B64 != '' }}
         run: |
           if [ -n "$VPS_SSH_KEY" ]; then
-            printf '%s' "$BACKEND_ENV_B64" | base64 -d | ssh -i ~/.ssh/choicemee_vps "$VPS_USER@$VPS_HOST" "cat > '$REMOTE_ENV' && chmod 600 '$REMOTE_ENV'"
+            printf '%s' "$BACKEND_ENV_B64" | base64 -d | ssh -i ~/.ssh/choicemee_vps "$VPS_USER@$VPS_HOST" "if [ -s '$REMOTE_ENV' ]; then cat >/dev/null; echo 'Keeping existing VPS runtime environment'; else cat > '$REMOTE_ENV' && chmod 600 '$REMOTE_ENV'; fi"
           else
-            printf '%s' "$BACKEND_ENV_B64" | base64 -d | SSHPASS="$VPS_PASSWORD" sshpass -e ssh "$VPS_USER@$VPS_HOST" "cat > '$REMOTE_ENV' && chmod 600 '$REMOTE_ENV'"
+            printf '%s' "$BACKEND_ENV_B64" | base64 -d | SSHPASS="$VPS_PASSWORD" sshpass -e ssh "$VPS_USER@$VPS_HOST" "if [ -s '$REMOTE_ENV' ]; then cat >/dev/null; echo 'Keeping existing VPS runtime environment'; else cat > '$REMOTE_ENV' && chmod 600 '$REMOTE_ENV'; fi"
           fi
 
       - name: Sync repository

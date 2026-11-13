@@ -275,6 +275,11 @@ export function LabelPreview({ values, order }: LabelPreviewProps) {
             </Box>
           </Box>
         )}
+        {values.noteEnabled && String(values.labelNote || '').trim() && (
+          <Box sx={{ borderTop: '1px solid #111', pt: 0.75, mt: 1 }}>
+            <Typography sx={{ fontSize: 8, lineHeight: 1.2, overflowWrap: 'anywhere' }}>{String(values.labelNote).trim()}</Typography>
+          </Box>
+        )}
       </Stack>
     </Paper>
   )

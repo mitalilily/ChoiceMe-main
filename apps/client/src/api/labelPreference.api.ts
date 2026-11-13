@@ -13,6 +13,8 @@ export type LabelPreferences = {
   product_info: Record<string, boolean>
   char_limit: number
   max_items: number
+  note_enabled?: boolean
+  label_note?: string
   brand_logo?: string | null
   powered_by?: string
   created_at?: string

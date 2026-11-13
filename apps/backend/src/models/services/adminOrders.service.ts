@@ -251,7 +251,8 @@ export const getAllOrdersServiceAdmin = async ({
     if (sortBy !== 'created_at') return 0
     const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
     const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
-    return sortOrder === 'asc' ? timeA - timeB : timeB - timeA
+    const difference = timeA - timeB || String(a.id).localeCompare(String(b.id))
+    return sortOrder === 'asc' ? difference : -difference
   })
 
   // Counts + pagination

@@ -1,4 +1,5 @@
 import { Response } from 'express'
+import { eq, sql } from 'drizzle-orm'
 import Papa from 'papaparse'
 import { db } from '../models/client'
 import {
@@ -30,6 +31,9 @@ export async function createPickupAddressHandler(req: any, res: Response): Promi
 
     // Surface pickup validation errors cleanly to the client
     const anyErr: any = err
+    if (anyErr?.code === 'WAREHOUSE_LIMIT_REACHED') {
+      return res.status(400).json({ code: anyErr.code, message: anyErr.message })
+    }
     if (anyErr?.code === 'DELHIVERY_WAREHOUSE_NAME_EXISTS') {
       return res.status(400).json({
         code: anyErr.code,
@@ -107,8 +111,8 @@ export async function getPickupAddressesHandler(req: any, res: Response): Promis
     const { data, totalCount } = await getPickupAddressesService(
       userId,
       filters,
-      Number(page),
-      Number(limit),
+      Math.max(1, Math.floor(Number(page) || 1)),
+      Math.min(500, Math.max(1, Math.floor(Number(limit) || 10))),
     )
 
     return res.status(200).json({ data, totalCount })
@@ -172,77 +176,92 @@ export async function importPickupAddressesHandler(req: any, res: Response): Pro
       return res.status(400).json({ errors })
     }
 
-    for (const p of rows) {
-      // 1️⃣ Insert Pickup Address
-      const [pickupAddr] = await db
-        .insert(addresses)
-        .values({
-          userId,
-          type: 'pickup',
-          contactName: p.contactName,
-          contactPhone: p.contactPhone,
-          contactEmail: p.contactEmail ?? '',
-          addressLine1: p.addressLine1,
-          addressLine2: p.addressLine2 ?? '',
-          landmark: p.landmark ?? '',
-          city: p.city,
-          state: p.state,
-          country: p.country ?? 'India',
-          pincode: p.pincode,
-          latitude: p.latitude ?? '',
-          longitude: p.longitude ?? '',
-          gstNumber: p.gstNumber ?? '',
-        })
-        .returning()
-
-      // 2️⃣ Optional RTO Address
-      let rtoAddressId: string | null = null
-      let isRTOSame: boolean = true
-      if (
-        p.rtoContactName &&
-        p.rtoContactPhone &&
-        p.rtoAddressLine1 &&
-        p.rtoCity &&
-        p.rtoState &&
-        p.rtoPincode
-      ) {
-        const [rtoAddr] = await db
+    await db.transaction(async (txn) => {
+      await txn.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`warehouses:${userId}`}))`)
+      const [existing] = await txn
+        .select({ count: sql<number>`count(*)::int` })
+        .from(pickupAddresses)
+        .where(eq(pickupAddresses.userId, userId))
+      if (Number(existing.count) + rows.length > 500)
+        throw Object.assign(
+          new Error('Import would exceed the limit of 500 warehouses. No rows were imported.'),
+          { code: 'WAREHOUSE_LIMIT_REACHED' },
+        )
+      for (const p of rows) {
+        // 1️⃣ Insert Pickup Address
+        const [pickupAddr] = await txn
           .insert(addresses)
           .values({
             userId,
-            type: 'rto',
-            contactName: p.rtoContactName,
-            contactPhone: p.rtoContactPhone,
-            contactEmail: p.rtoContactEmail ?? '',
-            addressLine1: p.rtoAddressLine1,
-            addressLine2: p.rtoAddressLine2 ?? '',
-            landmark: p.rtoLandmark ?? '',
-            city: p.rtoCity,
-            state: p.rtoState,
-            country: p.rtoCountry ?? 'India',
-            pincode: p.rtoPincode,
-            latitude: p.rtoLatitude ?? '',
-            longitude: p.rtoLongitude ?? '',
-            gstNumber: p.rtoGstNumber ?? '',
+            type: 'pickup',
+            contactName: p.contactName,
+            contactPhone: p.contactPhone,
+            contactEmail: p.contactEmail ?? '',
+            addressLine1: p.addressLine1,
+            addressLine2: p.addressLine2 ?? '',
+            landmark: p.landmark ?? '',
+            city: p.city,
+            state: p.state,
+            country: p.country ?? 'India',
+            pincode: p.pincode,
+            latitude: p.latitude ?? '',
+            longitude: p.longitude ?? '',
+            gstNumber: p.gstNumber ?? '',
           })
           .returning()
-        rtoAddressId = rtoAddr.id
-        isRTOSame = false
-      }
 
-      // 3️⃣ Link into pickup_addresses
-      await db.insert(pickupAddresses).values({
-        userId,
-        addressId: pickupAddr.id,
-        rtoAddressId,
-        isPrimary: false,
-        isPickupEnabled: true,
-        isRTOSame: isRTOSame,
-      })
-    }
+        // 2️⃣ Optional RTO Address
+        let rtoAddressId: string | null = null
+        let isRTOSame: boolean = true
+        if (
+          p.rtoContactName &&
+          p.rtoContactPhone &&
+          p.rtoAddressLine1 &&
+          p.rtoCity &&
+          p.rtoState &&
+          p.rtoPincode
+        ) {
+          const [rtoAddr] = await txn
+            .insert(addresses)
+            .values({
+              userId,
+              type: 'rto',
+              contactName: p.rtoContactName,
+              contactPhone: p.rtoContactPhone,
+              contactEmail: p.rtoContactEmail ?? '',
+              addressLine1: p.rtoAddressLine1,
+              addressLine2: p.rtoAddressLine2 ?? '',
+              landmark: p.rtoLandmark ?? '',
+              city: p.rtoCity,
+              state: p.rtoState,
+              country: p.rtoCountry ?? 'India',
+              pincode: p.rtoPincode,
+              latitude: p.rtoLatitude ?? '',
+              longitude: p.rtoLongitude ?? '',
+              gstNumber: p.rtoGstNumber ?? '',
+            })
+            .returning()
+          rtoAddressId = rtoAddr.id
+          isRTOSame = false
+        }
+
+        // 3️⃣ Link into pickup_addresses
+        await txn.insert(pickupAddresses).values({
+          userId,
+          addressId: pickupAddr.id,
+          rtoAddressId,
+          isPrimary: false,
+          isPickupEnabled: true,
+          isRTOSame: isRTOSame,
+        })
+      }
+    })
 
     return res.status(200).json({ message: 'Imported successfully.' })
   } catch (e) {
+    const error = e as { code?: string; message?: string }
+    if (error?.code === 'WAREHOUSE_LIMIT_REACHED')
+      return res.status(400).json({ code: error.code, message: error.message })
     console.error('Import Pickup Addresses Error:', e)
     return res.status(500).json({ message: 'Internal server error.' })
   }

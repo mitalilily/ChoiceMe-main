@@ -19,6 +19,8 @@ import {
   getInvoicePreferences,
 } from './invoicePreferences.service'
 import { presignDownload, presignUpload } from './upload.service'
+import { buildSellerBillingCsv } from './billingCsv.service'
+import { uniqueShipments } from '../../utils/shipmentIdentity'
 
 interface GenerateInvoiceParams {
   startDate: Date
@@ -79,7 +81,7 @@ export const generateInvoiceForUser = async (
       ),
     )
 
-  const allOrders = [...b2cOrders, ...b2bOrders]
+  const allOrders = uniqueShipments([...b2cOrders.map((row) => ({ ...row, type: 'b2c' })), ...b2bOrders.map((row) => ({ ...row, type: 'b2b' }))], userId)
   if (allOrders.length === 0) {
     console.log(
       `âš ï¸ No billable orders for user ${userId} between ${dayjs(startDate).format(
@@ -219,20 +221,8 @@ export const generateInvoiceForUser = async (
   const csvPath = path.join(tmpDir, `${invoiceNo}.csv`)
 
   // 4ï¸âƒ£ Generate CSV
-  const csvHeader = 'Order ID,Order Type,AWB,Freight Charges,COD Charges,Order Date\n'
-  const csvBody = allOrders
-    .map((o) => {
-      // Use order_type (prepaid/cod) instead of integration_type
-      const orderType = (o as any).order_type || 'prepaid'
-      const orderTypeDisplay = orderType.toLowerCase() === 'cod' ? 'COD' : 'Prepaid'
-      const billedDate = (o as any).updated_at || (o as any).created_at
-      return `${o.order_id || o.order_number},${orderTypeDisplay},${o.awb_number || '-'},${
-        (o as any).freight_charges ?? (o as any).shipping_charges ?? 0
-      },${(o as any).cod_charges ?? 0},${dayjs(billedDate).format('YYYY-MM-DD')}`
-    })
-    .join('\n')
-
-  fs.writeFileSync(csvPath, csvHeader + csvBody, 'utf-8')
+  const { csv } = buildSellerBillingCsv(allOrders, userId)
+  fs.writeFileSync(csvPath, csv, 'utf-8')
 
   // 5ï¸âƒ£ Get seller info
   const [sellerRow] = await db

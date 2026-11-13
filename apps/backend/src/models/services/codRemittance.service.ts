@@ -36,6 +36,8 @@ export const bookedCodRemittanceCondition = () =>
           .where(
             and(
               eq(b2c_orders.id, codRemittances.orderId),
+              eq(b2c_orders.user_id, codRemittances.userId),
+              sql`UPPER(TRIM(${b2c_orders.awb_number})) = UPPER(TRIM(${codRemittances.awbNumber}))`,
               isNotNull(b2c_orders.awb_number),
               sql`NULLIF(TRIM(${b2c_orders.awb_number}), '') IS NOT NULL`,
             ),
@@ -51,6 +53,8 @@ export const bookedCodRemittanceCondition = () =>
           .where(
             and(
               eq(b2b_orders.id, codRemittances.orderId),
+              eq(b2b_orders.user_id, codRemittances.userId),
+              sql`UPPER(TRIM(${b2b_orders.awb_number})) = UPPER(TRIM(${codRemittances.awbNumber}))`,
               isNotNull(b2b_orders.awb_number),
               sql`NULLIF(TRIM(${b2b_orders.awb_number}), '') IS NOT NULL`,
             ),
@@ -182,7 +186,14 @@ export async function createCodRemittance(params: {
         courierPartner || 'courier'
       }. No deduction applied by default. Awaiting settlement from courier partner.`,
     })
+    .onConflictDoNothing()
     .returning()
+
+  if (!remittance) {
+    const [existing] = await db.select().from(codRemittances).where(and(eq(codRemittances.userId, userId), or(...duplicateChecks))).limit(1)
+    if (!existing) throw new Error('COD remittance conflict requires review')
+    return { remittance: existing, created: false }
+  }
 
   console.log(
     `📦 COD Remittance created (PENDING): ₹${totalCollectedAmount} for order ${orderNumber}. Waiting for courier settlement.`,
@@ -311,7 +322,7 @@ export async function getCodRemittances(
     .select()
     .from(codRemittances)
     .where(and(...conditions))
-    .orderBy(desc(codRemittances.collectedAt), desc(codRemittances.createdAt))
+    .orderBy(desc(codRemittances.collectedAt), desc(codRemittances.createdAt), desc(codRemittances.id))
     .limit(limit)
     .offset(offset)
 

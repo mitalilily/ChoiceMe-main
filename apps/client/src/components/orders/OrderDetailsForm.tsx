@@ -13,6 +13,7 @@ import type { B2CFormData } from './b2c/B2COrderForm'
 type OrderFormData = B2CFormData | B2BFormData
 type OrderDetailsFormProps = {
   skipOrderIdAvailabilityCheck?: boolean
+  hidePaymentMode?: boolean
 }
 
 const padDatePart = (value: number) => String(value).padStart(2, '0')
@@ -26,7 +27,10 @@ const allOrderTypes = [
   { key: 'cod', label: 'Cash on Delivery' },
 ]
 
-const OrderDetailsForm = ({ skipOrderIdAvailabilityCheck = false }: OrderDetailsFormProps) => {
+const OrderDetailsForm = ({
+  skipOrderIdAvailabilityCheck = false,
+  hidePaymentMode = false,
+}: OrderDetailsFormProps) => {
   const {
     control,
     clearErrors,
@@ -98,7 +102,8 @@ const OrderDetailsForm = ({ skipOrderIdAvailabilityCheck = false }: OrderDetails
 
         setError('orderId', {
           type: 'duplicate',
-          message: response?.data?.message || 'This Order ID is already used. Please choose another.',
+          message:
+            response?.data?.message || 'This Order ID is already used. Please choose another.',
         })
       } catch {
         if (cancelled) return
@@ -118,10 +123,10 @@ const OrderDetailsForm = ({ skipOrderIdAvailabilityCheck = false }: OrderDetails
     (currentOrderId && orderIdStatus === 'checking'
       ? 'Checking Order ID...'
       : currentOrderId && orderIdStatus === 'available' && lastCheckedOrderId === currentOrderId
-      ? 'Order ID is available.'
-      : currentOrderId && orderIdStatus === 'error' && lastCheckedOrderId === currentOrderId
-      ? 'Could not verify right now. Final duplicate check will run on submit.'
-      : '')
+        ? 'Order ID is available.'
+        : currentOrderId && orderIdStatus === 'error' && lastCheckedOrderId === currentOrderId
+          ? 'Could not verify right now. Final duplicate check will run on submit.'
+          : '')
 
   // If current order type is disabled, reset to first available option
   useEffect(() => {
@@ -139,7 +144,7 @@ const OrderDetailsForm = ({ skipOrderIdAvailabilityCheck = false }: OrderDetails
   return (
     <Grid container spacing={2}>
       {/* Order ID */}
-      <Grid size={{ xs: 12, md: 4 }}>
+      <Grid size={{ xs: 12, md: hidePaymentMode ? 6 : 4 }}>
         <Controller
           name="orderId"
           control={control}
@@ -172,7 +177,7 @@ const OrderDetailsForm = ({ skipOrderIdAvailabilityCheck = false }: OrderDetails
       </Grid>
 
       {/* Order Date */}
-      <Grid size={{ xs: 12, md: 4 }}>
+      <Grid size={{ xs: 12, md: hidePaymentMode ? 6 : 4 }}>
         <Controller
           name="orderDate"
           control={control}
@@ -189,24 +194,26 @@ const OrderDetailsForm = ({ skipOrderIdAvailabilityCheck = false }: OrderDetails
       </Grid>
 
       {/* Order Type */}
-      <Grid size={{ xs: 12, md: 4 }}>
-        <Controller
-          name="orderType"
-          control={control}
-          rules={{ required: 'Order Type is required' }}
-          render={({ field }) => (
-            <CustomSelect
-              required
-              label="Order Type"
-              value={field.value || ''}
-              onSelect={(value) => field.onChange(value)}
-              items={orderTypes}
-              helperText={(errors?.orderType?.message as string) || 'Select type'}
-              error={!!errors?.orderType}
-            />
-          )}
-        />
-      </Grid>
+      {!hidePaymentMode && (
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Controller
+            name="orderType"
+            control={control}
+            rules={{ required: 'Order Type is required' }}
+            render={({ field }) => (
+              <CustomSelect
+                required
+                label="Order Type"
+                value={field.value || ''}
+                onSelect={(value) => field.onChange(value)}
+                items={orderTypes}
+                helperText={(errors?.orderType?.message as string) || 'Select type'}
+                error={!!errors?.orderType}
+              />
+            )}
+          />
+        </Grid>
+      )}
     </Grid>
   )
 }

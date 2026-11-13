@@ -10,6 +10,8 @@ export function mapApiToForm(prefs: LabelPreferences): LabelSettingsForm {
     productInfo: prefs.product_info,
     charLimit: prefs.char_limit,
     maxItems: prefs.max_items,
+    noteEnabled: prefs.note_enabled === true,
+    labelNote: prefs.label_note ?? '',
     printer: prefs.printer_type,
     labelSheetLayout: prefs.label_sheet_layout ?? 'a4_single',
   }
@@ -22,6 +24,8 @@ export function mapFormToApi(form: LabelSettingsForm): Partial<LabelPreferences>
     product_info: form.productInfo,
     char_limit: form.charLimit,
     max_items: form.maxItems,
+    note_enabled: form.noteEnabled,
+    label_note: form.labelNote,
     printer_type: form.printer,
     label_sheet_layout: form.labelSheetLayout,
   }

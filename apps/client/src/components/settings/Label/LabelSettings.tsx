@@ -11,6 +11,7 @@ import {
   Radio,
   RadioGroup,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material'
@@ -28,6 +29,8 @@ export type LabelSettingsForm = {
   productInfo: Record<string, boolean>
   charLimit: number
   maxItems: number
+  noteEnabled: boolean
+  labelNote: string
   printer: 'thermal' | 'inkjet'
   labelSheetLayout: 'a4_single' | 'a4_4up'
 }
@@ -36,6 +39,8 @@ const defaultValues: LabelSettingsForm = {
   labelSheetLayout: 'a4_single',
   charLimit: 25,
   maxItems: 3,
+  noteEnabled: false,
+  labelNote: '',
   orderInfo: {
     orderId: true,
     invoiceNumber: true,
@@ -320,6 +325,18 @@ export default function LabelSettingsPage() {
 
                   <Divider />
 
+                  <Box>
+                    <Typography fontWeight="bold" gutterBottom>Label note</Typography>
+                    <Controller name="noteEnabled" control={control} render={({ field }) => (
+                      <FormControlLabel label="Print a note at the bottom of the label" control={<Switch checked={field.value} onChange={(_, checked) => field.onChange(checked)} />} />
+                    )} />
+                    <Controller name="labelNote" control={control} render={({ field }) => (
+                      <TextField {...field} fullWidth multiline minRows={2} maxRows={4} label="Your note"
+                        disabled={!values.noteEnabled} slotProps={{ htmlInput: { maxLength: 240 } }}
+                        helperText={`${field.value?.length ?? 0}/240 characters. Saved text is kept when the note is switched off.`} />
+                    )} />
+                  </Box>
+                  <Divider />
                   {/* Printer Options */}
                   <Box>
                     <Typography fontWeight="bold" gutterBottom>
@@ -361,7 +378,7 @@ export default function LabelSettingsPage() {
         </Grid>
 
         {/* Right: Label Preview */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 8 }} sx={{ overflowX: 'auto' }}>
           <LabelPreview values={values} order={mockOrder} preferences={preferences} />
         </Grid>
       </Grid>

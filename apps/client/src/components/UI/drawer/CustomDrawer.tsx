@@ -1,6 +1,9 @@
 ﻿import {
   Box,
   Divider,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Drawer,
   IconButton,
   Typography,
@@ -18,6 +21,7 @@ interface GlassDrawerProps {
   width?: number | string
   anchor?: 'left' | 'right'
   children: React.ReactNode
+  presentation?: 'drawer' | 'dialog'
 }
 
 const CustomDrawer: React.FC<GlassDrawerProps> = ({
@@ -27,9 +31,21 @@ const CustomDrawer: React.FC<GlassDrawerProps> = ({
   width = 420,
   anchor = 'right',
   children,
+  presentation = 'drawer',
 }) => {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
+
+  if (presentation === 'dialog') return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg" fullScreen={isMobile}
+      slotProps={{ paper: { sx: { borderRadius: isMobile ? 0 : 3, maxHeight: isMobile ? '100dvh' : '92dvh', bgcolor: '#fff', backgroundImage: 'none' } }, backdrop: { sx: { bgcolor: 'rgba(17,24,39,.5)', backdropFilter: 'blur(4px)' } } }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E5E9EF', py: 1.75, px: { xs: 2, sm: 3 } }}>
+        <Box><Typography fontWeight={800} color="#102A54">{title}</Typography><Typography variant="caption" color="text.secondary">Customer, order and package details</Typography></Box>
+        <IconButton aria-label="Close order form" onClick={onClose}><IoCloseCircleOutline size={24} /></IconButton>
+      </DialogTitle>
+      <DialogContent sx={{ p: { xs: 1, sm: 2 }, bgcolor: '#F8FAFC', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>{children}</DialogContent>
+    </Dialog>
+  )
 
   return (
     <Drawer

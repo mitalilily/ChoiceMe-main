@@ -1,4 +1,4 @@
-import { Box, Checkbox, Chip, CircularProgress, Divider, Grid, Paper, Stack, Typography, alpha } from '@mui/material'
+import { Box, Button, Checkbox, Chip, CircularProgress, Divider, Grid, Paper, Stack, Typography, alpha } from '@mui/material'
 import { useFormContext } from 'react-hook-form'
 import { BiCalendar, BiMap, BiPackage, BiUser } from 'react-icons/bi'
 import { TbPlane, TbTruck } from 'react-icons/tb'
@@ -41,7 +41,7 @@ const computeInsuranceChargePreview = ({
   return roundMoney(baseAmount + (Math.max(0, normalizedValue - threshold) * percentage) / 100)
 }
 
-export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b2c' }) => {
+export const SelectCourierForm = ({ shipment_type, compact = false, disabled = false, onShip }: { shipment_type: 'b2b' | 'b2c'; compact?: boolean; disabled?: boolean; onShip?: () => void }) => {
   const { watch, setValue, clearErrors } = useFormContext<B2BFormData | B2CFormData>()
   const { data: paymentOptions } = usePaymentOptions()
 
@@ -272,7 +272,7 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
 
   return (
     <Grid container spacing={3}>
-      <Grid size={{ md: 4.5, xs: 12 }}>
+      <Grid size={{ md: 4.5, xs: 12 }} sx={{ display: compact ? 'none' : 'block' }}>
         <Stack spacing={2.5} sx={{ position: { md: 'sticky' }, top: { md: 16 } }}>
           <Paper
             sx={{
@@ -498,7 +498,7 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
         </Stack>
       </Grid>
 
-      <Grid size={{ md: 7.5, xs: 12 }}>
+      <Grid size={{ md: compact ? 12 : 7.5, xs: 12 }}>
         <Paper
           sx={{
             p: 2.5,
@@ -516,10 +516,10 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
           >
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 800, color: TEXT_PRIMARY }}>
-                Select Courier Partner
+                {compact ? 'Choose courier' : 'Select Courier Partner'}
               </Typography>
               <Typography sx={{ mt: 0.5, color: TEXT_SECONDARY }}>
-                Compare freight, speed and chargeable weight before locking the shipment.
+                {compact ? `${(Number(totalWeight) / 1000).toFixed(2)} kg · ${pickupPincode} → ${deliveryPincode} · ${orderType.toUpperCase()}` : 'Compare freight, speed and chargeable weight before locking the shipment.'}
               </Typography>
             </Box>
             <Chip
@@ -551,6 +551,7 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
               const isBookable = courier?.is_bookable !== false
               const finalChargeLabel = isBookable ? formatCurrency(finalCourierCharge) : 'Unavailable'
               const selectCourier = () => {
+                if (disabled || isFetching) return
                 if (!isBookable) {
                   toast.open({
                     message:
@@ -584,6 +585,24 @@ export const SelectCourierForm = ({ shipment_type }: { shipment_type: 'b2b' | 'b
                 setValue('slabs', courier?.slabs ?? null)
                 clearErrors('courierPartnerId')
               }
+
+              if (compact) return (
+                <Paper key={courierOptionKey} variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2.5, borderColor: isSelected ? ACCENT : '#E4E9F1', bgcolor: isSelected ? '#F4F8FF' : '#fff', boxShadow: 'none' }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr auto', sm: 'minmax(0, 2fr) 64px 110px 88px' }, alignItems: 'center', gap: 1.5 }}>
+                    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
+                      <Box component="img" src={getCourierLogo(courier, defaultLogo)} alt="" sx={{ width: 34, height: 34, objectFit: 'contain', flexShrink: 0 }} />
+                      <Box sx={{ minWidth: 0 }}><Typography variant="body2" fontWeight={750}>{getCourierDisplayName(courier)}</Typography>
+                        <Typography variant="caption" color="text.secondary">{courier.edd ? `Delivery: ${courier.edd}` : 'Delivery estimate unavailable'}</Typography>
+                        {courier.tag && <Typography variant="caption" sx={{ display: 'block', color: courier.tag === 'economy' ? '#16865D' : ACCENT }}>{courier.tag === 'economy' ? 'Best rate' : courier.tag === 'fastest' ? 'Fastest' : ''}</Typography>}
+                      </Box>
+                    </Stack>
+                    <Box sx={{ display: { xs: 'none', sm: 'block' }, color: ACCENT }}>{getModeIcon(courier.shipping_mode || courier.mode || local?.forward?.mode)}</Box>
+                    <Box sx={{ textAlign: 'right' }}><Typography variant="caption" color="text.secondary">Shipping charge</Typography><Typography fontWeight={800} color={TEXT_PRIMARY}>{finalChargeLabel}</Typography></Box>
+                    <Button variant="contained" size="small" disabled={!isBookable || disabled || isFetching} onClick={() => { selectCourier(); onShip?.() }} sx={{ gridColumn: { xs: '1 / -1', sm: 'auto' }, bgcolor: ACCENT, borderRadius: 2, textTransform: 'none', boxShadow: 'none' }}>Ship</Button>
+                  </Box>
+                  {!isBookable && <Typography color="error" variant="caption">{courier.unavailable_reason || 'Live rate unavailable'}</Typography>}
+                </Paper>
+              )
 
               return (
                 <Paper
