@@ -2,10 +2,35 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { uniqueShipments } from '../utils/shipmentIdentity'
+import { resolveBookingWarehouseSelection } from '../utils/bookingWarehouseSelection'
 import { buildSellerBillingCsv } from '../models/services/billingCsv.service'
 import { buildShipmentLabelPdfBuffer } from '../models/services/choicemeLabel.service'
 
 async function main() {
+  const storedWarehouse = {
+    id: 'old',
+    pickup: { phone: '1111111111', pincode: '110001' },
+    rto: { phone: '2222222222' },
+    isRtoDifferent: true,
+  }
+  const selectedWarehouse = resolveBookingWarehouseSelection(storedWarehouse, {
+    pickup_location_id: 'new',
+    pickup: { phone: '9999900500', pincode: '400001' },
+    is_rto_different: 'no',
+  })
+  assert.equal(selectedWarehouse.id, 'new')
+  assert.equal(selectedWarehouse.pickup.phone, '9999900500')
+  assert.equal(selectedWarehouse.pickup.pincode, '400001')
+  assert.equal(selectedWarehouse.rto, null)
+  assert.equal(storedWarehouse.pickup.phone, '1111111111')
+  assert.equal(resolveBookingWarehouseSelection(storedWarehouse, {}).id, 'old')
+  const differentRto = resolveBookingWarehouseSelection(storedWarehouse, {
+    pickup_location_id: 'new',
+    pickup: { phone: '9999900500' },
+    is_rto_different: 'yes',
+    rto: { phone: '9999900501' },
+  })
+  assert.equal(differentRto.rto?.phone, '9999900501')
   const seller = 'seller-a'
   const records = [
     {

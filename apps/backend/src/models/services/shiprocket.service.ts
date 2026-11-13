@@ -92,6 +92,7 @@ import {
 import { fetchPostalLocationsByPincode } from './location.service'
 import { getPaymentOptions } from './paymentOptions.service'
 import { calculateFreight } from './pricing/chargeableFreight'
+import { resolveBookingWarehouseSelection } from '../../utils/bookingWarehouseSelection'
 
 // Load correct .env based on NODE_ENV
 const env = process.env.NODE_ENV || 'development'
@@ -3686,8 +3687,14 @@ const buildB2CBookingParamsFromOrder = (
   order: B2COrderRow,
   courierParams: Partial<ShipmentParams>,
 ): ShipmentParams => {
-  const pickupDetails = getB2COrderPickupDetails(order)
-  const rtoDetails = getB2COrderRtoDetails(order)
+  const warehouse = resolveBookingWarehouseSelection({
+    id: order.pickup_location_id,
+    pickup: getB2COrderPickupDetails(order),
+    rto: getB2COrderRtoDetails(order),
+    isRtoDifferent: Boolean(order.is_rto_different),
+  }, courierParams)
+  const pickupDetails = warehouse.pickup
+  const rtoDetails = warehouse.rto
   const requestedTransactionFee =
     courierParams.transaction_fee !== undefined
       ? Number(courierParams.transaction_fee)
@@ -3733,7 +3740,7 @@ const buildB2CBookingParamsFromOrder = (
       phone: order.buyer_phone,
       email: order.buyer_email ?? undefined,
     },
-    pickup_location_id: order.pickup_location_id ?? courierParams.pickup_location_id,
+    pickup_location_id: warehouse.id,
     pickup: {
       warehouse_name: pickupDetails.warehouse_name || pickupDetails.name || 'Warehouse',
       name: pickupDetails.name || pickupDetails.warehouse_name || 'ChoiceMe',
@@ -3748,13 +3755,13 @@ const buildB2CBookingParamsFromOrder = (
       pickup_time: pickupTime,
     },
     company: {},
-    is_rto_different: order.is_rto_different ? 'yes' : 'no',
+    is_rto_different: warehouse.isRtoDifferent ? 'yes' : 'no',
     order_items: normalizeB2COrderItemsForBooking(order.products),
     pickup_date: pickupDate,
     pickup_time: pickupTime,
   }
 
-  if (order.is_rto_different && rtoDetails) {
+  if (warehouse.isRtoDifferent && rtoDetails) {
     params.rto = {
       warehouse_name: rtoDetails.warehouse_name || rtoDetails.name || 'RTO',
       name: rtoDetails.name || rtoDetails.warehouse_name || 'RTO',
@@ -3768,6 +3775,7 @@ const buildB2CBookingParamsFromOrder = (
     }
   }
 
+  if (!warehouse.isRtoDifferent) delete params.rto
   return params
 }
 
