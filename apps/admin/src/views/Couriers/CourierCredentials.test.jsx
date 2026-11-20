@@ -1,4 +1,5 @@
 import React from 'react'
+import { ChakraProvider } from '@chakra-ui/react'
 import { renderToStaticMarkup } from 'react-dom/server.node'
 import CourierCredentials from './CourierCredentials'
 
@@ -10,7 +11,7 @@ jest.mock('hooks/useCouriers', () => ({
 
 test('Shadowfax credential card asks only for a blank production token', () => {
   const host = document.createElement('div')
-  host.innerHTML = renderToStaticMarkup(<CourierCredentials />)
+  host.innerHTML = renderToStaticMarkup(<ChakraProvider><CourierCredentials /></ChakraProvider>)
   const token = host.querySelector('#shadowfax-production-token')
   expect(token).not.toBeNull()
   expect(token.type).toBe('password')
