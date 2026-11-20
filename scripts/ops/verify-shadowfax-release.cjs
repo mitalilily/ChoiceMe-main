@@ -45,5 +45,8 @@ const client = new Client({ connectionString: process.env.DATABASE_URL,
       (SELECT count(*)::int FROM choicemee_shadowfax_callbacks) AS callbacks`)
     assert.deepEqual(counts, { bookings: 0, callbacks: 0 })
     console.log('PASS Shadowfax admin authorization, seller rejection, secret redaction, inactive gate, callback gate and empty journals')
-  } finally { await client.end() }
-})().then(() => process.exit(0)).catch(error => { console.error(error.message); process.exit(1) })
+  } finally { void client.end().catch(() => {}) }
+})().then(() => setTimeout(() => process.exit(0), 250)).catch(error => {
+  console.error(error.message)
+  setTimeout(() => process.exit(1), 250)
+})
