@@ -55,7 +55,7 @@ import { usePresignedDownloadMutation } from '../../../hooks/Uploads/usePresigne
 import { useKycVerification } from '../../../hooks/User/useKycVerification'
 import type { B2COrder } from '../../../types/generic.types'
 import {
-  DELHIVERY_COURIER_FILTER_OPTIONS_BY_NAME,
+  B2C_COURIER_FILTER_OPTIONS_BY_NAME,
 } from '../../../utils/courierDisplay'
 import { downloadClientOrdersCsv } from '../../../utils/orderCsvExport'
 import { FilterBar, type FilterField } from '../../FilterBar'
@@ -1123,7 +1123,7 @@ const B2COrdersList = () => {
       name: 'courier',
       label: 'Courier',
       type: 'select',
-      options: DELHIVERY_COURIER_FILTER_OPTIONS_BY_NAME,
+      options: B2C_COURIER_FILTER_OPTIONS_BY_NAME,
       isAdvanced: true,
     },
     {

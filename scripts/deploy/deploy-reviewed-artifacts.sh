@@ -4,6 +4,7 @@ set -euo pipefail
 SOURCE=/opt/choicemee/source
 ENV_FILE=/opt/choicemee/shared/backend.env
 WEB=/var/www/choicemee/app
+ADMIN_WEB=/var/www/choicemee/admin
 STAGE=$(realpath "${1:?Pass the reviewed release directory}")
 case "$STAGE" in /opt/choicemee/review-*|/opt/choicemee/releases/*) ;; *) echo 'Invalid release directory'; exit 1 ;; esac
 test -f "$STAGE/backend/dist/app.js"
@@ -21,6 +22,10 @@ mkdir -p "$BACKUP"
 chmod 700 "$BACKUP"
 cp -a "$SOURCE/apps/backend/dist" "$BACKUP/backend-dist"
 cp -a "$WEB" "$BACKUP/app"
+if [ -f "$STAGE/admin/build/index.html" ]; then
+  test -d "$ADMIN_WEB"
+  cp -a "$ADMIN_WEB" "$BACKUP/admin"
+fi
 cp -a "$NGINX" "$BACKUP/nginx.conf"
 cp -a "$ENV_FILE" "$BACKUP/backend.env"
 ENV_HASH=$(sha256sum "$ENV_FILE" | cut -d' ' -f1)
@@ -54,6 +59,7 @@ rollback() {
   fi
   if [ "$ROUTED" = true ]; then install -m 644 "$BACKUP/nginx.conf" "$NGINX"; nginx -t && nginx -s reload; fi
   rsync -a "$BACKUP/app/" "$WEB/"
+  if [ -d "$BACKUP/admin" ]; then rsync -a "$BACKUP/admin/" "$ADMIN_WEB/"; fi
   pm2 delete choicemee-candidate >/dev/null 2>&1 || true
   exit 1
 }
@@ -73,6 +79,7 @@ wait_health 5013
 BASE_URL=http://127.0.0.1:5013 node "$SOURCE/scripts/ops/verify-shipping-release.cjs"
 if [ -f "$STAGE/backend/migration_add_shadowfax.sql" ]; then
   BASE_URL=http://127.0.0.1:5013 node "$SOURCE/scripts/ops/verify-shadowfax-release.cjs"
+  node "$SOURCE/scripts/ops/verify-shadowfax-rates.cjs"
 fi
 
 sed 's#proxy_pass http://127.0.0.1:5012;#proxy_pass http://127.0.0.1:5013;#' "$BACKUP/nginx.conf" > "$BACKUP/nginx-candidate.conf"
@@ -110,6 +117,11 @@ ROUTED=false
 rsync -a --exclude=index.html "$STAGE/client/dist/" "$WEB/"
 install -m 644 "$STAGE/client/dist/index.html" "$WEB/index.next.html"
 mv "$WEB/index.next.html" "$WEB/index.html"
+if [ -f "$STAGE/admin/build/index.html" ]; then
+  rsync -a --exclude=index.html "$STAGE/admin/build/" "$ADMIN_WEB/"
+  install -m 644 "$STAGE/admin/build/index.html" "$ADMIN_WEB/index.next.html"
+  mv "$ADMIN_WEB/index.next.html" "$ADMIN_WEB/index.html"
+fi
 test "$(sha256sum "$ENV_FILE" | cut -d' ' -f1)" = "$ENV_HASH"
 for url in https://choicemee.in https://app.choicemee.in https://admin.choicemee.in https://api.choicemee.in/health; do
   code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$url")

@@ -30,10 +30,11 @@ import {
 import { isAdminMiddleware } from '../../middlewares/isAdmin'
 import { requireAuth } from '../../middlewares/requireAuth'
 import { upload } from '../../middlewares/upload'
+import { updateShadowfaxProductionToken } from '../../controllers/admin/shadowfaxCredentials.controller'
 
 const router = Router()
 
-router.get('/shipping-rates', getShippingRatesController)
+router.get('/shipping-rates', requireAuth, isAdminMiddleware, getShippingRatesController)
 router.get('/list', getAllCouriersController)
 
 router.put(
@@ -51,6 +52,7 @@ router.post(
 )
 router.post('/available', requireAuth, fetchAvailableCouriersForAdmin)
 router.get('/credentials', requireAuth, isAdminMiddleware, getCourierCredentialsController)
+router.put('/credentials/shadowfax', requireAuth, isAdminMiddleware, updateShadowfaxProductionToken)
 router.put(
   '/credentials/delivery-one',
   requireAuth,

@@ -139,3 +139,14 @@ export const updateDeliveryOneCredentials = async (payload) => {
   if (!data?.success) throw new Error('Failed to update Delhivery credentials')
   return data.data
 }
+
+export const updateShadowfaxCredentials = async (productionToken) => {
+  try {
+    const { data } = await api.put('/admin/couriers/credentials/shadowfax', { productionToken })
+    if (!data?.success) throw new Error('Could not save Shadowfax credentials')
+    return data.data
+  } catch {
+    // Do not retain/rethrow Axios errors containing the submitted credential in config.data.
+    throw new Error('Could not save the Shadowfax production token. Check the token and try again.')
+  }
+}

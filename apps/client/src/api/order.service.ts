@@ -10,7 +10,7 @@ export interface CreateShipmentParams {
   package_height?: number
   shipping_mode?: string
   transaction_fee?: number
-  integration_type?: 'delhivery' | 'xpressbees' | 'ekart' | 'deliveryone' | 'icarry'
+  integration_type?: 'delhivery' | 'xpressbees' | 'ekart' | 'deliveryone' | 'icarry' | 'shadowfax'
   request_auto_pickup?: 'Yes' | 'No'
   gift_wrap?: number
   shipping_charges?: number // What seller charges customer (customer-facing price)

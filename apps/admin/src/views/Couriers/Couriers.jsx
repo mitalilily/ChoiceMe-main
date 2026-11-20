@@ -46,6 +46,7 @@ import { GenericTable } from 'views/Dashboard/Tables/components/GenericTable'
 
 const providerOptions = [
   { value: 'deliveryone', label: 'Delhivery' },
+  { value: 'shadowfax', label: 'Shadowfax' },
 ]
 
 const providerLabels = providerOptions.reduce((acc, option) => {
@@ -94,6 +95,7 @@ const Couriers = () => {
       const types = Array.isArray(value) ? value : value ? [value] : ['b2c', 'b2b']
 
       const handleToggle = (type) => {
+        if (row.serviceProvider === 'shadowfax') return
         const currentTypes = types || ['b2c', 'b2b']
         let newTypes = []
 
@@ -454,7 +456,12 @@ const Couriers = () => {
           <Select
             placeholder="Select Service Provider"
             value={formData?.serviceProvider || ''}
-            onChange={(e) => setFormData((prev) => ({ ...prev, serviceProvider: e.target.value }))}
+            onChange={(e) => {
+              const serviceProvider = e.target.value
+              setFormData((prev) => ({ ...prev, serviceProvider,
+                ...(serviceProvider === 'shadowfax' ? { courierId: 101, courierName: 'Shadowfax', businessType: ['b2c'], isEnabled: false } : {}),
+              }))
+            }}
             required
             isRequired
           >
@@ -495,6 +502,7 @@ const Couriers = () => {
                   flex={1}
                   size="md"
                   colorScheme={formData?.businessType?.includes('b2b') ? 'purple' : 'gray'}
+                  isDisabled={formData?.serviceProvider === 'shadowfax'}
                   variant={formData?.businessType?.includes('b2b') ? 'solid' : 'outline'}
                   onClick={() => {
                     const currentTypes = formData?.businessType || ['b2c', 'b2b']

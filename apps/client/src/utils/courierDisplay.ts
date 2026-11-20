@@ -36,6 +36,12 @@ export const DELHIVERY_COURIER_FILTER_OPTIONS_BY_NAME = [
   { label: DELHIVERY_EXPRESS_DISPLAY_NAME, value: DELHIVERY_EXPRESS_DISPLAY_NAME },
 ]
 
+// Catalog/filter visibility is independent of live shipment availability.
+export const B2C_COURIER_FILTER_OPTIONS_BY_NAME = [
+  ...DELHIVERY_COURIER_FILTER_OPTIONS_BY_NAME,
+  { label: 'Shadowfax', value: 'Shadowfax' },
+]
+
 const normalizeToken = (value?: string | null) =>
   String(value || '')
     .trim()

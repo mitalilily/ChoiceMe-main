@@ -11,6 +11,7 @@ import {
   fetchServiceProviders,
   fetchShippingRates,
   updateDeliveryOneCredentials,
+  updateShadowfaxCredentials,
   updateCourierStatus,
   updateServiceProviderStatus,
   updateShippingRate,
@@ -127,6 +128,16 @@ export const useUpdateDeliveryOneCredentials = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(['courierCredentials'])
     },
+  })
+}
+
+export const useUpdateShadowfaxCredentials = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateShadowfaxCredentials,
+    gcTime: 0,
+    retry: false,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['courierCredentials'] }),
   })
 }
 

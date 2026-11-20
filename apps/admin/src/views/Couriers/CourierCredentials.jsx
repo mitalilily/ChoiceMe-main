@@ -12,12 +12,31 @@ import {
   VStack,
 } from '@chakra-ui/react'
 import { useEffect, useState } from 'react'
-import { useCourierCredentials, useUpdateDeliveryOneCredentials } from 'hooks/useCouriers'
+import { useCourierCredentials, useUpdateDeliveryOneCredentials, useUpdateShadowfaxCredentials } from 'hooks/useCouriers'
 
 const CourierCredentials = () => {
   const toast = useToast()
   const { data, isLoading, error } = useCourierCredentials()
   const updateDeliveryOne = useUpdateDeliveryOneCredentials()
+  const updateShadowfax = useUpdateShadowfaxCredentials()
+  const [shadowfaxToken, setShadowfaxToken] = useState('')
+
+  const handleSaveShadowfax = () => {
+    const token = shadowfaxToken.trim()
+    if (!token) return
+    updateShadowfax.mutate(token, {
+      onSuccess: () => {
+        setShadowfaxToken('')
+        updateShadowfax.reset()
+        toast({ title: 'Shadowfax production token saved', status: 'success' })
+      },
+      onError: () => {
+        setShadowfaxToken('')
+        updateShadowfax.reset()
+        toast({ title: 'Could not save Shadowfax token', description: 'Check the production token and try again.', status: 'error' })
+      },
+    })
+  }
 
   const [deliveryOneForm, setDeliveryOneForm] = useState({
     apiBase: '',
@@ -84,7 +103,7 @@ const CourierCredentials = () => {
       </Text>
 
       <Flex gap={4} flexWrap="wrap">
-        <Box borderWidth="1px" borderRadius="lg" p={5} minW="320px" flex="1" maxW="520px">
+        <Box borderWidth="1px" borderRadius="lg" p={5} minW={{ base: 0, md: '320px' }} w="100%" flex="1" maxW="520px">
           <VStack spacing={4} align="stretch">
             <Flex justify="space-between" align="center">
               <Text fontWeight="semibold">Delhivery</Text>
@@ -178,7 +197,7 @@ const CourierCredentials = () => {
             </FormControl>
 
             <Text fontSize="xs" color="gray.500">
-              Delhivery is the only active courier integration. Leave password, API key, or
+              Leave password, API key, or
               webhook secret blank to keep the saved value.
             </Text>
 
@@ -189,6 +208,38 @@ const CourierCredentials = () => {
               alignSelf="flex-start"
             >
               Save Delhivery Credentials
+            </Button>
+          </VStack>
+        </Box>
+        <Box borderWidth="1px" borderRadius="lg" p={5} minW={{ base: 0, md: '320px' }} w="100%" flex="1" maxW="520px" alignSelf="flex-start">
+          <VStack spacing={4} align="stretch">
+            <Flex justify="space-between" align="center" gap={2} flexWrap="wrap">
+              <Text fontWeight="semibold">Shadowfax</Text>
+              <Badge colorScheme={data?.shadowfax?.hasApiToken && data.shadowfax.environment === 'production' ? 'green' : 'orange'}>
+                {data?.shadowfax?.hasApiToken && data.shadowfax.environment === 'production' ? 'Production token saved' : 'Production token required'}
+              </Badge>
+            </Flex>
+            <FormControl>
+              <FormLabel htmlFor="shadowfax-production-token">Production Token</FormLabel>
+              <Input
+                id="shadowfax-production-token"
+                name="shadowfax-production-token"
+                type="password"
+                autoComplete="new-password"
+                spellCheck={false}
+                value={shadowfaxToken}
+                onChange={(event) => setShadowfaxToken(event.target.value)}
+                placeholder={data?.shadowfax?.hasApiToken ? 'Enter a new token to replace the saved token' : 'Enter Shadowfax production token'}
+                isDisabled={updateShadowfax.isPending}
+              />
+            </FormControl>
+            <Text fontSize="sm" color="gray.500">
+              The production API URL is configured automatically. Your saved token is never displayed.
+              You can prepare B2C rate cards while shipment booking remains disabled.
+            </Text>
+            <Button colorScheme="blue" onClick={handleSaveShadowfax} isLoading={updateShadowfax.isPending}
+              isDisabled={!shadowfaxToken.trim()} alignSelf={{ base: 'stretch', md: 'flex-start' }}>
+              Save Shadowfax Token
             </Button>
           </VStack>
         </Box>

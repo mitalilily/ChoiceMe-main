@@ -293,7 +293,12 @@ export const RateCardContainer = ({ forceBusinessType = null, embedded = false }
           key: 'courier_name',
           label: 'Courier',
           type: 'multiselect',
-          options: DELIVERY_ONE_COURIER_FILTER_OPTIONS,
+          options: Array.from(new Map([
+            ...DELIVERY_ONE_COURIER_FILTER_OPTIONS,
+            ...(courierList || []).map((courier) => ({
+              label: getCourierDisplayName(courier), value: courier.name,
+            })),
+          ].map((option) => [option.value, option])).values()),
         },
         {
           key: 'mode',
@@ -319,7 +324,7 @@ export const RateCardContainer = ({ forceBusinessType = null, embedded = false }
 
       return options
     },
-    [selectedBusinessType, zones],
+    [selectedBusinessType, zones, courierList],
   )
 
   return (

@@ -17,6 +17,7 @@ import {
 } from '../../models/services/deliveryOneCourierCatalog.service'
 import { DeliveryOneService } from '../../models/services/couriers/deliveryone.service'
 import { XpressbeesService } from '../../models/services/couriers/xpressbees.service'
+import { shadowfaxEnabled } from '../../models/services/shadowfaxIntegration.service'
 import { fetchAvailableCouriersWithRatesAdmin } from '../../models/services/shiprocket.service'
 import { courier_credentials } from '../../models/schema/courierCredentials'
 import { couriers } from '../../models/schema/couriers'
@@ -266,7 +267,7 @@ export const getShippingRatesController = async (req: Request, res: Response) =>
       zone: zonesFilter.length ? zonesFilter : undefined,
     }
 
-    const rates = await getShippingRates(filters)
+    const rates = await getShippingRates(filters, { includeInactive: true })
     res.json({ success: true, data: rates })
   } catch (err) {
     console.error('Error fetching shipping rates:', err)
@@ -360,6 +361,9 @@ export const updateCourierStatusController = async (req: Request, res: Response)
     }
 
     const normalizedServiceProvider = normalizeServiceProviderKey(serviceProvider)
+    if (normalizedServiceProvider === 'shadowfax' && (Number(id) !== 101 || businessType?.some((type: string) => type !== 'b2c'))) {
+      return res.status(400).json({ success: false, message: 'Shadowfax supports B2C only and uses courier ID 101.' })
+    }
     if (!isVisibleServiceProvider(normalizedServiceProvider)) {
       return res.status(400).json({
         success: false,
@@ -485,6 +489,7 @@ export const updateServiceProviderStatusController = async (req: Request, res: R
 }
 
 export const getCourierCredentialsController = async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store')
   try {
     const maskSecret = (value?: string | null) => {
       const text = String(value || '').trim()
@@ -505,7 +510,7 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
         webhookSecret: courier_credentials.webhookSecret,
       })
       .from(courier_credentials)
-      .where(inArray(courier_credentials.provider, ['delhivery', 'deliveryone', 'xpressbees']))
+      .where(inArray(courier_credentials.provider, ['delhivery', 'deliveryone', 'xpressbees', 'shadowfax']))
 
     const defaults = {
       deliveryOne: {
@@ -536,8 +541,16 @@ export const getCourierCredentialsController = async (req: Request, res: Respons
       (row) => String(row.provider || '').toLowerCase() === 'xpressbees',
     )
     const xpressbeesApiKey = xpressbeesCredential?.apiKey || ''
+    const shadowfaxCredential = rows.find(row => row.provider === 'shadowfax')
     const data = {
       ...defaults,
+      shadowfax: {
+        provider: 'shadowfax',
+        hasApiToken: Boolean((shadowfaxCredential?.apiKey || process.env.SHADOWFAX_API_TOKEN || '').trim()),
+        environment: shadowfaxCredential?.apiBase?.includes('dale.shadowfax.in') ||
+          (!shadowfaxCredential?.apiBase && process.env.SHADOWFAX_API_BASE?.includes('dale.shadowfax.in')) ? 'production' : 'unconfigured',
+        bookingEnabled: shadowfaxEnabled(),
+      },
       ...(activeCredential
         ? {
             deliveryOne: {

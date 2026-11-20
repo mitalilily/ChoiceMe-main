@@ -75,4 +75,4 @@ export const getCourierDisplayName = (courierOrName, fallback = 'N/A') => {
 }
 
 export const getProviderDisplayName = (provider, fallback = 'Not selected') =>
-  isDeliveryOneValue(provider) ? 'Delhivery' : provider || fallback
+  isDeliveryOneValue(provider) ? 'Delhivery' : provider === 'shadowfax' ? 'Shadowfax' : provider || fallback

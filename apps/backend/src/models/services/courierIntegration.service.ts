@@ -300,7 +300,7 @@ export const getCourierSummary = async () => {
   return summary
 }
 
-export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
+export const getShippingRates = async (filters: ShippingRateFilters = {}, options: { includeInactive?: boolean } = {}) => {
   const conditions: any[] = []
   const normalizedModeFilter = normalizeB2CShippingMode(filters.mode)
   const zoneFilter = Array.isArray(filters.zone)
@@ -372,7 +372,7 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
         inArray(sql`lower(trim(coalesce(${shippingRates.service_provider}, '')))`, [
           ...VISIBLE_SERVICE_PROVIDERS,
         ]),
-        or(eq(couriers.isEnabled, true), sql`${couriers.id} is null`)!,
+        options.includeInactive ? sql`true` : or(eq(couriers.isEnabled, true), sql`${couriers.id} is null`)!,
       ),
     )
     .orderBy(desc(shippingRates.last_updated), desc(shippingRates.created_at))
@@ -650,6 +650,9 @@ export const updateShippingRate = async (
     resolvedCourierName,
     providedOrExistingProvider,
   )
+  if (normalizedServiceProvider === 'shadowfax' && (Number(courierId) !== SHADOWFAX_COURIER_ID || normalizedBusinessType !== 'b2c')) {
+    throw new Error('Shadowfax rate cards require courier ID 101 and B2C business type')
+  }
   const previousServiceProvider =
     normalizeB2CServiceProvider(previous_service_provider) ||
     normalizeB2CServiceProvider(existingDefault?.service_provider) ||
@@ -886,6 +889,9 @@ export const upsertShippingRate = async (input: RateInput) => {
     finalServiceProvider = providedServiceProvider
   }
 
+  if (finalServiceProvider === 'shadowfax' && (Number(input.courier_id) !== SHADOWFAX_COURIER_ID || input.business_type !== 'b2c')) {
+    throw new Error('Shadowfax supports courier 101 and B2C rate cards only')
+  }
   const shouldReplaceCodSlabs = input.business_type === 'b2c' && Array.isArray(input.cod_slabs)
   const explicitCodSlabs = shouldReplaceCodSlabs ? normaliseCodSlabs(input.cod_slabs || []) : []
   if (shouldReplaceCodSlabs) {
@@ -1036,7 +1042,7 @@ export const createCourier = async (data: {
 
   // Validate and set businessType (default to both if not provided)
   const businessType =
-    data?.businessType && data.businessType.length > 0 ? data.businessType : ['b2c', 'b2b']
+    normalizedProvider === 'shadowfax' ? ['b2c'] : data?.businessType && data.businessType.length > 0 ? data.businessType : ['b2c', 'b2b']
 
   // Insert new courier
   const [newCourier] = await db

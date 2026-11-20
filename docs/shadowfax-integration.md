@@ -2,6 +2,26 @@
 
 Status: API implementation deployed inactive. Credentials and carrier end-to-end verification are pending. No real shipment was created during implementation. Existing couriers retain their existing configuration and billing behavior.
 
+## Credential card and rate-card setup
+
+Admin → Courier Credentials includes a Shadowfax card with one password input: Production Token.
+`PUT /api/admin/couriers/credentials/shadowfax` accepts only `{ "productionToken": "..." }`,
+uses the fixed official production host, and preserves existing OAuth/callback configuration.
+The saved token is never returned by the card's read or write APIs. Saving does not activate booking.
+
+Shadowfax (internal ID 101) appears in the B2C courier/provider catalog, admin rate-card
+add/edit/export/import selections and filters, and seller B2C order/rate-card filters.
+Admins can save and review inactive-courier pricing; sellers still receive only available
+courier pricing. Existing plan isolation, slabs, COD rules and booking gates are unchanged.
+Shadowfax is not offered for B2B or the settlement CSV uploader, whose carrier-specific
+column mapping has not been verified. Actual shipping choices remain serviceability/activation gated.
+
+Verification: `check:shadowfax` covers token-only validation. The admin credential-card test
+checks a single masked, empty input and saved metadata. `scripts/ops/verify-shadowfax-release.cjs`
+checks authenticated catalogs and credential/rate access. `verify-shadowfax-rates.cjs` exercises
+the real rate service using a private QA plan inside one confirmed rolled-back transaction;
+it never assigns a plan to a seller, commits rates, or contacts a courier.
+
 Source documentation: [Forward quickstart](https://developer.shadowfax.in/docs/forward-logistics/quickstart), [forward API reference](https://developer.shadowfax.in/docs/api/forward-logistics), [reverse quickstart](https://developer.shadowfax.in/docs/reverse-logistics/quickstart), [reverse API reference](https://developer.shadowfax.in/docs/api/reverse-logistics). Reviewed November 20, 2026. The reference navigation lists 14 forward and 9 reverse operations; shared endpoints are intentionally listed under both directions below. Authentication is additional.
 
 ## Forward API inventory

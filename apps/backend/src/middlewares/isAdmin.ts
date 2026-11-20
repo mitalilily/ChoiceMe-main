@@ -11,6 +11,7 @@ const ADMIN_PERMISSION_PREFIXES: Array<[string, string]> = [
   ['/api/admin/users/employees', 'admin_users'],
   ['/api/admin/users', 'users_management'],
   ['/api/admin/couriers/providers', 'service_providers'],
+  ['/api/admin/couriers/credentials', 'courier_credentials'],
   ['/api/admin/couriers', 'couriers'],
   ['/api/admin/zones', 'serviceability'],
   ['/api/admin/b2b', 'pricing_b2b'],

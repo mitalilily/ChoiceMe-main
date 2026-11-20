@@ -27,6 +27,7 @@ import { useShippingRates } from '../../hooks/Integrations/useCouriers'
 import { useZones } from '../../hooks/useZones'
 import {
   DELHIVERY_COURIER_FILTER_OPTIONS_BY_NAME,
+  B2C_COURIER_FILTER_OPTIONS_BY_NAME,
   getCourierDisplayName,
   getCourierLogo,
 } from '../../utils/courierDisplay'
@@ -303,7 +304,7 @@ const RateCard = () => {
       name: 'courier',
       label: 'Courier',
       type: 'multiselect',
-      options: DELHIVERY_COURIER_FILTER_OPTIONS_BY_NAME,
+      options: businessType === 'b2c' ? B2C_COURIER_FILTER_OPTIONS_BY_NAME : DELHIVERY_COURIER_FILTER_OPTIONS_BY_NAME,
     },
     { name: 'min_weight', label: 'Min Weight (kg)', type: 'text', placeholder: 'Enter min weight' },
   ]

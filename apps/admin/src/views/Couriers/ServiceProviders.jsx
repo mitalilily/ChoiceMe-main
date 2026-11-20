@@ -17,6 +17,7 @@ import { useServiceProviders, useUpdateServiceProviderStatus } from 'hooks/useCo
 const providerLabels = {
   delhivery: 'Delhivery',
   deliveryone: 'Delhivery',
+  shadowfax: 'Shadowfax',
 }
 
 const ServiceProviders = () => {
@@ -53,7 +54,7 @@ const ServiceProviders = () => {
         Service Providers
       </Text>
       <Text fontSize="sm" color="gray.500">
-        Manage the Delhivery courier integration.
+        Manage courier integrations. Rate cards can be prepared before enabling booking.
       </Text>
       <Table variant="simple">
         <Thead>

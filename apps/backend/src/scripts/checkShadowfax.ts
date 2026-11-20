@@ -3,6 +3,7 @@ import { ShadowfaxService, ShadowfaxError, shadowfaxBase, validateShadowfaxOrder
 import { buildShadowfaxPayload, normalizeShadowfaxTracking, shadowfaxOrderId, shadowfaxStatus, shadowfaxWeightKg } from '../models/services/couriers/shadowfaxPayload'
 import { getShadowfaxService, placeShadowfaxBooking, shadowfaxBookingLockPool } from '../models/services/shadowfaxIntegration.service'
 import { pool } from '../models/client'
+import { shadowfaxProductionTokenValues } from '../models/services/couriers/shadowfaxCredentials'
 
 let checks = 0
 const check = async (name: string, run: () => any) => { await run(); checks++; console.log(`PASS ${name}`) }
@@ -30,6 +31,17 @@ const service = new ShadowfaxService({ apiKey: 'test-token' }, fake)
 const last = () => calls[calls.length - 1]
 
 async function main() {
+  await check('token-only production credential contract rejects host and activation overrides', () => {
+    const token = 'test-production-token-12345'
+    assert.deepEqual(shadowfaxProductionTokenValues({ productionToken: ` Token ${token} ` }), {
+      provider: 'shadowfax', apiBase: 'https://dale.shadowfax.in/api', apiKey: token,
+    })
+    for (const input of [null, [], {}, { productionToken: '' }, { productionToken: 123 },
+      { productionToken: 'invalid\nheader' }, { productionToken: token, enabled: true },
+      { productionToken: token, apiBase: 'https://attacker.example' }]) {
+      assert.throws(() => shadowfaxProductionTokenValues(input), (error: any) => error.statusCode === 400)
+    }
+  })
   await check('official host allowlist and staging default', () => {
     assert.equal(shadowfaxBase(), 'https://dale.staging.shadowfax.in/api')
     for (const url of ['http://dale.shadowfax.in/api', 'https://attacker.example/api', 'https://dale.shadowfax.in/api@attacker.example']) assert.throws(() => shadowfaxBase(url))
