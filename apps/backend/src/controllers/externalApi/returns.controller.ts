@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { Response } from 'express'
+import { normalizeServiceProviderKey } from '../../utils/courierProviders'
 import { db } from '../../models/client'
 import { quoteReverseForOrder } from '../../models/services/reverse.service'
 import { createB2CShipmentService } from '../../models/services/shiprocket.service'
@@ -33,7 +34,8 @@ export const createReturnOrderController = async (req: any, res: Response) => {
       // optional: keep zero if not found
     }
 
-    if (reverseCharge > 0) {
+    // Shadowfax charges through the main booking transaction, not before carrier acceptance.
+    if (reverseCharge > 0 && normalizeServiceProviderKey(body.integration_type) !== 'shadowfax' && String(body.provider_code || '').toUpperCase() !== 'SF6T9') {
       const [userWallet] = await db
         .select()
         .from(wallets)

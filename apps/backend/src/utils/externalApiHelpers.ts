@@ -10,6 +10,7 @@ import {
 
 // Map integration types to opaque codes that don't reveal the provider
 const PROVIDER_CODE_MAP: Record<string, string> = {
+  shadowfax: 'SF6T9',
   deliveryone: 'QH8L2',
   delhivery: 'QH8L2',
   xpressbees: 'XB9K3',
@@ -17,6 +18,7 @@ const PROVIDER_CODE_MAP: Record<string, string> = {
 
 // Reverse map: provider code -> integration type
 const PROVIDER_CODE_REVERSE_MAP: Record<string, string> = {
+  SF6T9: 'shadowfax',
   QH8L2: 'deliveryone',
   R7M4K: 'deliveryone',
   XB9K3: 'xpressbees',

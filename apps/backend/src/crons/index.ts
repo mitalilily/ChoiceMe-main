@@ -15,12 +15,17 @@ import {
 } from './weightReconciliationEmails'
 import { pollEkartTracking } from './ekartTracking'
 import { pollDeliveryOneTracking } from './deliveryOneTracking'
+import { pollShadowfaxTracking } from './shadowfaxTracking'
 import { retryFailedShipmentStatusEmails } from '../models/services/shipmentNotification.service'
 
 let isReconcilingCodRemittances = false
 let isRetryingShipmentEmails = false
 let isPollingDeliveryOneTracking = false
 let isSyncingShopifyOrders = false
+
+cron.schedule('*/3 * * * *', () => {
+  pollShadowfaxTracking().catch(() => console.warn('[Shadowfax] Reconciliation unavailable; will retry next cycle.'))
+})
 
 const syncRecentShopifyOrders = async () => {
   if (isSyncingShopifyOrders) {

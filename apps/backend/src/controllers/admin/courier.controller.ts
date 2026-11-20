@@ -274,11 +274,23 @@ export const getShippingRatesController = async (req: Request, res: Response) =>
   }
 }
 
+const getShadowfaxCatalogRows = async (filters: { search?: unknown; serviceProvider?: unknown; businessType?: unknown } = {}) => {
+  const provider = String(filters.serviceProvider || '').trim().toLowerCase()
+  if ((provider && provider !== 'shadowfax') || String(filters.businessType || '').toLowerCase() === 'b2b') return []
+  const rows = await db.select().from(couriers).where(eq(couriers.serviceProvider, 'shadowfax'))
+  const search = String(filters.search || '').trim().toLowerCase()
+  return rows.filter(row => !search || `${row.id} ${row.name}`.toLowerCase().includes(search)).map(row => ({
+    ...row, displayName: row.name, service_provider: 'shadowfax', mode: 'surface',
+    shipping_mode: 'surface', shippingMode: 'Surface',
+  }))
+}
+
 export const getAllCouriersController = async (req: Request, res: Response) => {
   try {
     const courierList = await getCanonicalDelhiveryCouriers()
+    const shadowfax = await getShadowfaxCatalogRows()
 
-    res.json({ success: true, data: courierList })
+    res.json({ success: true, data: [...courierList, ...shadowfax] })
   } catch (err) {
     console.error(err)
     res.status(500).json({ success: false })
@@ -294,8 +306,9 @@ export const getAllCouriersListController = async (req: Request, res: Response) 
       serviceProvider,
       businessType,
     })
+    const shadowfax = await getShadowfaxCatalogRows({ search, serviceProvider, businessType })
 
-    res.json({ success: true, data: courierList })
+    res.json({ success: true, data: [...courierList, ...shadowfax] })
   } catch (err) {
     console.error(err)
     res.status(500).json({ success: false, message: 'Failed to fetch couriers' })

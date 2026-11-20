@@ -5,6 +5,7 @@ import { DelhiveryService } from './couriers/delhivery.service'
 import { DeliveryOneService } from './couriers/deliveryone.service'
 import { EkartService } from './couriers/ekart.service'
 import { XpressbeesService } from './couriers/xpressbees.service'
+import { getShadowfaxService } from './shadowfaxIntegration.service'
 import { applyCancellationRefundOnce } from './webhookProcessor'
 import { sendShipmentStatusEmailIfChanged } from './shipmentNotification.service'
 import {
@@ -71,6 +72,7 @@ export async function cancelOrderShipment(orderId: string, expectedUserId?: stri
     'confirmed',
     'pickup_initiated',
     'manifest_failed',
+    'shipment_created',
   ])
   const currentStatus = String(order.order_status || '').toLowerCase()
   if (!cancellableStatuses.has(currentStatus)) {
@@ -135,6 +137,9 @@ export async function cancelOrderShipment(orderId: string, expectedUserId?: stri
   } else if (integration === 'deliveryone') {
     const svc = new DeliveryOneService()
     cancellationResult = await svc.cancelShipment(order.awb_number)
+  } else if (integration === 'shadowfax') {
+    const svc = await getShadowfaxService()
+    cancellationResult = await svc.cancelOrder(order.order_type === 'reverse' ? 'reverse' : 'forward', order.awb_number)
   } else if (integration === 'ekart') {
     const svc = new EkartService()
     cancellationResult = await svc.cancelShipment(order.awb_number)

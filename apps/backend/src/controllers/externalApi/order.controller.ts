@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { Response } from 'express'
+import { getShadowfaxService } from '../../models/services/shadowfaxIntegration.service'
 import { db } from '../../models/client'
 import { DelhiveryService } from '../../models/services/couriers/delhivery.service'
 import { DeliveryOneService } from '../../models/services/couriers/deliveryone.service'
@@ -336,6 +337,9 @@ export const cancelOrderController = async (req: any, res: Response) => {
       } else if (provider === 'deliveryone') {
         const deliveryOne = new DeliveryOneService()
         cancellationResult = await deliveryOne.cancelShipment(order.awb_number)
+      } else if (provider === 'shadowfax') {
+        const shadowfax = await getShadowfaxService()
+        cancellationResult = await shadowfax.cancelOrder(order.order_type === 'reverse' ? 'reverse' : 'forward', order.awb_number)
       } else if (provider === 'ekart') {
         const ekart = new EkartService()
         cancellationResult = await ekart.cancelShipment(order.awb_number)

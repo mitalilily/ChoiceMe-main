@@ -3,7 +3,7 @@ import { db } from '../client'
 import { courierCredentials } from '../schema/courierCredentials'
 
 export type BusinessType = 'b2b' | 'b2c'
-export type ServiceProviderId = 'delhivery' | 'shipway' | 'xpressbees' | 'ekart' | 'deliveryone'
+export type ServiceProviderId = 'delhivery' | 'shipway' | 'xpressbees' | 'ekart' | 'deliveryone' | 'shadowfax'
 
 export type DelhiveryConfig = {
   apiKey?: string
@@ -90,7 +90,7 @@ export interface CourierCredentialsMeta {
   }
 }
 
-const KNOWN_PROVIDERS: ServiceProviderId[] = ['deliveryone']
+const KNOWN_PROVIDERS: ServiceProviderId[] = ['deliveryone', 'shadowfax']
 export const DEFAULT_EKART_BASE_URL = 'https://app.elite.ekartlogistics.in'
 
 const hasEnvForProviderAndType = (provider: ServiceProviderId, _type: BusinessType): boolean => {
@@ -144,6 +144,10 @@ export const normalizeEkartBaseUrl = (value?: string | null) => {
 }
 
 const buildConfigFromRow = (provider: ServiceProviderId, row: typeof courierCredentials.$inferSelect) => {
+  if (provider === 'shadowfax') return {
+    apiBase: normalize(row.apiBase), apiKey: normalize(row.apiKey), clientId: normalize(row.clientId),
+    password: normalize(row.password), webhookSecret: normalize(row.webhookSecret),
+  }
   if (provider === 'ekart') {
     const ekartBaseUrl = normalizeEkartBaseUrl(row.apiBase)
     const cfg: EkartConfig = {

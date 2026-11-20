@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import { normalizeServiceProviderKey } from '../utils/courierProviders'
 import { createB2CShipmentService } from '../models/services/shiprocket.service'
 import { quoteReverseForOrder } from '../models/services/reverse.service'
 import { db } from '../models/client'
@@ -29,7 +30,8 @@ export const createReversePickup = async (req: any, res: Response) => {
       // optional: keep zero if not found
     }
 
-    if (reverseCharge > 0) {
+    // Shadowfax uses the main booking transaction for a single atomic wallet debit.
+    if (reverseCharge > 0 && normalizeServiceProviderKey(body.integration_type) !== 'shadowfax') {
       const [userWallet] = await db.select().from(wallets).where(eq(wallets.userId, userId)).limit(1)
       if (!userWallet) throw new Error('Wallet not found')
       if (Number(userWallet.balance || 0) < reverseCharge) {

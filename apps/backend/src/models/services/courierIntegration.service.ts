@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { SHADOWFAX_COURIER_ID } from './couriers/shadowfax.service'
 import { and, asc, desc, eq, gte, ilike, inArray, or, sql } from 'drizzle-orm'
 import { ShippingRateFilters } from '../../controllers/admin/courier.controller'
 import { db } from '../client'
@@ -63,7 +64,7 @@ export const buildCourierWhereClause = (filters: CourierFilters = {}) => {
   const conditions = [
     eq(couriers.isEnabled, true),
     inArray(couriers.serviceProvider, [...VISIBLE_SERVICE_PROVIDERS]),
-    inArray(couriers.id, DELIVERY_ONE_ALLOWED_COURIER_IDS),
+    inArray(couriers.id, [...DELIVERY_ONE_ALLOWED_COURIER_IDS, SHADOWFAX_COURIER_ID]),
   ]
 
   if (filters.name) {
@@ -283,7 +284,7 @@ export const getCourierById = async (id: number) => {
         eq(couriers.id, id),
         eq(couriers.isEnabled, true),
         inArray(couriers.serviceProvider, [...VISIBLE_SERVICE_PROVIDERS]),
-        inArray(couriers.id, DELIVERY_ONE_ALLOWED_COURIER_IDS),
+        inArray(couriers.id, [...DELIVERY_ONE_ALLOWED_COURIER_IDS, SHADOWFAX_COURIER_ID]),
       ),
     )
 
@@ -367,7 +368,7 @@ export const getShippingRates = async (filters: ShippingRateFilters = {}) => {
     .where(
       and(
         ...conditions,
-        inArray(shippingRates.courier_id, DELIVERY_ONE_ALLOWED_COURIER_IDS),
+        inArray(shippingRates.courier_id, [...DELIVERY_ONE_ALLOWED_COURIER_IDS, SHADOWFAX_COURIER_ID]),
         inArray(sql`lower(trim(coalesce(${shippingRates.service_provider}, '')))`, [
           ...VISIBLE_SERVICE_PROVIDERS,
         ]),
@@ -1015,6 +1016,9 @@ export const createCourier = async (data: {
   }
   if (normalizedProvider === 'deliveryone' && !DELIVERY_ONE_ALLOWED_COURIER_IDS.includes(courierId)) {
     throw new Error('Only Delhivery Surface and Delhivery Express can be used for DeliveryOne')
+  }
+  if (normalizedProvider === 'shadowfax' && (courierId !== SHADOWFAX_COURIER_ID || data.businessType?.includes('b2b'))) {
+    throw new Error('Shadowfax uses internal courier ID 101 and supports B2C only.')
   }
   console.log('data', data)
   // Check if courier already exists for this service provider

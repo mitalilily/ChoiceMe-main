@@ -62,6 +62,10 @@ trap rollback ERR
 # Additive columns only; current application and database relay continue running.
 cd "$STAGE/backend"
 node -e "const {ensureLabelNoteColumns}=require('./dist/models/migrations/ensureLabelNoteColumns');const {pool}=require('./dist/models/client');ensureLabelNoteColumns().then(()=>{pool.end();setTimeout(()=>process.exit(0),250)}).catch(e=>{console.error(e);process.exit(1)})"
+# Shadowfax is deployed inactive; this migration only adds its journal and disabled catalog row.
+if [ -f "$STAGE/backend/migration_add_shadowfax.sql" ]; then
+  node -e "const fs=require('fs');const {pool}=require('./dist/models/client');pool.query(fs.readFileSync('./migration_add_shadowfax.sql','utf8')).then(()=>pool.end()).then(()=>process.exit(0)).catch(()=>{console.error('Shadowfax additive migration failed');process.exit(1)})"
+fi
 pm2 start "$SOURCE/scripts/deploy/candidate-api.cjs" --name choicemee-candidate --time --kill-timeout 240000
 wait_health 5013
 

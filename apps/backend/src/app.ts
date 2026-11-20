@@ -36,6 +36,8 @@ import billingPreferencesRoutes from './routes/billingPreferences.routes'
 import blogRoutes from './routes/blogs.routes'
 import codRemittanceRoutes from './routes/codRemittance.routes'
 import courierRoutes from './routes/courier.routes'
+import shadowfaxRoutes from './routes/shadowfax.routes'
+import { shadowfaxWebhookHandler } from './controllers/webhooks/shadowfax.webhook'
 import courierPriorityRoutes from './routes/courierPriority.routes'
 import dashboardRoutes from './routes/dashboard.routes'
 import employeeRoutes from './routes/employee.routes'
@@ -214,6 +216,8 @@ app.use('/api/admin/users', adminUserRoutes)
 app.use('/api/admin/orders', adminOrderRoutes)
 app.use('/api/admin/developer', adminDeveloperRoutes)
 app.use('/api/admin/couriers', adminCourierRoutes)
+app.use('/api/admin/couriers/shadowfax', shadowfaxRoutes)
+app.post('/api/webhooks/shadowfax', shadowfaxWebhookHandler)
 app.use('/api/admin/zones', zoneRoutes)
 app.use('/api/admin/b2b', b2bAdminRoutes)
 app.use('/api/notifications', notificationRoutes)

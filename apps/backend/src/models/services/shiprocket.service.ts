@@ -27,7 +27,7 @@ import {
   normalizeCourierId,
 } from '../../utils/delhiveryCourier'
 import { getBucketName } from '../../utils/functions'
-import { db } from '../client'
+import { db, pool } from '../client'
 import { b2b_orders } from '../schema/b2bOrders'
 import { b2c_orders } from '../schema/b2cOrders'
 import { invoicePreferences } from '../schema/invoicePreferences'
@@ -93,6 +93,9 @@ import { fetchPostalLocationsByPincode } from './location.service'
 import { getPaymentOptions } from './paymentOptions.service'
 import { calculateFreight } from './pricing/chargeableFreight'
 import { resolveBookingWarehouseSelection } from '../../utils/bookingWarehouseSelection'
+import { getShadowfaxService, placeShadowfaxBooking, shadowfaxEnabled } from './shadowfaxIntegration.service'
+import { buildShadowfaxPayload, normalizeShadowfaxTracking, shadowfaxWeightKg } from './couriers/shadowfaxPayload'
+import { SHADOWFAX_COURIER_ID } from './couriers/shadowfax.service'
 
 // Load correct .env based on NODE_ENV
 const env = process.env.NODE_ENV || 'development'
@@ -1773,6 +1776,7 @@ export const fetchAvailableCouriersWithRates = async (
 
     for (const row of systemCourierRows) {
       const providerKey = normalizeProviderKey(row.serviceProvider)
+      if (providerKey === 'shadowfax' && !shadowfaxEnabled()) continue
       if (!providerKey || !SUPPORTED_PROVIDERS.includes(providerKey as any)) continue
       if (
         providerKey === 'delhivery' &&
@@ -2186,6 +2190,23 @@ export const fetchAvailableCouriersWithRates = async (
       })
     }
 
+    if (enabledProviders.has('shadowfax') && shadowfaxEnabled()) {
+      try {
+        const shadowfax = await getShadowfaxService(true)
+        const origin = String(params.origin ?? params.source_pincode ?? '')
+        const destination = String(params.destination ?? params.destination_pincode ?? '')
+        const reverse = params.isReverse === true || params.payment_type === 'reverse'
+        if (await shadowfax.checkRoute(reverse ? 'reverse' : 'forward', origin, destination)) {
+          registerServiceableProvider('shadowfax', {
+            providerId: 'shadowfax', providerName: 'Shadowfax', codAvailable: !reverse,
+            prepaidAvailable: true, edd: 'Carrier estimate at booking', raw: null,
+          })
+        }
+      } catch {
+        console.warn('[Shadowfax] Serviceability unavailable; provider omitted, other couriers unchanged.')
+      }
+    }
+
     const ekartProviderRate =
       ekartAvailable && ekartResp
         ? buildProviderRate('ekart', {
@@ -2357,6 +2378,8 @@ export const fetchAvailableCouriersWithRates = async (
 
       for (const rateCard of localRates) {
         const providerKey = normalizeProviderKey(rateCard.service_provider)
+        // Never manufacture Shadowfax availability from a local rate when live checks failed.
+        if (providerKey === 'shadowfax' && (!shadowfaxEnabled() || !serviceableProviders.has('shadowfax'))) continue
         if (!providerKey) continue
         if (!VISIBLE_SERVICE_PROVIDERS.includes(providerKey as any)) continue
 
@@ -3924,6 +3947,55 @@ export const createB2CShipmentService = async (
   is_external_api: boolean = false,
   options: { existingOrderId?: string } = {},
 ) => {
+  const { getIntegrationTypeFromProviderCode } = await import('../../utils/externalApiHelpers')
+  const provider = normalizeServiceProviderKey(params.integration_type || getIntegrationTypeFromProviderCode(params.provider_code))
+  if (provider !== 'shadowfax') return createB2CShipmentServiceImpl(params, userId, is_external_api, options)
+  await getShadowfaxService(true)
+  if (!params.order_number) throw new HttpError(400, 'Order number is required.')
+  if (params.payment_type !== 'reverse' && !params.isReverse && Number(params.courier_id) !== SHADOWFAX_COURIER_ID) throw new HttpError(400, 'Select a valid Shadowfax courier.')
+  params.integration_type = 'shadowfax'
+  const lock = await pool.connect()
+  const lockKey = `shadowfax:${userId}:${params.order_number}`
+  let locked = false
+  try {
+    const { rows: [result] } = await lock.query('SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked', [lockKey])
+    if (!result?.locked) throw new HttpError(409, 'Booking is already in progress.')
+    locked = true
+    const [existing] = await db.select().from(b2c_orders).where(and(eq(b2c_orders.user_id, userId), eq(b2c_orders.order_number, params.order_number))).limit(1)
+    if (existing?.awb_number) throw new HttpError(409, 'This order already has a shipment. Use its existing AWB.')
+    if (existing && existing.id !== options.existingOrderId) throw new HttpError(409, 'Book the existing draft instead of creating another order.')
+    if (params.payment_type === 'reverse' || params.isReverse) {
+      const originalId = params.original_order_id || params.order_id
+      if (!originalId) throw new HttpError(400, 'Original order ID is required for a reverse shipment.')
+      const [original] = await db.select().from(b2c_orders).where(and(eq(b2c_orders.id, originalId), eq(b2c_orders.user_id, userId))).limit(1)
+      if (!original) throw new HttpError(404, 'Original order not found.')
+      params.package_weight = Number(original.weight)
+      params.order_amount = Number(original.order_amount)
+      params.package_length = Number(original.length)
+      params.package_breadth = Number(original.breadth)
+      params.package_height = Number(original.height)
+      params.courier_id = SHADOWFAX_COURIER_ID
+      params.pickup_location_id = undefined
+      params.pickup = {
+        warehouse_name: original.buyer_name, name: original.buyer_name, phone: original.buyer_phone,
+        address: original.address, city: original.city, state: original.state, pincode: original.pincode,
+      }
+      params.consignee = original.pickup_details as any
+      params.order_items = original.products as any
+    }
+    return await createB2CShipmentServiceImpl(params, userId, is_external_api, options)
+  } finally {
+    try { if (locked) await lock.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [lockKey]) }
+    finally { lock.release() }
+  }
+}
+
+const createB2CShipmentServiceImpl = async (
+  params: ShipmentParams,
+  userId: string,
+  is_external_api: boolean = false,
+  options: { existingOrderId?: string } = {},
+) => {
   await requireMerchantOrderReadiness(userId)
 
   // 🔹 Handle provider_code: Convert provider_code to integration_type if provided
@@ -4589,12 +4661,13 @@ export const createB2CShipmentService = async (
     }
 
     const integrationType = requestedIntegrationType as
+      | 'shadowfax'
       | 'delhivery'
       | 'ekart'
       | 'xpressbees'
       | 'deliveryone'
     const providerName =
-      integrationType === 'delhivery'
+      integrationType === 'shadowfax' ? 'Shadowfax' : integrationType === 'delhivery'
         ? 'Delhivery'
         : integrationType === 'ekart'
           ? 'Ekart Logistics'
@@ -4659,7 +4732,7 @@ export const createB2CShipmentService = async (
       }
     }
 
-    if (['delhivery', 'deliveryone'].includes(integrationType) && !isReverseShipment) {
+    if ((['delhivery', 'deliveryone'].includes(integrationType) && !isReverseShipment) || integrationType === 'shadowfax') {
       const insuranceSettings = await getShipmentInsuranceSettings()
       const insuranceChargeBasis = computeB2CInsuranceChargeBasis(params)
       const insuranceCharge = computeShipmentInsuranceCharge({
@@ -4713,7 +4786,33 @@ export const createB2CShipmentService = async (
     let providerCourierCost: number | null = null
     let providerSortCode: string | null = null
 
-    if (integrationType === 'delhivery') {
+    if (integrationType === 'shadowfax') {
+      const shadowfax = await getShadowfaxService(true)
+      const direction = isReverseShipment ? 'reverse' : 'forward'
+      const payload = buildShadowfaxPayload(shipmentProviderParams, userId, direction)
+      const origin = String(payload.pickup_details?.pincode ?? payload.customer_details.pincode)
+      const destination = String(isReverseShipment ? payload.return_details.pincode : payload.customer_details.pincode)
+      if (!await shadowfax.checkRoute(direction, origin, destination, String(payload.return_details.pincode))) throw new HttpError(400, 'Shadowfax pickup, delivery or return leg is not serviceable.')
+      const rate = await shadowfax.rate(origin, destination, direction, shadowfaxWeightKg(params.package_weight))
+      if (!Number.isFinite(rate.total) || rate.total <= 0) throw new HttpError(502, 'Shadowfax live rate is unavailable. No booking was created.')
+      providerCourierCost = rate.total
+      shipmentData = await placeShadowfaxBooking(shadowfax, userId, direction, payload)
+      const result = shipmentData.data
+      shipmentSuccessPackage = { waybill: result.awb_number }
+      providerSortCode = result.sort_code || null
+      shipmentMeta = {
+        shipment_id: String(result.id || result.awb_number), awb_number: result.awb_number,
+        courier_name: 'Shadowfax', courier_id: SHADOWFAX_COURIER_ID,
+        courier_cost: providerCourierCost, sort_code: providerSortCode,
+      }
+      if (!isReverseShipment) {
+        // Label failure must never turn an accepted booking into a rebooking attempt.
+        try {
+          const label = await shadowfax.label(result.awb_number)
+          shipmentMeta.label = label?.data?.label_url
+        } catch { console.warn('[Shadowfax] Booking accepted; carrier label can be regenerated later.') }
+      }
+    } else if (integrationType === 'delhivery') {
       console.log(
         isReverseShipment
           ? '→ Using Delhivery Reverse Shipment API...'
@@ -5340,7 +5439,7 @@ export const createB2CShipmentService = async (
       }
 
       // 3️⃣ CREATE LOCAL ORDER ENTRY (no seller insurance for B2C – platform liability only)
-      const orderStatus =
+      const orderStatus = integrationType === 'shadowfax' ? 'booked' :
         ['delhivery', 'deliveryone'].includes(integrationType) &&
         !isReverseShipment &&
         shipmentMeta.awb_number
@@ -5508,7 +5607,7 @@ export const createB2CShipmentService = async (
       // 4️⃣ WALLET TRANSACTION
       // Delhivery forward orders are charged at booking; other forward couriers are charged after manifest.
       const shouldDeferWalletDebit =
-        !isReverseShipment && !['delhivery', 'deliveryone'].includes(integrationType)
+        !isReverseShipment && !['delhivery', 'deliveryone', 'shadowfax'].includes(integrationType)
       const finalWalletDebit = walletDebit ?? 0
       if (shouldDeferWalletDebit) {
         console.log('ℹ️ Deferring wallet debit until manifest success for B2C order', {
@@ -9494,9 +9593,11 @@ const TRACKING_SYNC_TERMINAL_STATUSES = new Set([
   'cancelled',
   'rto_delivered',
   'manifest_failed',
+  'lost',
 ])
 
 const TRACKING_SYNC_INTERNAL_STATUSES = new Set([
+  'lost',
   'pending',
   'booked',
   'pickup_initiated',
@@ -9876,7 +9977,7 @@ const getTrackingProviderKey = (order: {
     .replace(/[\s_-]+/g, '')
   let providerKey = normalizeServiceProviderKey(order.integration_type)
 
-  if (!['delhivery', 'deliveryone', 'xpressbees'].includes(providerKey)) {
+  if (!['delhivery', 'deliveryone', 'xpressbees', 'shadowfax'].includes(providerKey)) {
     if (courierPartner.includes('deliveryone') || courierPartner.includes('delhiveryone')) {
       providerKey = 'deliveryone'
     } else if (courierPartner.includes('delhivery')) {
@@ -9893,6 +9994,12 @@ const fetchLiveTrackingForOrder = async (
   order: OrderSummary,
 ): Promise<ProviderNormalizedTracking | null> => {
   const providerKey = getTrackingProviderKey(order)
+
+  if (providerKey === 'shadowfax') {
+    const shadowfax = await getShadowfaxService()
+    const reverse = order.order_type === 'reverse'
+    return normalizeShadowfaxTracking(await shadowfax.trackOrder(reverse ? 'reverse' : 'forward', order.awb_number), reverse)
+  }
 
   if (providerKey === 'deliveryone') {
     const deliveryOneService = new DeliveryOneService()
@@ -10066,7 +10173,7 @@ const shouldSyncB2CTrackingStatus = (order: any) => {
   if (TRACKING_SYNC_TERMINAL_STATUSES.has(currentStatus)) return false
 
   const providerKey = getTrackingProviderKey(order)
-  return providerKey === 'deliveryone' || providerKey === 'xpressbees'
+  return providerKey === 'deliveryone' || providerKey === 'xpressbees' || providerKey === 'shadowfax'
 }
 
 const toB2COrderSummary = (order: any): OrderSummary => ({
@@ -10241,7 +10348,7 @@ export const syncB2COrderTrackingById = async (
   orderId: string,
   options: {
     userId?: string
-    provider?: 'delhivery' | 'deliveryone' | 'xpressbees'
+    provider?: 'delhivery' | 'deliveryone' | 'xpressbees' | 'shadowfax'
     emitEvents?: boolean
   } = {},
 ) => {
