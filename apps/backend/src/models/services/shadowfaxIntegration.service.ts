@@ -1,10 +1,20 @@
 import { createHash } from 'crypto'
 import { eq } from 'drizzle-orm'
+import { Pool } from 'pg'
 import { db, pool } from '../client'
 import { courierCredentials } from '../schema/courierCredentials'
 import { ShadowfaxConfig, ShadowfaxDirection, ShadowfaxError, ShadowfaxService, SHADOWFAX_BASES, shadowfaxBase } from './couriers/shadowfax.service'
 
 export const shadowfaxEnabled = () => process.env.SHADOWFAX_ENABLED === 'true'
+
+// Long-lived booking locks must not consume the shared application pool: otherwise
+// concurrent bookings could occupy every connection while waiting for their own DB work.
+// This separate bounded pool opens no connections while Shadowfax is inactive.
+export const shadowfaxBookingLockPool = new Pool({
+  ...pool.options, max: 2, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000,
+  allowExitOnIdle: true,
+})
+shadowfaxBookingLockPool.on('error', () => console.warn('[Shadowfax] Booking lock connection interrupted.'))
 
 export async function getShadowfaxConfig(): Promise<ShadowfaxConfig> {
   const [row] = await db.select().from(courierCredentials).where(eq(courierCredentials.provider, 'shadowfax')).limit(1)

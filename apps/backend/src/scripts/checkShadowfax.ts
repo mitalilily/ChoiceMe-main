@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { ShadowfaxService, ShadowfaxError, shadowfaxBase, validateShadowfaxOrder } from '../models/services/couriers/shadowfax.service'
 import { buildShadowfaxPayload, normalizeShadowfaxTracking, shadowfaxOrderId, shadowfaxStatus, shadowfaxWeightKg } from '../models/services/couriers/shadowfaxPayload'
-import { getShadowfaxService, placeShadowfaxBooking } from '../models/services/shadowfaxIntegration.service'
+import { getShadowfaxService, placeShadowfaxBooking, shadowfaxBookingLockPool } from '../models/services/shadowfaxIntegration.service'
 import { pool } from '../models/client'
 
 let checks = 0
@@ -208,6 +208,11 @@ async function main() {
   await check('disabled booking refuses before loading credentials or contacting carrier', async () => {
     delete process.env.SHADOWFAX_ENABLED
     await assert.rejects(() => getShadowfaxService(true), (e: any) => e.statusCode === 503)
+  })
+  await check('inactive booking lock pool is bounded and isolated from application pool', () => {
+    assert.notEqual(shadowfaxBookingLockPool, pool)
+    assert.equal(shadowfaxBookingLockPool.options.max, 2)
+    assert.equal(shadowfaxBookingLockPool.totalCount, 0)
   })
   console.log(`Shadowfax: ${checks} contract/safety groups passed. No live requests or bookings.`)
 }

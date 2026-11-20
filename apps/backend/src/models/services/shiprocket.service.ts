@@ -27,7 +27,7 @@ import {
   normalizeCourierId,
 } from '../../utils/delhiveryCourier'
 import { getBucketName } from '../../utils/functions'
-import { db, pool } from '../client'
+import { db } from '../client'
 import { b2b_orders } from '../schema/b2bOrders'
 import { b2c_orders } from '../schema/b2cOrders'
 import { invoicePreferences } from '../schema/invoicePreferences'
@@ -93,7 +93,7 @@ import { fetchPostalLocationsByPincode } from './location.service'
 import { getPaymentOptions } from './paymentOptions.service'
 import { calculateFreight } from './pricing/chargeableFreight'
 import { resolveBookingWarehouseSelection } from '../../utils/bookingWarehouseSelection'
-import { getShadowfaxService, placeShadowfaxBooking, shadowfaxEnabled } from './shadowfaxIntegration.service'
+import { getShadowfaxService, placeShadowfaxBooking, shadowfaxEnabled, shadowfaxBookingLockPool } from './shadowfaxIntegration.service'
 import { buildShadowfaxPayload, normalizeShadowfaxTracking, shadowfaxWeightKg } from './couriers/shadowfaxPayload'
 import { SHADOWFAX_COURIER_ID } from './couriers/shadowfax.service'
 
@@ -3957,7 +3957,7 @@ export const createB2CShipmentService = async (
   if (!params.order_number) throw new HttpError(400, 'Order number is required.')
   if (params.payment_type !== 'reverse' && !params.isReverse && Number(params.courier_id) !== SHADOWFAX_COURIER_ID) throw new HttpError(400, 'Select a valid Shadowfax courier.')
   params.integration_type = 'shadowfax'
-  const lock = await pool.connect()
+  const lock = await shadowfaxBookingLockPool.connect()
   const lockKey = `shadowfax:${userId}:${params.order_number}`
   let locked = false
   try {
