@@ -71,6 +71,9 @@ wait_health 5013
 
 # An authenticated read check must pass against the candidate before routing traffic.
 BASE_URL=http://127.0.0.1:5013 node "$SOURCE/scripts/ops/verify-shipping-release.cjs"
+if [ -f "$STAGE/backend/migration_add_shadowfax.sql" ]; then
+  BASE_URL=http://127.0.0.1:5013 node "$SOURCE/scripts/ops/verify-shadowfax-release.cjs"
+fi
 
 sed 's#proxy_pass http://127.0.0.1:5012;#proxy_pass http://127.0.0.1:5013;#' "$BACKUP/nginx.conf" > "$BACKUP/nginx-candidate.conf"
 install -m 644 "$BACKUP/nginx-candidate.conf" "$NGINX"
@@ -95,6 +98,9 @@ rsync -a --delete "$STAGE/backend/dist/" "$SOURCE/apps/backend/dist/"
 pm2 restart choicemee-api
 wait_health 5012
 BASE_URL=http://127.0.0.1:5012 node "$SOURCE/scripts/ops/verify-shipping-release.cjs"
+if [ -f "$STAGE/backend/migration_add_shadowfax.sql" ]; then
+  BASE_URL=http://127.0.0.1:5012 node "$SOURCE/scripts/ops/verify-shadowfax-release.cjs"
+fi
 install -m 644 "$BACKUP/nginx.conf" "$NGINX"
 nginx -t
 nginx -s reload
