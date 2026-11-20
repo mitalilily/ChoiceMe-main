@@ -1052,6 +1052,7 @@ export const createCourier = async (data: {
       id: courierId,
       serviceProvider: normalizedProvider,
       businessType: businessType,
+      ...(normalizedProvider === 'shadowfax' ? { isEnabled: false } : {}),
     } as any)
     .returning()
 
