@@ -3951,6 +3951,9 @@ export const createB2CShipmentService = async (
   const provider = normalizeServiceProviderKey(params.integration_type || getIntegrationTypeFromProviderCode(params.provider_code))
   if (provider !== 'shadowfax') return createB2CShipmentServiceImpl(params, userId, is_external_api, options)
   await getShadowfaxService(true)
+  const [shadowfaxCourier] = await db.select({ enabled: couriers.isEnabled }).from(couriers)
+    .where(and(eq(couriers.id, SHADOWFAX_COURIER_ID), eq(couriers.serviceProvider, 'shadowfax'))).limit(1)
+  if (!shadowfaxCourier?.enabled) throw new HttpError(503, 'Shadowfax courier is not enabled for booking.')
   if (!params.order_number) throw new HttpError(400, 'Order number is required.')
   if (params.payment_type !== 'reverse' && !params.isReverse && Number(params.courier_id) !== SHADOWFAX_COURIER_ID) throw new HttpError(400, 'Select a valid Shadowfax courier.')
   params.integration_type = 'shadowfax'
