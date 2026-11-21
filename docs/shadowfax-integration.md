@@ -1,6 +1,6 @@
 # Shadowfax forward and reverse APIs
 
-Status: API implementation deployed inactive. Credentials and carrier end-to-end verification are pending. No real shipment was created during implementation. Existing couriers retain their existing configuration and billing behavior.
+Status (November 21, 2026): the token-only admin card and B2C pricing/catalog changes are deployed. The supplied production token is saved, and forward/reverse read-only production rate calls passed. Booking remains intentionally inactive; shipment/callback/POD end-to-end verification is still pending. No real shipment was created. Existing couriers retain their configuration and billing behavior.
 
 ## Credential card and rate-card setup
 
@@ -21,6 +21,14 @@ checks a single masked, empty input and saved metadata. `scripts/ops/verify-shad
 checks authenticated catalogs and credential/rate access. `verify-shadowfax-rates.cjs` exercises
 the real rate service using a private QA plan inside one confirmed rolled-back transaction;
 it never assigns a plan to a seller, commits rates, or contacts a courier.
+
+Release verification passed for the three credential-card/submission tests, 27 Shadowfax
+contract/safety groups, transactional rate-card create/read/update, seller-isolated exports,
+warehouse completeness, label preferences, authorization and credential redaction.
+The reviewed deployment retains old hashed frontend assets and uses a checked candidate API
+during the main process restart. Both deployment paths share the VPS deployment lock.
+Browser visual verification was unavailable in this session; the card was checked by rendering
+and automated assertions, not a claimed live browser walkthrough.
 
 Source documentation: [Forward quickstart](https://developer.shadowfax.in/docs/forward-logistics/quickstart), [forward API reference](https://developer.shadowfax.in/docs/api/forward-logistics), [reverse quickstart](https://developer.shadowfax.in/docs/reverse-logistics/quickstart), [reverse API reference](https://developer.shadowfax.in/docs/api/reverse-logistics). Reviewed November 20, 2026. The reference navigation lists 14 forward and 9 reverse operations; shared endpoints are intentionally listed under both directions below. Authentication is additional.
 
