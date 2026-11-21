@@ -87,7 +87,15 @@ export const isAdminMiddleware = async (req: any, res: Response, next: NextFunct
       }
 
       const permissionKey = getPermissionKeyForRequest(req.originalUrl || req.url)
-      if (!hasRequiredAccess(parseModuleAccess(employee.moduleAccess), permissionKey, req.method)) {
+      const moduleAccess = parseModuleAccess(employee.moduleAccess)
+      // The newly protected rate-card read must remain available to pricing staff,
+      // without granting them courier configuration or credentials permissions.
+      const requestUrl = new URL(req.originalUrl || req.url, 'http://internal')
+      const businessType = String(requestUrl.searchParams.get('businessType') || '').toLowerCase()
+      const pricingRead = req.method === 'GET' && requestUrl.pathname === '/api/admin/couriers/shipping-rates' &&
+        (businessType === 'b2c' || businessType === 'b2b') &&
+        hasRequiredAccess(moduleAccess, `pricing_${businessType}`, 'GET')
+      if (!hasRequiredAccess(moduleAccess, permissionKey, req.method) && !pricingRead) {
         return res.status(403).json({ message: 'You do not have permission for this action' })
       }
     }

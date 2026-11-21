@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Share the VPS auto-deployer lock so reviewed and automatic rollouts cannot overlap.
+exec 9>/opt/choicemee/deploy.lock
+flock -n 9 || { echo 'Another ChoiceMee deployment is running'; exit 1; }
+
 SOURCE=/opt/choicemee/source
 ENV_FILE=/opt/choicemee/shared/backend.env
 WEB=/var/www/choicemee/app
